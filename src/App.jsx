@@ -1,0 +1,943 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAccount, useDisconnect } from 'wagmi'
+import { useAppKit } from '@reown/appkit/react'
+
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const PHOTOS = [
+  { id:1, username:'Scarlett_V',  link:'OnlyFans',   votes:48200, myVotes:0, img:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80' },
+  { id:2, username:'Luna_Rose',   link:'Instagram',  votes:31750, myVotes:0, img:'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=600&q=80' },
+  { id:3, username:'Mia_Noir',    link:'Twitter/X',  votes:27400, myVotes:0, img:'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&q=80' },
+  { id:4, username:'Jade_Storm',  link:'Linktree',   votes:19880, myVotes:0, img:'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=600&q=80' },
+  { id:5, username:'Aria_Blaze',  link:'Website',    votes:14320, myVotes:0, img:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80' },
+]
+
+const TIERS = [
+  { label:'Bronze',   min:50,   max:99,       boost:'1.1×',  apr:'8%'  },
+  { label:'Silver',   min:100,  max:249,      boost:'1.25×', apr:'12%' },
+  { label:'Gold',     min:250,  max:499,      boost:'1.5×',  apr:'18%' },
+  { label:'Platinum', min:500,  max:999,      boost:'1.75×', apr:'24%' },
+  { label:'Diamond',  min:1000, max:Infinity, boost:'2×',    apr:'32%' },
+]
+
+const CONTRACT_TEXT = `IRREVOCABLE RIGHTS GRANT AND SUBMISSION AGREEMENT ("Agreement")
+
+THIS AGREEMENT is entered into as of the date of electronic acceptance between the individual executing this Agreement ("Submitter") and Blockchain Entertainment LLC ("Company").
+
+1. IRREVOCABLE GRANT OF RIGHTS. Submitter hereby irrevocably, unconditionally, perpetually, and globally grants to the Company its exclusive, royalty-free right and license to use, reproduce, modify, distribute, display, perform, broadcast, publish, and create derivative works of the submitted photograph and profile ("Content") in any medium, format, or technology now known or hereafter developed, for any and all purposes, without limitation of time, geography, or compensation to Submitter. This grant is perpetual and shall survive termination of any relationship between the parties.
+
+2. WAIVER OF MORAL RIGHTS. Submitter expressly and irrevocably waives all moral rights, rights of attribution, integrity rights, or similar rights in any jurisdiction worldwide.
+
+3. NO REVOCATION. This grant is irrevocable and may not be rescinded, withdrawn, or modified at any time for any reason. Submitter permanently relinquishes any right to demand removal, alteration, or cessation of use of the Content.
+
+4. REPRESENTATIONS & WARRANTIES. Submitter warrants that: (a) Submitter is the sole author and owner of the Content; (b) Submitter is at least 18 years of age; (c) the Content does not infringe any third-party rights; (d) the Content complies with SFW standards as defined by the laws of all applicable jurisdictions, currently in effect and as amended in the future; (e) all persons depicted have provided written consent.
+
+5. WALLET ADDRESS. Payment of prizes shall be made solely to the wallet address provided. The Company bears NO obligation to verify the accuracy of any wallet address. Any error results in permanent, irrecoverable loss of funds. Transactions on the Base blockchain are irreversible.
+
+6. EXTERNAL LINKS. The Company has no affiliation with, endorsement of, or responsibility for any external website linked from Submitter's profile. The Company expressly disclaims all liability arising from such links.
+
+7. CONTENT MODERATION. The Company reserves the sole and absolute right to approve, reject, or remove any Content at any time without liability.
+
+8. GOVERNING LAW. This Agreement shall be governed by the laws of the State of Florida, United States, and enforced in accordance with applicable EU law where required.
+
+9. BINDING EFFECT. This Agreement is legally binding upon electronic acceptance and submission of 1 $TTS as a cryptographic signing mechanism on the Base blockchain, constituting a legal signature under the U.S. ESIGN Act and EU eIDAS Regulation.
+
+BY PROCEEDING, SUBMITTER ACKNOWLEDGES HAVING READ, UNDERSTOOD, AND AGREED TO BE LEGALLY BOUND BY THIS AGREEMENT IN ITS ENTIRETY.`
+
+// ── STYLES ─────────────────────────────────────────────────────────────────
+const S = `
+  :root {
+    --void:#05050a; --deep:#0c0c14; --surface:#12121e; --surface2:#1a1a2a;
+    --border:rgba(212,175,55,0.18); --border2:rgba(255,255,255,0.06);
+    --gold:#d4af37; --gold-light:#f0d060; --gold-dim:rgba(212,175,55,0.6);
+    --crimson:#8b1a2a; --crimson-glow:#c0253a; --rose:#e8405a;
+    --green:#2ecc71; --text:#f0e8d8; --muted:rgba(240,232,216,0.5);
+    --font-d:'Cormorant Garamond',serif; --font-b:'Montserrat',sans-serif;
+  }
+  .app { min-height:100vh; background:var(--void); overflow-x:hidden; font-family:var(--font-b); }
+
+  /* WALLET BAR */
+  .wbar { background:linear-gradient(135deg,#0e0e1a,#141424); border-bottom:1px solid var(--border);
+    padding:12px 18px; position:sticky; top:0; z-index:100; backdrop-filter:blur(20px); }
+  .wbar-inner { max-width:520px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .wlogo img { width:46px; height:46px; object-fit:contain; display:block; }
+  .wbal { display:flex; flex-direction:column; align-items:center; }
+  .wlabel { font-size:.56rem; letter-spacing:.18em; color:var(--muted); text-transform:uppercase; }
+  .wamt { font-family:var(--font-d); font-size:1.5rem; font-weight:600; color:var(--gold-light); line-height:1.1; }
+  .wamt span { font-size:.6rem; font-family:var(--font-b); color:var(--gold-dim); margin-left:3px; }
+  .waddr { font-size:.54rem; color:var(--muted); letter-spacing:.04em; margin-top:1px; }
+  .wbtns { display:flex; gap:6px; }
+  .btn-t { font-family:var(--font-b); font-size:.56rem; letter-spacing:.1em; text-transform:uppercase;
+    padding:6px 10px; border-radius:4px; border:1px solid var(--border); background:transparent;
+    color:var(--gold); cursor:pointer; transition:all .2s; }
+  .btn-t:hover { background:rgba(212,175,55,.1); border-color:var(--gold); }
+  .btn-conn { font-family:var(--font-b); font-size:.62rem; letter-spacing:.08em; text-transform:uppercase;
+    padding:9px 14px; border-radius:5px; border:1px solid var(--crimson-glow);
+    background:linear-gradient(135deg,var(--crimson),#a0203a); color:var(--text); cursor:pointer; transition:all .25s; }
+  .btn-conn:hover { background:linear-gradient(135deg,var(--crimson-glow),var(--rose)); box-shadow:0 0 18px rgba(192,37,58,.4); }
+
+  /* NAV */
+  .nav { background:var(--deep); border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+  .nav::-webkit-scrollbar { display:none; }
+  .nav-inner { display:flex; max-width:520px; margin:0 auto; padding:0 6px; }
+  .ni { flex-shrink:0; padding:13px 12px; font-size:.54rem; letter-spacing:.14em; text-transform:uppercase;
+    font-weight:600; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;
+    transition:all .2s; white-space:nowrap; background:none; border-top:none; border-left:none;
+    border-right:none; font-family:var(--font-b); }
+  .ni:hover { color:var(--text); }
+  .ni.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  /* MAIN */
+  .main { max-width:520px; margin:0 auto; padding-bottom:60px; }
+
+  /* SECTION HEAD */
+  .shead { padding:26px 20px 12px; text-align:center; }
+  .shead h2 { font-family:var(--font-d); font-size:2rem; font-weight:300; letter-spacing:.06em; font-style:italic; }
+  .shead p { font-size:.66rem; color:var(--muted); letter-spacing:.08em; margin-top:6px; }
+  .grule { width:46px; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); margin:8px auto; }
+
+  /* TIMER */
+  .wtimer { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:13px 16px; margin:0 16px 18px; display:flex; align-items:center; justify-content:space-between; }
+  .tl { font-size:.56rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .tv { font-family:var(--font-d); font-size:1.1rem; color:var(--gold-light); letter-spacing:.04em; }
+  .ldot { width:7px; height:7px; border-radius:50%; background:var(--rose); animation:pulse 1.5s infinite; }
+  .live-row { display:flex; align-items:center; gap:6px; }
+  .live-txt { font-size:.56rem; color:var(--rose); letter-spacing:.1em; text-transform:uppercase; }
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(232,64,90,.5);}50%{opacity:.7;box-shadow:0 0 0 5px rgba(232,64,90,0);} }
+
+  /* CAROUSEL */
+  .car-outer { padding:0 16px; }
+  .car-wrap { position:relative; overflow:hidden; border-radius:12px; touch-action:pan-y; }
+  .car-track { display:flex; transition:transform .38s cubic-bezier(.25,.46,.45,.94); will-change:transform; }
+  .car-track .pcard { min-width:100%; width:100%; flex-shrink:0; }
+  .car-arrow { position:absolute; top:38%; transform:translateY(-50%); z-index:20;
+    width:40px; height:70px; display:flex; align-items:center; justify-content:center;
+    background:rgba(5,5,10,.6); backdrop-filter:blur(6px);
+    border:1px solid rgba(212,175,55,.22); cursor:pointer; transition:all .22s;
+    color:var(--gold); font-size:1.6rem; line-height:1; user-select:none;
+    -webkit-tap-highlight-color:transparent; }
+  .car-arrow:hover { background:rgba(139,26,42,.7); border-color:var(--gold); }
+  .car-arrow:active { transform:translateY(-50%) scale(.93); }
+  .car-arrow.left { left:0; border-radius:0 8px 8px 0; border-left:none; }
+  .car-arrow.right { right:0; border-radius:8px 0 0 8px; border-right:none; }
+  .car-arrow.hidden { opacity:0; pointer-events:none; }
+  .car-footer { display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 0 4px; }
+  .car-dots { display:flex; gap:6px; align-items:center; }
+  .car-dot { width:6px; height:6px; border-radius:50%; background:rgba(212,175,55,.22); transition:all .25s; cursor:pointer; }
+  .car-dot.active { background:var(--gold); width:20px; border-radius:3px; }
+  .car-count { font-size:.56rem; color:var(--muted); letter-spacing:.1em; min-width:44px; text-align:center; }
+
+  /* PHOTO CARD */
+  .pcard { background:var(--surface); border:1px solid var(--border); overflow:hidden; }
+  .pimg-wrap { position:relative; aspect-ratio:3/4; overflow:hidden; user-select:none; }
+  .pimg-wrap img { width:100%; height:100%; object-fit:cover; pointer-events:none; display:block; transition:transform .6s ease; }
+  .pcard:hover .pimg-wrap img { transform:scale(1.03); }
+  .prank { position:absolute; top:12px; left:12px; background:rgba(0,0,0,.72);
+    border:1px solid var(--gold); color:var(--gold); font-family:var(--font-d); font-size:1.05rem;
+    padding:3px 10px; border-radius:4px; backdrop-filter:blur(8px); }
+  .pcounter { position:absolute; top:12px; right:12px; background:rgba(0,0,0,.7);
+    border:1px solid rgba(212,175,55,.3); color:var(--muted); font-size:.54rem;
+    padding:3px 9px; border-radius:4px; backdrop-filter:blur(8px); letter-spacing:.08em; }
+  .pno-dl { position:absolute; inset:0; z-index:10; cursor:default; }
+  .pinfo { padding:14px 16px; }
+  .pname { font-family:var(--font-d); font-size:1.3rem; font-style:italic; margin-bottom:5px; }
+  .plink { display:inline-flex; align-items:center; gap:5px; font-size:.56rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--gold-dim); border:1px solid rgba(212,175,55,.2);
+    padding:4px 10px; border-radius:20px; cursor:pointer; transition:all .2s; background:none; font-family:var(--font-b); }
+  .plink:hover { color:var(--gold); border-color:var(--gold); }
+
+  /* VOTE SECTION */
+  .vsec { padding:14px 16px; background:var(--surface2); border-top:1px solid var(--border); }
+  .vtotal { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; }
+  .vtl { font-size:.56rem; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; }
+  .vta { font-family:var(--font-d); font-size:1.1rem; color:var(--gold-light); }
+  .vta span { font-size:.6rem; color:var(--muted); font-family:var(--font-b); }
+  .vbar-wrap { background:rgba(255,255,255,.04); border-radius:3px; height:3px; margin-bottom:12px; }
+  .vbar { height:3px; background:linear-gradient(90deg,var(--crimson),var(--rose)); border-radius:3px; transition:width .6s ease; }
+  .vinput-row { display:flex; gap:8px; align-items:center; }
+  .vinput { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    color:var(--text); font-family:var(--font-b); font-size:.85rem; padding:10px 12px;
+    outline:none; transition:border-color .2s; }
+  .vinput:focus { border-color:var(--gold); }
+  .vinput::placeholder { color:var(--muted); font-size:.7rem; }
+  .vbtn { background:linear-gradient(135deg,var(--crimson),#a0203a); color:var(--text); border:none;
+    border-radius:6px; padding:10px 18px; font-family:var(--font-b); font-size:.6rem;
+    letter-spacing:.1em; text-transform:uppercase; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
+  .vbtn:hover { background:linear-gradient(135deg,var(--crimson-glow),var(--rose)); box-shadow:0 4px 16px rgba(192,37,58,.4); }
+  .myvotes { font-size:.56rem; color:var(--gold-dim); margin-top:7px; letter-spacing:.06em; }
+
+  /* LEADERBOARD */
+  .lb-list { padding:0 16px; display:flex; flex-direction:column; gap:10px; }
+  .lbc { display:flex; align-items:center; gap:13px; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:13px; animation:cardIn .4s ease forwards; opacity:0; }
+  .lbc:nth-child(1){animation-delay:.05s;border-color:rgba(212,175,55,.4);}
+  .lbc:nth-child(2){animation-delay:.1s;}.lbc:nth-child(3){animation-delay:.15s;}
+  .lbc:nth-child(4){animation-delay:.2s;}.lbc:nth-child(5){animation-delay:.25s;}
+  @keyframes cardIn { from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);} }
+  .lbrank { font-family:var(--font-d); font-size:1.5rem; font-weight:600; width:28px; text-align:center; flex-shrink:0; }
+  .r1{color:var(--gold);}.r2{color:#c0c0c0;}.r3{color:#cd7f32;}.r4,.r5{color:var(--muted);font-size:1.1rem;}
+  .lbthumb { width:50px; height:50px; border-radius:7px; object-fit:cover; flex-shrink:0; border:1px solid var(--border); pointer-events:none; }
+  .lbinfo { flex:1; min-width:0; }
+  .lbname { font-family:var(--font-d); font-size:1rem; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lbvotes { font-size:.6rem; color:var(--muted); letter-spacing:.06em; margin-top:2px; }
+  .lbvotes strong { color:var(--gold-light); font-family:var(--font-d); font-size:.88rem; }
+  .lb-bar-w { background:rgba(255,255,255,.05); border-radius:2px; height:3px; margin-top:6px; }
+  .lb-bar { height:3px; background:linear-gradient(90deg,var(--crimson),var(--rose)); border-radius:2px; transition:width .8s ease; }
+  .prize-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; margin:18px 16px; padding:18px; }
+  .prize-title { font-family:var(--font-d); font-size:1rem; font-style:italic; margin-bottom:12px; }
+  .prize-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .prize-cell { background:var(--surface2); border-radius:7px; padding:10px 12px; border:1px solid var(--border); }
+  .prize-cl { font-size:.52rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+  .prize-cv { font-size:.72rem; color:var(--gold); margin-top:3px; }
+
+  /* BUY/SELL/STAKE */
+  .bs-wrap { padding:0 16px; }
+  .bs-tabs { display:flex; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:4px; margin-bottom:18px; }
+  .bs-tab { flex:1; padding:10px; border:none; background:transparent; color:var(--muted);
+    font-family:var(--font-b); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; border-radius:6px; transition:all .2s; }
+  .bs-tab.active { background:linear-gradient(135deg,var(--crimson),#a0203a); color:var(--text); }
+  .flabel { font-size:.56rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; display:block; }
+  .finput { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:var(--font-b); font-size:.88rem; padding:12px 14px;
+    outline:none; transition:border-color .2s; margin-bottom:13px; }
+  .finput:focus { border-color:var(--gold); }
+  .fselect { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:var(--font-b); font-size:.82rem; padding:12px 14px;
+    outline:none; cursor:pointer; margin-bottom:13px; }
+  .fselect option { background:var(--deep); }
+  .rate-box { background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    padding:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:13px; }
+  .rate-l { font-size:.56rem; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; }
+  .rate-v { font-family:var(--font-d); font-size:1rem; color:var(--gold-light); }
+  .stk-info { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:15px; margin-bottom:14px; }
+  .stk-title { font-family:var(--font-d); font-size:1rem; font-style:italic; margin-bottom:11px; }
+  .stk-tiers { display:flex; flex-direction:column; gap:7px; }
+  .stk-tier { display:flex; justify-content:space-between; align-items:center; padding:10px 12px;
+    background:var(--surface); border-radius:6px; border:1px solid var(--border); cursor:pointer; transition:border-color .2s; }
+  .stk-tier.sel { border-color:var(--gold); }
+  .tn { font-size:.66rem; letter-spacing:.06em; }
+  .tn.Bronze{color:#cd7f32;}.tn.Silver{color:#c0c0c0;}.tn.Gold{color:var(--gold);}
+  .tn.Platinum{color:#e5e4e2;}.tn.Diamond{color:#b9f2ff;}
+  .tr2 { font-size:.56rem; color:var(--muted); }
+  .tboost { font-size:.62rem; color:var(--rose); font-weight:700; }
+  .tapr { font-size:.62rem; color:var(--gold-dim); }
+  .warn-box { background:rgba(192,37,58,.08); border:1px solid rgba(192,37,58,.25); border-radius:8px;
+    padding:12px; font-size:.58rem; color:var(--muted); line-height:1.7; margin-bottom:13px; }
+  .pbtn { background:linear-gradient(135deg,var(--crimson),#a0203a); color:var(--text); border:none;
+    border-radius:8px; padding:14px; font-family:var(--font-b); font-size:.66rem;
+    letter-spacing:.14em; text-transform:uppercase; font-weight:600; cursor:pointer; transition:all .25s; width:100%; }
+  .pbtn:hover { background:linear-gradient(135deg,var(--crimson-glow),var(--rose)); box-shadow:0 6px 24px rgba(192,37,58,.4); }
+  .sub-note { font-size:.56rem; color:var(--muted); text-align:center; line-height:1.6; margin-top:10px; }
+
+  /* SUBMIT */
+  .sub-wrap { padding:0 16px; }
+  .upbox { background:var(--surface); border:2px dashed var(--border); border-radius:12px;
+    padding:36px 20px; text-align:center; cursor:pointer; transition:all .25s; margin-bottom:18px; }
+  .upbox:hover { border-color:var(--gold-dim); background:var(--surface2); }
+  .upicon { font-size:2.2rem; display:block; margin-bottom:10px; opacity:.5; }
+  .uptxt { font-size:.66rem; color:var(--muted); letter-spacing:.08em; line-height:1.65; }
+  .uppreview { width:100%; border-radius:8px; max-height:260px; object-fit:cover; margin-bottom:13px; pointer-events:none; }
+  .cbox { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:15px;
+    margin:16px 0; max-height:180px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--crimson) transparent; }
+  .cbox::-webkit-scrollbar{width:3px;}.cbox::-webkit-scrollbar-track{background:transparent;}
+  .cbox::-webkit-scrollbar-thumb{background:var(--crimson);border-radius:2px;}
+  .ctxt { font-size:.58rem; color:var(--muted); line-height:1.85; white-space:pre-wrap; }
+  .chk-row { display:flex; align-items:flex-start; gap:11px; margin:13px 0; cursor:pointer; }
+  .chk-row input[type=checkbox] { width:17px; height:17px; flex-shrink:0; accent-color:var(--crimson-glow); cursor:pointer; margin-top:1px; }
+  .chk-lbl { font-size:.58rem; color:var(--muted); letter-spacing:.04em; line-height:1.65; }
+  .chk-lbl strong { color:var(--gold-dim); }
+  .cost-note { display:flex; align-items:center; justify-content:center; gap:8px;
+    background:rgba(212,175,55,.06); border:1px solid rgba(212,175,55,.2); border-radius:8px;
+    padding:11px; font-size:.62rem; color:var(--gold-dim); letter-spacing:.08em; margin-bottom:12px; }
+  .addr-warn { font-size:.56rem; color:var(--crimson-glow); letter-spacing:.04em; line-height:1.65; margin-bottom:16px; }
+  .support-note { font-size:.58rem; color:var(--muted); letter-spacing:.04em; line-height:1.7;
+    margin-bottom:13px; background:var(--surface2); border-radius:7px; padding:11px; border:1px solid var(--border); }
+  .mclose { background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:6px;
+    padding:10px; width:100%; cursor:pointer; font-family:var(--font-b); font-size:.62rem;
+    letter-spacing:.1em; text-transform:uppercase; margin-top:7px; transition:all .2s; }
+  .mclose:hover { color:var(--text); border-color:var(--muted); }
+
+  /* RULES */
+  .rules-wrap { padding:0 16px; display:flex; flex-direction:column; gap:11px; }
+  .rcard { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:17px; animation:cardIn .4s ease forwards; opacity:0; }
+  .rcard:nth-child(1){animation-delay:.05s;}.rcard:nth-child(2){animation-delay:.1s;}
+  .rcard:nth-child(3){animation-delay:.15s;}.rcard:nth-child(4){animation-delay:.2s;}
+  .rcard:nth-child(5){animation-delay:.25s;}.rcard:nth-child(6){animation-delay:.3s;}
+  .rnum { font-family:var(--font-d); font-size:1.5rem; color:rgba(212,175,55,.2); font-weight:300; line-height:1; margin-bottom:5px; }
+  .rtitle { font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text); font-weight:600; margin-bottom:5px; }
+  .rbody { font-size:.65rem; color:var(--muted); line-height:1.75; }
+
+  /* FAQ */
+  .faq-wrap { padding:0 16px; display:flex; flex-direction:column; gap:9px; }
+  .faq-item { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; animation:cardIn .4s ease forwards; opacity:0; }
+  .faq-q { padding:15px 17px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; gap:12px; }
+  .faq-qt { font-size:.66rem; letter-spacing:.06em; color:var(--text); font-weight:500; }
+  .faq-ch { color:var(--gold-dim); font-size:.78rem; flex-shrink:0; transition:transform .25s; }
+  .faq-ch.open { transform:rotate(180deg); }
+  .faq-a { padding:0 17px 14px; font-size:.63rem; color:var(--muted); line-height:1.78; border-top:1px solid var(--border); padding-top:12px; }
+
+  /* MODAL */
+  .moverlay { position:fixed; inset:0; background:rgba(0,0,0,.86); z-index:500;
+    display:flex; align-items:flex-end; justify-content:center; backdrop-filter:blur(6px); animation:fadeIn .2s ease; }
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .msheet { background:var(--deep); border:1px solid var(--border); border-radius:20px 20px 0 0;
+    width:100%; max-width:520px; padding:24px 20px 36px; animation:slideUp .3s cubic-bezier(.34,1.56,.64,1); max-height:85vh; overflow-y:auto; }
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .mhandle { width:34px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 17px; }
+  .mtitle { font-family:var(--font-d); font-size:1.5rem; font-style:italic; margin-bottom:5px; }
+  .msub { font-size:.62rem; color:var(--muted); letter-spacing:.08em; margin-bottom:16px; }
+  .wopt { display:flex; align-items:center; gap:13px; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:14px; margin-bottom:9px; cursor:pointer; transition:all .2s; }
+  .wopt:hover { border-color:var(--gold-dim); background:var(--surface2); }
+  .wopt-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0; }
+  .wopt-name { font-size:.76rem; font-weight:600; letter-spacing:.04em; display:flex; align-items:center; gap:7px; }
+  .wopt-desc { font-size:.56rem; color:var(--muted); margin-top:2px; }
+  .live-pill { font-size:.46rem; background:rgba(46,204,113,.13); color:#2ecc71; border:1px solid rgba(46,204,113,.3); border-radius:3px; padding:1px 5px; letter-spacing:.08em; }
+  .hosted-pill { font-size:.46rem; background:rgba(255,255,255,.05); color:var(--muted); border:1px solid rgba(255,255,255,.08); border-radius:3px; padding:1px 5px; letter-spacing:.08em; }
+  .pid-box { background:rgba(212,175,55,.06); border:1px solid rgba(212,175,55,.18); border-radius:8px; padding:9px 12px; margin-bottom:13px; font-size:.56rem; color:var(--gold-dim); letter-spacing:.04em; line-height:1.65; }
+
+  /* TRANSFER MODAL */
+  .base-l { font-size:.56rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; display:block; }
+  .base-addr { background:var(--surface2); border:1px solid var(--border); border-radius:7px; padding:11px; margin-bottom:13px; font-size:.66rem; color:var(--gold); font-family:monospace; word-break:break-all; }
+  .irrev { font-size:.56rem; color:var(--crimson-glow); letter-spacing:.04em; line-height:1.65; margin-bottom:13px; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(70px);
+    background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    padding:12px 20px; font-size:.66rem; letter-spacing:.06em; color:var(--text); z-index:1000;
+    white-space:nowrap; transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .3s;
+    opacity:0; max-width:90vw; text-align:center; }
+  .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+  .toast.s { border-color:rgba(212,175,55,.5); }
+  .toast.e { border-color:rgba(232,64,90,.5); }
+
+  /* NFT EMPTY */
+  .nft-empty { text-align:center; padding:50px 20px; color:var(--muted); font-size:.7rem; letter-spacing:.08em; line-height:1.9; margin:0 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+  .nft-ei { font-size:2.5rem; display:block; margin-bottom:12px; opacity:.35; }
+
+  ::-webkit-scrollbar{width:4px;height:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px;}
+
+  @media(min-width:700px){
+    .wbar-inner,.nav-inner,.main{max-width:640px;}
+    .car-outer{max-width:580px;margin:0 auto;}
+  }
+`
+
+// ── HELPERS ─────────────────────────────────────────────────────────────────
+function shortAddr(a) {
+  if (!a) return ''
+  return a.slice(0,6) + '…' + a.slice(-4)
+}
+
+function useCountdown() {
+  const [t, setT] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      const sun = new Date(now)
+      sun.setUTCHours(23,59,59,999)
+      while (sun.getUTCDay() !== 0) sun.setUTCDate(sun.getUTCDate()+1)
+      const d = sun - now
+      const da = Math.floor(d/86400000)
+      const h = Math.floor((d%86400000)/3600000)
+      const m = Math.floor((d%3600000)/60000)
+      const s = Math.floor((d%60000)/1000)
+      setT(`${da}d ${h}h ${m}m ${s}s`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return t
+}
+
+function useToast() {
+  const [t, setT] = useState({ msg:'', type:'s', show:false })
+  const show = useCallback((msg, type='s') => {
+    setT({ msg, type, show:true })
+    setTimeout(() => setT(x => ({ ...x, show:false })), 3200)
+  }, [])
+  return [t, show]
+}
+
+// ── WALLET MODAL ─────────────────────────────────────────────────────────────
+function WalletModal({ onClose, showToast }) {
+  const { open } = useAppKit()
+  const [connecting, setConnecting] = useState(null)
+
+  const connectMetaMask = async () => {
+    setConnecting('MetaMask')
+    const provider = window.ethereum
+    if (!provider) {
+      window.open('https://metamask.io/download/', '_blank')
+      showToast('MetaMask not found — opening download page', 'e')
+      setConnecting(null)
+      return
+    }
+    try {
+      try {
+        await provider.request({ method:'wallet_switchEthereumChain', params:[{ chainId:'0x2105' }] })
+      } catch (switchErr) {
+        if (switchErr.code === 4902 || switchErr.code === -32603) {
+          await provider.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0x2105',
+              chainName: 'Base',
+              nativeCurrency: { name:'Ether', symbol:'ETH', decimals:18 },
+              rpcUrls: ['https://mainnet.base.org'],
+              blockExplorerUrls: ['https://basescan.org']
+            }]
+          })
+        } else throw switchErr
+      }
+      const accounts = await provider.request({ method:'eth_requestAccounts' })
+      if (!accounts || accounts.length === 0) throw new Error('No accounts')
+      showToast('MetaMask connected on Base ✓', 's')
+    } catch (e) {
+      if (e.code === 4001) showToast('Connection rejected', 'e')
+      else showToast('MetaMask error — see console', 'e')
+      console.error(e)
+    }
+    setConnecting(null)
+    onClose()
+  }
+
+  const connectWalletConnect = () => {
+    onClose()
+    open()
+  }
+
+  const wallets = [
+    { name:'MetaMask', desc: window.ethereum?.isMetaMask ? 'Detected — ready to connect' : 'Install extension or open in MetaMask browser', icon:'🦊', bg:'#f6851b22', action:connectMetaMask, live:true },
+    { name:'WalletConnect', desc:'Scan QR code with any mobile wallet', icon:'🔗', bg:'#3b99fc22', action:connectWalletConnect, live:true },
+    { name:'Trust Wallet', desc:'Open this page inside the Trust Wallet browser', icon:'🛡️', bg:'#3375bb22', action:() => { showToast('Open this URL inside Trust Wallet app browser', 'e'); onClose() }, live:false },
+    { name:'Coinbase Wallet', desc: window.coinbaseWalletExtension ? 'Detected — ready to connect' : 'Install extension or open in Coinbase browser', icon:'🔵', bg:'#0052ff22', action:connectWalletConnect, live:true },
+  ]
+
+  return (
+    <div className="moverlay" onClick={onClose}>
+      <div className="msheet" onClick={e => e.stopPropagation()}>
+        <div className="mhandle" />
+        <div className="mtitle">Connect Wallet</div>
+        <div className="msub">Connect to Base network to use $TTS</div>
+        <div className="pid-box">⬡ Base Mainnet · Chain ID 8453 · Reown Project Active</div>
+        {wallets.map(w => (
+          <div key={w.name} className="wopt" onClick={w.action}>
+            <div className="wopt-icon" style={{ background:w.bg }}>
+              {connecting === w.name ? '⏳' : w.icon}
+            </div>
+            <div style={{ flex:1 }}>
+              <div className="wopt-name">
+                {w.name}
+                {w.live
+                  ? <span className="live-pill">LIVE</span>
+                  : <span className="hosted-pill">IN BROWSER</span>
+                }
+              </div>
+              <div className="wopt-desc">{w.desc}</div>
+            </div>
+          </div>
+        ))}
+        <button className="mclose" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+// ── TRANSFER MODAL ────────────────────────────────────────────────────────────
+function TransferModal({ dir, onClose, showToast }) {
+  const [amt, setAmt] = useState('')
+  const [addr, setAddr] = useState('')
+
+  const go = () => {
+    if (!amt || isNaN(amt) || Number(amt) <= 0) { showToast('Enter a valid amount', 'e'); return }
+    if (dir === 'out' && !addr) { showToast('Enter destination address', 'e'); return }
+    showToast(`${dir === 'in' ? 'Deposit' : 'Withdrawal'} of ${amt} $TTS initiated on Base`, 's')
+    onClose()
+  }
+
+  return (
+    <div className="moverlay" onClick={onClose}>
+      <div className="msheet" onClick={e => e.stopPropagation()}>
+        <div className="mhandle" />
+        <div className="mtitle">{dir === 'in' ? 'Deposit $TTS' : 'Withdraw $TTS'}</div>
+        <div className="msub">{dir === 'in' ? 'Send $TTS from your external wallet to your in-app wallet on Base.' : 'Withdraw $TTS to an external Base wallet address.'}</div>
+        {dir === 'in' && (
+          <>
+            <span className="base-l">Your Deposit Address (Base)</span>
+            <div className="base-addr">0x51C73bc241c0BB1442d374C7833c186b40a5FAdB</div>
+          </>
+        )}
+        <label className="flabel">Amount ($TTS)</label>
+        <input className="finput" type="number" min="1" placeholder="Enter amount" value={amt} onChange={e => setAmt(e.target.value)} />
+        {dir === 'out' && (
+          <>
+            <label className="flabel">Destination Wallet Address (Base)</label>
+            <input className="finput" type="text" placeholder="0x…" value={addr} onChange={e => setAddr(e.target.value)} />
+            <div className="irrev">⚠ Verify your address carefully. Transactions on Base are irreversible. Blockchain Entertainment LLC bears no responsibility for funds sent to incorrect addresses.</div>
+          </>
+        )}
+        <button className="pbtn" onClick={go}>{dir === 'in' ? 'Confirm Deposit' : 'Confirm Withdrawal'}</button>
+        <button className="mclose" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+// ── PLAY SCREEN ───────────────────────────────────────────────────────────────
+function PlayScreen({ balance, setBalance, showToast, connected }) {
+  const [photos, setPhotos] = useState(() => [...PHOTOS].sort(() => Math.random() - .5))
+  const [va, setVa] = useState({})
+  const [idx, setIdx] = useState(0)
+  const cd = useCountdown()
+  const max = Math.max(...photos.map(p => p.votes), 1)
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
+
+  const goTo = n => setIdx(Math.max(0, Math.min(photos.length - 1, n)))
+
+  const onTouchStart = e => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+  const onTouchEnd = e => {
+    if (touchStartX.current === null) return
+    const dx = touchStartX.current - e.changedTouches[0].clientX
+    const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY)
+    if (Math.abs(dx) > 44 && Math.abs(dx) > dy * 1.5) { dx > 0 ? goTo(idx+1) : goTo(idx-1) }
+    touchStartX.current = null
+    touchStartY.current = null
+  }
+
+  const vote = id => {
+    if (!connected) { showToast('Connect your wallet to vote', 'e'); return }
+    const a = Number(va[id] || 0)
+    if (a < 5) { showToast('Minimum vote is 5 $TTS', 'e'); return }
+    if (a > balance) { showToast('Insufficient $TTS balance', 'e'); return }
+    setBalance(b => b - a)
+    setPhotos(prev => prev.map(p => p.id === id ? { ...p, votes:p.votes+a, myVotes:p.myVotes+a } : p))
+    setVa(v => ({ ...v, [id]:'' }))
+    showToast(`${a.toLocaleString()} $TTS voted! 🔥`, 's')
+  }
+
+  return (
+    <div>
+      <div className="shead">
+        <div style={{ fontSize:'.54rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Week of Mar 3–9, 2026</div>
+        <h2>Vote &amp; Win</h2>
+        <div className="grule" />
+        <p>Swipe or use arrows · Place $TTS to win 40% of the pool</p>
+      </div>
+
+      <div className="wtimer">
+        <div><div className="tl">Round Ends</div><div className="tv">{cd}</div></div>
+        <div className="live-row"><div className="ldot" /><span className="live-txt">Live</span></div>
+      </div>
+
+      <div className="car-outer">
+        <div className="car-wrap" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+
+          {/* LEFT ARROW */}
+          <div className={`car-arrow left${idx === 0 ? ' hidden' : ''}`} onClick={() => goTo(idx-1)}>‹</div>
+
+          {/* SLIDING TRACK */}
+          <div className="car-track" style={{ transform:`translateX(-${idx*100}%)` }}>
+            {photos.map((ph, i) => (
+              <div key={ph.id} className="pcard">
+                <div className="pimg-wrap">
+                  <div className="pno-dl" onContextMenu={e => e.preventDefault()} />
+                  <img src={ph.img} alt="" draggable="false" onContextMenu={e => e.preventDefault()} />
+                  <div className="prank">#{i+1}</div>
+                  <div className="pcounter">{i+1} / {photos.length}</div>
+                </div>
+                <div className="pinfo">
+                  <div className="pname">{ph.username}</div>
+                  <button className="plink">🔗 {ph.link}</button>
+                </div>
+                <div className="vsec">
+                  <div className="vtotal">
+                    <span className="vtl">Total Votes</span>
+                    <span className="vta">{ph.votes.toLocaleString()} <span>$TTS</span></span>
+                  </div>
+                  <div className="vbar-wrap">
+                    <div className="vbar" style={{ width:`${Math.round((ph.votes/max)*100)}%` }} />
+                  </div>
+                  <div className="vinput-row">
+                    <input className="vinput" type="number" min="5" placeholder="Min 5 $TTS"
+                      value={va[ph.id] || ''}
+                      onChange={e => setVa(v => ({ ...v, [ph.id]:e.target.value }))} />
+                    <button className="vbtn" onClick={() => vote(ph.id)}>Vote</button>
+                  </div>
+                  {ph.myVotes > 0 && <div className="myvotes">✦ Your votes this round: {ph.myVotes.toLocaleString()} $TTS</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* RIGHT ARROW */}
+          <div className={`car-arrow right${idx === photos.length-1 ? ' hidden' : ''}`} onClick={() => goTo(idx+1)}>›</div>
+
+        </div>
+
+        {/* DOTS + COUNTER */}
+        <div className="car-footer">
+          <div className="car-count">{idx+1} of {photos.length}</div>
+          <div className="car-dots">
+            {photos.map((_, i) => (
+              <div key={i} className={`car-dot${i === idx ? ' active' : ''}`} onClick={() => goTo(i)} />
+            ))}
+          </div>
+          <div className="car-count" style={{ textAlign:'right' }}>{Math.round((photos[idx].votes/max)*100)}% votes</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+function LeaderboardScreen() {
+  const sorted = [...PHOTOS].sort((a,b) => b.votes - a.votes)
+  const maxV = sorted[0].votes
+  const medals = ['🥇','🥈','🥉','4','5']
+  const rcs = ['r1','r2','r3','r4','r5']
+  return (
+    <div>
+      <div className="shead"><h2>Leaderboard</h2><div className="grule" /><p>Live rankings · Updated in real time</p></div>
+      <div style={{ padding:'0 16px 13px', display:'flex', justifyContent:'space-between', fontSize:'.56rem', color:'var(--muted)', letterSpacing:'.1em', textTransform:'uppercase' }}>
+        <span>Profile</span><span>Total $TTS</span>
+      </div>
+      <div className="lb-list">
+        {sorted.map((p,i) => (
+          <div key={p.id} className="lbc">
+            <div className={`lbrank ${rcs[i]}`}>{medals[i]}</div>
+            <img className="lbthumb" src={p.img} alt="" draggable="false" onContextMenu={e => e.preventDefault()} />
+            <div className="lbinfo">
+              <div className="lbname">{p.username}</div>
+              <div className="lbvotes"><strong>{p.votes.toLocaleString()}</strong> $TTS</div>
+              <div className="lb-bar-w"><div className="lb-bar" style={{ width:`${(p.votes/maxV)*100}%` }} /></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="prize-box">
+        <div className="prize-title">Prize Pool — Week of Mar 3–9, 2026</div>
+        <div className="prize-grid">
+          {[['🏆 Top Voter','40% + stake back'],['📸 Top Profile','40% of pool'],['🏢 Blockchain Ent.','10% of pool'],['💙 Polaris Project','10% donation']].map(([l,v]) => (
+            <div key={l} className="prize-cell"><div className="prize-cl">{l}</div><div className="prize-cv">{v}</div></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── NFT SCREEN ────────────────────────────────────────────────────────────────
+function NFTScreen() {
+  return (
+    <div>
+      <div className="shead"><h2>My NFTs</h2><div className="grule" /><p>Weekly winners receive exclusive on-chain NFT trophies</p></div>
+      <div className="nft-empty">
+        <span className="nft-ei">💎</span>
+        Win a weekly round to receive your exclusive NFT trophy.<br />
+        NFTs are minted on Base and held permanently in your wallet.
+      </div>
+    </div>
+  )
+}
+
+// ── BUY/SELL/STAKE ────────────────────────────────────────────────────────────
+function BuySellScreen({ showToast, connected }) {
+  const [tab, setTab] = useState('buy')
+  const [amt, setAmt] = useState('')
+  const [cur, setCur] = useState('ETH')
+  const [selTier, setSelTier] = useState(null)
+  const [lockPd, setLockPd] = useState('3 months')
+  const rate = 1200
+  const recv = amt ? (Number(amt) * rate).toLocaleString() : '—'
+
+  return (
+    <div>
+      <div className="shead"><h2>Buy · Sell · Stake</h2><div className="grule" /><p>Trade $TTS on Base · Stake to boost your votes</p></div>
+      <div className="bs-wrap">
+        <div className="bs-tabs">
+          {['buy','sell','stake'].map(t => (
+            <button key={t} className={`bs-tab${tab===t?' active':''}`} onClick={() => setTab(t)}>
+              {t.charAt(0).toUpperCase()+t.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {(tab === 'buy' || tab === 'sell') && (
+          <>
+            <label className="flabel">{tab === 'buy' ? 'You Pay' : 'You Send'}</label>
+            <input className="finput" type="number" placeholder="0.00" value={amt} onChange={e => setAmt(e.target.value)} />
+            <label className="flabel">Currency</label>
+            <select className="fselect" value={cur} onChange={e => setCur(e.target.value)}>
+              <option>ETH</option><option>USDC</option><option>DAI</option>
+            </select>
+            <div className="rate-box">
+              <span className="rate-l">You Receive</span>
+              <span className="rate-v">{tab === 'buy' ? recv + ' $TTS' : (amt ? (Number(amt)/rate).toFixed(4)+' '+cur : '—')}</span>
+            </div>
+            <div className="rate-box">
+              <span className="rate-l">Rate</span>
+              <span className="rate-v" style={{ fontSize:'.82rem' }}>1 ETH = {rate.toLocaleString()} $TTS</span>
+            </div>
+            <button className="pbtn" onClick={() => { if (!connected) { showToast('Connect your wallet first','e'); return } showToast(`${tab==='buy'?'Purchase':'Sale'} submitted on Base DEX`,'s') }}>
+              {tab === 'buy' ? 'Buy $TTS' : 'Sell $TTS'} on Base
+            </button>
+            <div className="sub-note">Powered by Base DEX · Also on Uniswap, Coinbase, and crypto.com</div>
+          </>
+        )}
+
+        {tab === 'stake' && (
+          <>
+            <div className="stk-info">
+              <div className="stk-title">Staking Tiers</div>
+              <div style={{ fontSize:'.58rem', color:'var(--muted)', marginBottom:12, lineHeight:1.65 }}>
+                Lock $TTS for 3–12 months. Earn APR + boosted votes. No early unlock. USD equivalent tracked via Chainlink Oracle.
+              </div>
+              <div className="stk-tiers">
+                {TIERS.map(t => (
+                  <div key={t.label} className={`stk-tier${selTier===t.label?' sel':''}`} onClick={() => setSelTier(t.label)}>
+                    <div>
+                      <div className={`tn ${t.label}`}>{t.label}</div>
+                      <div className="tr2">${t.min}–{t.max===Infinity?'1,000+':t.max} USD eq.</div>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <div className="tboost">{t.boost} Votes</div>
+                      <div className="tapr">{t.apr} APR</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <label className="flabel">Amount to Stake ($TTS)</label>
+            <input className="finput" type="number" placeholder="Min equivalent of $50 USD" value={amt} onChange={e => setAmt(e.target.value)} />
+            <label className="flabel">Lock Period</label>
+            <select className="fselect" value={lockPd} onChange={e => setLockPd(e.target.value)}>
+              <option>3 months</option><option>6 months</option><option>12 months</option>
+            </select>
+            <div className="warn-box">⚠ Once staked, funds are locked for the full selected period and cannot be unlocked early under any circumstances whatsoever.</div>
+            <button className="pbtn" onClick={() => { if (!connected) { showToast('Connect your wallet first','e'); return } showToast('Staking transaction submitted on Base','s') }}>
+              Stake $TTS
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
+function SubmitScreen({ balance, setBalance, showToast, connected }) {
+  const [prev, setPrev] = useState(null)
+  const [name, setName] = useState('')
+  const [lt, setLt] = useState('')
+  const [lu, setLu] = useState('')
+  const [wallet, setWallet] = useState('')
+  const [a1, setA1] = useState(false)
+  const [a2, setA2] = useState(false)
+  const fRef = useRef()
+
+  const handleFile = e => {
+    const f = e.target.files[0]
+    if (!f) return
+    if (!['image/jpeg','image/jpg','image/png'].includes(f.type)) { showToast('Only JPEG and PNG accepted','e'); return }
+    const r = new FileReader()
+    r.onload = ev => setPrev(ev.target.result)
+    r.readAsDataURL(f)
+  }
+
+  const submit = () => {
+    if (!connected) { showToast('Connect your wallet first','e'); return }
+    if (!prev) { showToast('Please upload a photo','e'); return }
+    if (!name.trim()) { showToast('Enter your display name','e'); return }
+    if (!wallet.trim()) { showToast('Enter your payout wallet address','e'); return }
+    if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
+    if (balance < 1) { showToast('Insufficient $TTS — 1 TTS required','e'); return }
+    setBalance(b => b - 1)
+    showToast('Submission sent for review! In-app notification when approved.', 's')
+    setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false)
+  }
+
+  return (
+    <div>
+      <div className="shead"><h2>Submit Profile</h2><div className="grule" /><p>Be voted on · Win $TTS · Promote yourself · 3 per week max</p></div>
+      <div className="sub-wrap">
+        <input ref={fRef} type="file" accept=".jpg,.jpeg,.png" style={{ display:'none' }} onChange={handleFile} />
+        {prev
+          ? <>
+              <img className="uppreview" src={prev} alt="" draggable="false" onContextMenu={e => e.preventDefault()} />
+              <button className="mclose" style={{ marginBottom:13 }} onClick={() => setPrev(null)}>Remove Photo</button>
+            </>
+          : <div className="upbox" onClick={() => fRef.current?.click()}>
+              <span className="upicon">📸</span>
+              <div className="uptxt">Tap to upload<br /><strong style={{ color:'var(--gold-dim)' }}>JPEG or PNG only</strong><br />High resolution · SFW required</div>
+            </div>
+        }
+        <label className="flabel">Display Name / Handle</label>
+        <input className="finput" type="text" placeholder="e.g. Scarlett_V" value={name} onChange={e => setName(e.target.value)} />
+        <label className="flabel">Link Button Title</label>
+        <input className="finput" type="text" placeholder='e.g. "Follow Me on Instagram"' value={lt} onChange={e => setLt(e.target.value)} />
+        <label className="flabel">External Link URL</label>
+        <input className="finput" type="url" placeholder="https://yourlink.com" value={lu} onChange={e => setLu(e.target.value)} />
+        <label className="flabel">Your Base Wallet Address (prize payouts)</label>
+        <input className="finput" type="text" placeholder="0x…" value={wallet} onChange={e => setWallet(e.target.value)} />
+        <div className="addr-warn">⚠ Double-check this address. Prizes sent to an incorrect address are permanently lost. We cannot recover misdirected funds.</div>
+        <div style={{ fontFamily:'var(--font-d)', fontSize:'1rem', fontStyle:'italic', marginBottom:9 }}>Legal Agreement</div>
+        <div className="cbox"><div className="ctxt">{CONTRACT_TEXT}</div></div>
+        <label className="chk-row">
+          <input type="checkbox" checked={a1} onChange={e => setA1(e.target.checked)} />
+          <span className="chk-lbl">I have read and <strong>irrevocably agree</strong> to the Rights Grant and Submission Agreement. I understand this grant is permanent, global, and cannot be revoked.</span>
+        </label>
+        <label className="chk-row">
+          <input type="checkbox" checked={a2} onChange={e => setA2(e.target.checked)} />
+          <span className="chk-lbl">I confirm I am 18+ years of age, the Content is SFW compliant, I own all rights to this photo, and I <strong>accept sole responsibility</strong> for the accuracy of my wallet address.</span>
+        </label>
+        <div className="cost-note"><span>💳</span><span>Submission costs <strong>1 $TTS</strong> — signed on Base blockchain</span></div>
+        <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
+        <button className="pbtn" onClick={submit}>Sign Contract &amp; Submit (1 $TTS)</button>
+      </div>
+    </div>
+  )
+}
+
+// ── RULES ─────────────────────────────────────────────────────────────────────
+function RulesScreen() {
+  const rules = [
+    { t:'Weekly Voting Cycle', b:'Each week begins Monday 00:00 UTC and ends Sunday 23:59 UTC. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
+    { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
+    { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 1 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
+    { t:'Prize Distribution', b:'Top Voter: 40% of winning pool + full stake returned.\nWinning Profile: 40% of pool.\nBlockchain Entertainment LLC: 10%.\nPolaris Project (501c3): 10%.\nLosing votes are burned after staking rewards are funded.' },
+    { t:'Staking', b:'Lock $TTS for 3–12 months to earn APR rewards and vote multipliers up to 2×. Rewards funded from a portion of losing votes. Once locked, funds cannot be accessed early under any circumstances.' },
+    { t:'Fairness & Privacy', b:'Voting and gameplay are anonymous. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
+  ]
+  return (
+    <div>
+      <div className="shead"><h2>Rules of the Game</h2><div className="grule" /><p>Understand the game · Play with confidence</p></div>
+      <div className="rules-wrap">
+        {rules.map((r,i) => (
+          <div key={i} className="rcard" style={{ animationDelay:`${i*.05}s` }}>
+            <div className="rnum">0{i+1}</div>
+            <div className="rtitle">{r.t}</div>
+            <div className="rbody" style={{ whiteSpace:'pre-line' }}>{r.b}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+function FAQScreen() {
+  const faqs = [
+    { q:'What is Temptation Token ($TTS)?', a:'$TTS is the native cryptocurrency of the Temptation Token platform on the Base blockchain. Use it to vote on profiles, submit your own, stake for rewards, and win prizes.' },
+    { q:'How do I get $TTS?', a:'New users receive 100 $TTS as a sign-up bonus. You can also buy $TTS via the Base DEX, Uniswap, Coinbase, or crypto.com. You need ETH or USDC on the Base network.' },
+    { q:'How do I connect my wallet?', a:'Tap Connect at the top of the app. We support MetaMask, WalletConnect, Trust Wallet, and Coinbase Wallet. Ensure you are on the Base network.' },
+    { q:'Can I download the photos?', a:'No. All submitted photos are the exclusive property of Blockchain Entertainment LLC. Right-click saving, drag-saving, and downloading are prohibited by our Terms of Service.' },
+    { q:'Can I remove my votes once placed?', a:'No. Votes are final and cannot be removed or reduced once placed. You may add additional votes to any profile at any time during the active week.' },
+    { q:'How are winners determined?', a:'The player who committed the most cumulative $TTS to the winning profile (most total votes by Sunday 23:59 UTC) is the Top Voter and receives 40% of that profile\'s pool plus their full stake returned.' },
+    { q:'What happens to losing votes?', a:'Losing votes are burned to preserve $TTS value and integrity, after a portion is set aside to fund staking rewards for active stakers.' },
+    { q:'When are prizes paid out?', a:'Prizes are distributed automatically via Base smart contract immediately after the round closes Sunday 23:59 UTC. Funds go directly to wallet addresses on file.' },
+    { q:'Who is the Polaris Project?', a:'The Polaris Project is a 501(c)(3) nonprofit dedicated to disrupting human trafficking globally. 10% of every weekly prize pool is donated to them. Blockchain Entertainment LLC reserves the right to change the designated nonprofit at any time.' },
+    { q:'Who do I contact for support?', a:'For photo or submission questions email photos@temptationtoken.io. All gameplay notifications are delivered in-app only.' },
+  ]
+  const [open, setOpen] = useState(null)
+  return (
+    <div>
+      <div className="shead"><h2>FAQ</h2><div className="grule" /><p>Frequently asked questions</p></div>
+      <div className="faq-wrap">
+        {faqs.map((f,i) => (
+          <div key={i} className="faq-item" style={{ animationDelay:`${i*.04}s` }}>
+            <div className="faq-q" onClick={() => setOpen(open===i?null:i)}>
+              <span className="faq-qt">{f.q}</span>
+              <span className={`faq-ch${open===i?' open':''}`}>▾</span>
+            </div>
+            {open===i && <div className="faq-a">{f.a}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── ROOT APP ──────────────────────────────────────────────────────────────────
+export default function App() {
+  const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
+  const [tab, setTab] = useState('play')
+  const [balance, setBalance] = useState(100)
+  const [showW, setShowW] = useState(false)
+  const [transDir, setTransDir] = useState(null)
+  const [toast, showToast] = useToast()
+
+  const tabs = [
+    { k:'buysell', l:'Buy/Sell' }, { k:'play', l:'Play' }, { k:'leaderboard', l:'Leaderboard' },
+    { k:'nfts', l:'NFTs' }, { k:'submit', l:'Submit' }, { k:'rules', l:'Rules' }, { k:'faqs', l:'FAQs' },
+  ]
+
+  const sp = { balance, setBalance, showToast, connected: isConnected }
+
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = S
+    document.head.appendChild(style)
+    return () => document.head.removeChild(style)
+  }, [])
+
+  return (
+    <div className="app">
+      {/* WALLET BAR */}
+      <div className="wbar">
+        <div className="wbar-inner">
+          <div className="wlogo">
+            <img src="/tts_logo.webp" alt="TTS" />
+          </div>
+          <div className="wbal">
+            <div className="wlabel">Balance</div>
+            <div className="wamt">{balance.toLocaleString()}<span>$TTS</span></div>
+            {isConnected && <div className="waddr">{shortAddr(address)} · Base</div>}
+          </div>
+          {isConnected
+            ? <div className="wbtns">
+                <button className="btn-t" onClick={() => setTransDir('in')}>↓ In</button>
+                <button className="btn-t" onClick={() => setTransDir('out')}>↑ Out</button>
+              </div>
+            : <button className="btn-conn" onClick={() => setShowW(true)}>Connect</button>
+          }
+        </div>
+      </div>
+
+      {/* NAV */}
+      <div className="nav">
+        <div className="nav-inner">
+          {tabs.map(t => (
+            <button key={t.k} className={`ni${tab===t.k?' active':''}`} onClick={() => setTab(t.k)}>{t.l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* SCREENS */}
+      <div className="main">
+        {tab==='play'        && <PlayScreen {...sp} />}
+        {tab==='leaderboard' && <LeaderboardScreen />}
+        {tab==='nfts'        && <NFTScreen />}
+        {tab==='buysell'     && <BuySellScreen {...sp} />}
+        {tab==='submit'      && <SubmitScreen {...sp} />}
+        {tab==='rules'       && <RulesScreen />}
+        {tab==='faqs'        && <FAQScreen />}
+      </div>
+
+      {/* MODALS */}
+      {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
+      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} />}
+
+      {/* TOAST */}
+      <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>
+    </div>
+  )
+}
