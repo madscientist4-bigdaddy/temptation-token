@@ -944,10 +944,6 @@ export default function App() {
   const [tab, setTab] = useState('play')
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
   const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
-  const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
-  const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
-  const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
-  const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
       const [balance, setBalance] = useState(100)
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
