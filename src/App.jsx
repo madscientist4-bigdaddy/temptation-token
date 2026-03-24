@@ -46,6 +46,7 @@ BY PROCEEDING, SUBMITTER ACKNOWLEDGES HAVING READ, UNDERSTOOD, AND AGREED TO BE 
 
 // ── STYLES ─────────────────────────────────────────────────────────────────
 const S = `
+  html { font-size: 18px; }
   :root {
     --void:#05050a; --deep:#0c0c14; --surface:#12121e; --surface2:#1a1a2a;
     --border:rgba(212,175,55,0.18); --border2:rgba(255,255,255,0.06);
