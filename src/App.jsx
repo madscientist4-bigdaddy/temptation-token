@@ -16,7 +16,8 @@ const TIERS = [
   { label:'Silver',   min:100,  max:249,      boost:'1.25×', apr:'12%' },
   { label:'Gold',     min:250,  max:499,      boost:'1.5×',  apr:'18%' },
   { label:'Platinum', min:500,  max:999,      boost:'1.75×', apr:'24%' },
-  { label:'Diamond',  min:1000, max:Infinity, boost:'2×',    apr:'32%' },
+  { label:'Diamond',  min:1000, max:4999,     boost:'2×',    apr:'32%' },
+  { label:'VIP',      min:5000, max:Infinity, boost:'3×',    apr:'45%' },
 ]
 
 const CONTRACT_TEXT = `IRREVOCABLE RIGHTS GRANT AND SUBMISSION AGREEMENT ("Agreement")
