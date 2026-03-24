@@ -878,77 +878,7 @@ function HowToWinScreen() {
   )
 }
 
-function HowToWinScreen() {
-  const steps = [
-    { icon:"🎟️", title:"Sign Up — Get 100 Free $TTS", body:"Every new user gets 100 $TTS automatically on signup. No purchase needed. Use them to vote right away." },
-    { icon:"📸", title:"Browse the Photos", body:"Swipe left or right through this week's profiles. Photos are in random order so everyone gets a fair shot." },
-    { icon:"🏆", title:"Pick Your Winner", body:"Find the profile you think will get the most votes by Sunday night. That is your bet." },
-    { icon:"💰", title:"Vote $TTS on That Profile", body:"Minimum 5 $TTS per vote. No maximum. The more you put on the winning profile, the bigger your edge. Votes cannot be removed." },
-    { icon:"👑", title:"Be the Top Voter on the Winning Profile", body:"The player who put the MOST $TTS specifically on the winning profile is the Top Voter." },
-    { icon:"💸", title:"Collect Your Prize", body:"Top Voter wins 40% of the winning profile's vote pool PLUS gets every $TTS they wagered returned. Goes straight to your wallet." },
-  ]
-  const tips = [
-    { t:"Vote Early, Vote Big", b:"Lock in a large vote early. Other players see the total — they will have to outspend you to take the top spot." },
-    { t:"Watch the Leaderboard", b:"Check live standings constantly. If your profile is climbing fast, top up your vote to protect your position." },
-    { t:"Stake for an Edge", b:"Stake $TTS in the Buy/Sell tab. Higher tiers multiply your vote weight 1.1x up to 2x — same TTS, more power." },
-    { t:"Focus Your TTS", b:"Only the winning profile pays out. TTS you put on losing profiles is burned. Pick one and go all in." },
-  ]
-  return (
-    <div>
-      <div className="shead">
-        <div style={{display:'inline-block',background:'rgba(212,175,55,.1)',border:'1px solid rgba(212,175,55,.3)',borderRadius:20,padding:'6px 16px',fontSize:'.72rem',letterSpacing:'.1em',color:'var(--gold)',textTransform:'uppercase',fontWeight:700,marginBottom:10}}>
-          📖 How to Play · How to Win
-        </div>
-        <h2>Simple. Strategic. Real Money.</h2>
-        <div className="grule"/>
-        <p>Read this once. Win $TTS every week.</p>
-      </div>
-      <div style={{padding:'0 16px',marginBottom:24}}>
-        <div style={{fontSize:'.65rem',letterSpacing:'.16em',textTransform:'uppercase',color:'var(--muted)',fontWeight:700,marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>The 6 Steps</div>
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {steps.map((s,i) => (
-            <div key={i} style={{display:'flex',gap:14,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:16,alignItems:'flex-start'}}>
-              <div style={{fontSize:'1.6rem',flexShrink:0,width:36,textAlign:'center'}}>{s.icon}</div>
-              <div>
-                <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--text)',marginBottom:5,lineHeight:1.4}}>Step {i+1} — {s.title}</div>
-                <div style={{fontSize:'.76rem',color:'var(--muted)',lineHeight:1.78}}>{s.body}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{padding:'0 16px',marginBottom:24}}>
-        <div style={{fontSize:'.65rem',letterSpacing:'.16em',textTransform:'uppercase',color:'var(--muted)',fontWeight:700,marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Winning Tips</div>
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          {tips.map((t,i) => (
-            <div key={i} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:15}}>
-              <div style={{fontSize:'.82rem',fontWeight:700,color:'var(--gold-light)',marginBottom:6}}>⚡ {t.t}</div>
-              <div style={{fontSize:'.76rem',color:'var(--muted)',lineHeight:1.78}}>{t.b}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{padding:'0 16px 32px'}}>
-        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
-          <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--text)',marginBottom:14}}>💰 Prize Breakdown — Every Week</div>
-          {[
-            ["🥇 Top Voter","40% of winning votes + full wager returned","var(--gold-light)"],
-            ["📸 Winning Profile","40% of winning votes","var(--gold-light)"],
-            ["🏢 Blockchain Ent.","10% to company wallet","var(--muted)"],
-            ["💙 Polaris Project","10% to nonprofit","var(--muted)"],
-            ["🔥 Losing votes","Burned — maintains token value","var(--muted)"],
-          ].map(([l,v,c]) => (
-            <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'11px 0',borderBottom:'1px solid var(--border2)',gap:12}}>
-              <span style={{fontSize:'.78rem',fontWeight:600,color:'var(--text)',flexShrink:0}}>{l}</span>
-              <span style={{fontSize:'.74rem',color:c,textAlign:'right',lineHeight:1.5}}>{v}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-// ── RULES ─────────────────────────────────────────────────────────────────────
+
 function RulesScreen() {
   const rules = [
     { t:'Weekly Voting Cycle', b:'Each week begins Monday 00:00 UTC and ends Sunday 23:59 UTC. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
@@ -1014,9 +944,7 @@ export default function App() {
   const [tab, setTab] = useState('play')
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
   const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
-  const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
-  const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
-  const [balance, setBalance] = useState(100)
+      const [balance, setBalance] = useState(100)
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
   const [toast, showToast] = useToast()
