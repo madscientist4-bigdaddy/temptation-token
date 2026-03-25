@@ -10,26 +10,26 @@ const injectStyles = () => {
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --void: #05050a;
-      --deep: #0c0c14;
-      --surface: #111120;
-      --surface2: #181828;
-      --surface3: #1e1e32;
-      --border: rgba(212,175,55,0.14);
-      --border2: rgba(255,255,255,0.06);
-      --gold: #d4af37;
-      --gold-light: #f0d060;
+      --void: #f5f5f5;
+      --deep: #ffffff;
+      --surface: #ffffff;
+      --surface2: #f0f0f0;
+      --surface3: #e8e8e8;
+      --border: rgba(0,0,0,0.12);
+      --border2: rgba(0,0,0,0.07);
+      --gold: #8b6914;
+      --gold-light: #6b4f0a;
       --gold-dim: rgba(212,175,55,0.55);
       --crimson: #8b1a2a;
       --crimson-glow: #c0253a;
       --rose: #e8405a;
-      --green: #2ecc71;
+      --green: #1a7a3c;
       --green-dim: rgba(46,204,113,0.15);
       --red-dim: rgba(232,64,90,0.15);
       --amber: #f39c12;
       --amber-dim: rgba(243,156,18,0.15);
-      --text: #f0e8d8;
-      --muted: rgba(240,232,216,0.45);
+      --text: #1a1a1a;
+      --muted: #555555;
       --font-display: 'Cormorant Garamond', serif;
       --font-body: 'Montserrat', sans-serif;
       --sidebar-w: 220px;
@@ -40,6 +40,7 @@ const injectStyles = () => {
       background: var(--void);
       color: var(--text);
       font-family: var(--font-body);
+      font-size: 16px;
     }
 
     /* GRAIN */
@@ -50,7 +51,7 @@ const injectStyles = () => {
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
       pointer-events: none;
       z-index: 9999;
-      opacity: 0.3;
+      opacity: 0;
     }
 
     /* LOGIN */
@@ -59,7 +60,7 @@ const injectStyles = () => {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: radial-gradient(ellipse at 50% 0%, rgba(139,26,42,0.18) 0%, var(--void) 70%);
+      background: #ececec;
       padding: 24px;
     }
     .login-card {
