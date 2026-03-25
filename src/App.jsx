@@ -809,6 +809,97 @@ function SubmitScreen({ balance, setBalance, showToast, connected }) {
 }
 
 
+
+function ReferScreen({ showToast, connected }) {
+  const { address } = useAccount()
+  const [copied, setCopied] = useState(false)
+  const referralLink = address
+    ? `https://app.temptationtoken.io?ref=${address.slice(2,10)}`
+    : 'Connect wallet to get your link'
+
+  const copy = () => {
+    if (!connected) { showToast('Connect your wallet first','e'); return }
+    navigator.clipboard.writeText(referralLink).then(() => {
+      setCopied(true)
+      showToast('Referral link copied!','s')
+      setTimeout(() => setCopied(false), 2500)
+    })
+  }
+
+  const shareTwitter = () => {
+    if (!connected) { showToast('Connect your wallet first','e'); return }
+    const txt = encodeURIComponent('Playing Temptation Token — vote on profiles and win $TTS every week. Join with my link and we both get bonus tokens 🔥')
+    const url = encodeURIComponent(referralLink)
+    window.open(`https://twitter.com/intent/tweet?text=${txt}&url=${url}`, '_blank')
+  }
+
+  const shareTelegram = () => {
+    if (!connected) { showToast('Connect your wallet first','e'); return }
+    const txt = encodeURIComponent('Vote on profiles and win $TTS every week. Join with my link and we both get bonus tokens 🔥')
+    const url = encodeURIComponent(referralLink)
+    window.open(`https://t.me/share/url?url=${url}&text=${txt}`, '_blank')
+  }
+
+  return (
+    <div>
+      <div className="shead"><h2>Refer & Earn</h2><div className="grule"/><p>Earn $TTS for every friend you bring in. They get a bonus too.</p></div>
+      <div style={{padding:'0 16px 32px',display:'flex',flexDirection:'column',gap:20}}>
+
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {[
+            {icon:'🔗',title:'Share Your Link',body:'Copy your unique referral link and send it to anyone.'},
+            {icon:'👤',title:'Friend Signs Up',body:'They register, connect their wallet, and claim their 100 $TTS sign-up bonus.'},
+            {icon:'💰',title:'You Both Earn',body:'You receive 10 $TTS. Your friend gets an extra 10 $TTS on top of their sign-up bonus.'},
+            {icon:'♾️',title:'No Limit',body:'Refer as many people as you want. Every successful referral pays.'},
+          ].map((s,i) => (
+            <div key={i} style={{display:'flex',gap:14,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:16,alignItems:'flex-start'}}>
+              <div style={{fontSize:'1.5rem',flexShrink:0,width:32,textAlign:'center'}}>{s.icon}</div>
+              <div>
+                <div style={{fontSize:'.88rem',fontWeight:700,color:'var(--text)',marginBottom:4}}>{s.title}</div>
+                <div style={{fontSize:'.8rem',color:'var(--muted)',lineHeight:1.7}}>{s.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{background:'linear-gradient(135deg,rgba(212,175,55,.08),rgba(192,37,58,.06))',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:'.72rem',letterSpacing:'.14em',textTransform:'uppercase',color:'var(--gold)',fontWeight:700,marginBottom:14}}>Bonus Breakdown</div>
+          {[
+            ['You (referrer)','+10 $TTS per referral','var(--gold-light)'],
+            ['Your friend (new user)','+10 $TTS on top of sign-up bonus','var(--gold-light)'],
+            ["Friend's sign-up bonus",'100 $TTS (all new users)','var(--muted)'],
+            ['Total your friend receives','110 $TTS on day one','var(--green)'],
+          ].map(([l,v,col]) => (
+            <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'10px 0',borderBottom:'1px solid var(--border2)',gap:12}}>
+              <span style={{fontSize:'.8rem',color:'var(--muted)',flexShrink:0}}>{l}</span>
+              <span style={{fontSize:'.8rem',color:col,fontWeight:600,textAlign:'right'}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
+          <div style={{fontSize:'.72rem',letterSpacing:'.14em',textTransform:'uppercase',color:'var(--gold)',fontWeight:700,marginBottom:12}}>Your Referral Link</div>
+          <div style={{background:'var(--deep)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px',fontSize:'.78rem',color:connected?'var(--text)':'var(--muted)',marginBottom:14,wordBreak:'break-all',lineHeight:1.6}}>
+            {referralLink}
+          </div>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <button onClick={copy} className="pbtn" style={{flex:1,minWidth:120,padding:'13px 16px',fontSize:'.78rem'}}>
+              {copied ? '✓ Copied!' : '📋 Copy Link'}
+            </button>
+            <button onClick={shareTwitter} style={{flex:1,minWidth:100,padding:'13px 16px',background:'rgba(29,161,242,.15)',border:'1px solid rgba(29,161,242,.3)',color:'#1da1f2',borderRadius:8,fontSize:'.78rem',fontWeight:700,cursor:'pointer'}}>
+              𝕏 Share
+            </button>
+            <button onClick={shareTelegram} style={{flex:1,minWidth:100,padding:'13px 16px',background:'rgba(0,136,204,.15)',border:'1px solid rgba(0,136,204,.3)',color:'#08c',borderRadius:8,fontSize:'.78rem',fontWeight:700,cursor:'pointer'}}>
+              ✈️ Telegram
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 function HowToWinScreen() {
   const steps = [
     { icon:"🎟️", title:"Sign Up — Get 100 Free $TTS", body:"Every new user gets 100 $TTS automatically on signup. No purchase needed. Use them to vote right away." },
@@ -953,7 +1044,7 @@ export default function App() {
 
   const tabs = [
     { k:'buysell', l:'Buy/Sell' }, { k:'play', l:'Play' }, { k:'leaderboard', l:'Leaderboard' },
-    { k:'nfts', l:'NFTs' }, { k:'submit', l:'Submit' }, { k:'howto', l:'How to Win' }, { k:'faqs', l:'FAQs' },
+    { k:'nfts', l:'NFTs' }, { k:'submit', l:'Submit' }, { k:'refer', l:'Refer' }, { k:'howto', l:'How to Win' }, { k:'faqs', l:'FAQs' },
   ]
 
   const sp = { balance, setBalance, showToast, connected: isConnected }
@@ -1004,6 +1095,7 @@ export default function App() {
         {tab==='nfts'        && <NFTScreen />}
         {tab==='buysell'     && <BuySellScreen {...sp} />}
         {tab==='submit'      && <SubmitScreen {...sp} />}
+        {tab==='refer'       && <ReferScreen {...sp} />}
         {tab==='rules'       && <RulesScreen />}
         {tab==='faqs'        && <FAQScreen />}
       </div>
