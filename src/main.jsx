@@ -5,13 +5,14 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { wagmiConfig, queryClient } from './config/wallet.js'
 import './config/wallet.js'
 import App from './App.jsx'
+import AdminDashboard from './TTAdminDashboard.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <App />
+        {window.location.pathname === '/admin' ? <AdminDashboard /> : <App />}
       </QueryClientProvider>
     </WagmiProvider>
   </React.StrictMode>
