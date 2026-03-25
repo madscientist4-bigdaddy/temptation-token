@@ -1114,6 +1114,97 @@ function StakingScreen() {
   );
 }
 
+function ReferralScreen({ showToast }) {
+  const [settings, setSettings] = React.useState({ signup_bonus:100, referrer_bonus:10, new_user_bonus:10, referral_enabled:true })
+  const [saving, setSaving] = React.useState(false)
+  const [referrers, setReferrers] = React.useState([])
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    sb.get('referral_settings','id=eq.1&select=*').then(d => { if(Array.isArray(d)&&d.length>0) setSettings(d[0]) }).catch(()=>{})
+    sb.get('users','select=referred_by').then(d => {
+      if(Array.isArray(d)) {
+        const counts = {}
+        d.forEach(u => { if(u.referred_by) counts[u.referred_by]=(counts[u.referred_by]||0)+1 })
+        setReferrers(Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([code,count])=>({code,count,earned:count*settings.referrer_bonus})))
+      }
+      setLoading(false)
+    }).catch(()=>setLoading(false))
+  },[])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await sb.patch('referral_settings','id=eq.1',settings)
+      showToast('Settings saved','success')
+    } catch(e){ showToast('Save failed','error') }
+    setSaving(false)
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Referral Program</div>
+        <div className="gold-rule"/>
+        <div className="page-sub">Adjust bonuses and view top referrers. Changes take effect immediately.</div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16,marginBottom:28}}>
+        <div className="stat-card" style={{gridColumn:"1/-1",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:".8rem",fontWeight:700,color:"var(--text)",marginBottom:4}}>PROGRAM STATUS</div>
+            <div style={{fontSize:".75rem",color:"var(--muted)"}}>Toggle the referral program on or off globally</div>
+          </div>
+          <div onClick={()=>setSettings(s=>({...s,referral_enabled:!s.referral_enabled}))}
+            style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",
+              background:settings.referral_enabled?"rgba(46,204,113,.12)":"rgba(232,64,90,.12)",
+              border:`1px solid ${settings.referral_enabled?"rgba(46,204,113,.3)":"rgba(232,64,90,.3)"}`,
+              borderRadius:20,padding:"10px 20px"}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:settings.referral_enabled?"#2ecc71":"var(--rose)"}}/>
+            <span style={{fontSize:".85rem",fontWeight:700,color:settings.referral_enabled?"#2ecc71":"var(--rose)"}}>
+              {settings.referral_enabled?"ACTIVE":"PAUSED"}
+            </span>
+          </div>
+        </div>
+        {[
+          {key:"signup_bonus",label:"Sign-Up Bonus",sub:"Every new user on registration",icon:"🎁"},
+          {key:"referrer_bonus",label:"Referrer Bonus",sub:"Paid to person who shared the link",icon:"👤"},
+          {key:"new_user_bonus",label:"New User Referral Bonus",sub:"Extra bonus for referred users only",icon:"⭐"},
+        ].map(({key,label,sub,icon})=>(
+          <div key={key} className="stat-card">
+            <div style={{fontSize:"1.4rem",marginBottom:8}}>{icon}</div>
+            <div style={{fontSize:".75rem",letterSpacing:".08em",textTransform:"uppercase",color:"var(--muted)",marginBottom:4}}>{label}</div>
+            <div style={{fontSize:".72rem",color:"var(--muted)",marginBottom:12,lineHeight:1.6}}>{sub}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <input type="number" min="0" max="100000" value={settings[key]}
+                onChange={e=>setSettings(s=>({...s,[key]:parseInt(e.target.value)||0}))}
+                style={{flex:1,background:"rgba(255,255,255,.05)",border:"1px solid var(--border-gold)",borderRadius:6,
+                  color:"var(--text)",padding:"10px 12px",fontSize:"1.1rem",fontWeight:800}}/>
+              <span style={{fontSize:".82rem",color:"var(--gold)",fontWeight:700}}>$TTS</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button className="login-btn" onClick={save} disabled={saving} style={{marginBottom:36,minWidth:220}}>
+        {saving?"Saving...":"Save Referral Settings"}
+      </button>
+      <div style={{fontSize:".82rem",fontWeight:700,color:"var(--text)",marginBottom:12,textTransform:"uppercase",letterSpacing:".08em"}}>Top Referrers</div>
+      {loading?<div style={{color:"var(--muted)",fontSize:".85rem",padding:"20px 0"}}>Loading...</div>
+      :referrers.length===0?<div className="empty-state"><span className="empty-icon">🔗</span>No referrals yet.</div>
+      :<table className="data-table" style={{width:"100%"}}>
+        <thead><tr><th>#</th><th>Referral Code</th><th>Users Referred</th><th>$TTS Earned</th></tr></thead>
+        <tbody>{referrers.map((r,i)=>(
+          <tr key={r.code}>
+            <td style={{color:"var(--muted)"}}>#{i+1}</td>
+            <td><span style={{fontFamily:"monospace",fontSize:".82rem"}}>{r.code}</span></td>
+            <td><span className="badge badge-success">{r.count}</span></td>
+            <td style={{color:"var(--gold)",fontWeight:700}}>{r.earned.toLocaleString()} $TTS</td>
+          </tr>
+        ))}</tbody>
+      </table>}
+    </div>
+  )
+}
+
 function SettingsScreen() {
   return (
     <div>
@@ -1180,6 +1271,7 @@ const NAV = [
     { key: "payouts",     icon: "💸", label: "Payouts" },
     { key: "staking",     icon: "🔒", label: "Staking" },
     { key: "wallets",     icon: "💼", label: "Wallets" },
+    { key: "referral",    icon: "🔗", label: "Referrals" },
     { key: "settings",    icon: "⚙️", label: "Settings" },
   ]},
 ];
@@ -1201,6 +1293,7 @@ export default function AdminApp() {
     wallets:  <WalletsScreen />,
     payouts:  <PayoutsScreen {...screenProps} />,
     staking:  <StakingScreen />,
+    referral: <ReferralScreen showToast={showToast} />,
     settings: <SettingsScreen />,
   };
 
