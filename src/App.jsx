@@ -409,54 +409,20 @@ function WalletModal({ onClose, showToast }) {
   const { open } = useAppKit()
   const [connecting, setConnecting] = useState(null)
 
-  const connectMetaMask = async () => {
-    setConnecting('MetaMask')
-    const provider = window.ethereum
-    if (!provider) {
-      window.open('https://metamask.io/download/', '_blank')
-      showToast('MetaMask not found — opening download page', 'e')
-      setConnecting(null)
-      return
-    }
-    try {
-      try {
-        await provider.request({ method:'wallet_switchEthereumChain', params:[{ chainId:'0x2105' }] })
-      } catch (switchErr) {
-        if (switchErr.code === 4902 || switchErr.code === -32603) {
-          await provider.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0x2105',
-              chainName: 'Base',
-              nativeCurrency: { name:'Ether', symbol:'ETH', decimals:18 },
-              rpcUrls: ['https://mainnet.base.org'],
-              blockExplorerUrls: ['https://basescan.org']
-            }]
-          })
-        } else throw switchErr
-      }
-      const accounts = await provider.request({ method:'eth_requestAccounts' })
-      if (!accounts || accounts.length === 0) throw new Error('No accounts')
-      showToast('MetaMask connected on Base ✓', 's')
-    } catch (e) {
-      if (e.code === 4001) showToast('Connection rejected', 'e')
-      else showToast('MetaMask error — see console', 'e')
-      console.error(e)
-    }
-    setConnecting(null)
+  const connectMetaMask = () => {
     onClose()
+    open()
   }
-
   const connectWalletConnect = () => {
     onClose()
     open()
   }
 
   const wallets = [
-    { name:'MetaMask', desc: window.ethereum?.isMetaMask ? 'Detected — ready to connect' : 'Install extension or open in MetaMask browser', icon:'🦊', bg:'#f6851b22', action:connectMetaMask, live:true },
+    { name:'MetaMask', desc: 'Tap to connect — desktop & mobile', icon:'🦊', bg:'#f6851b22', action:connectMetaMask, live:true },
     { name:'WalletConnect', desc:'Scan QR code with any mobile wallet', icon:'🔗', bg:'#3b99fc22', action:connectWalletConnect, live:true },
-    { name:'Trust Wallet', desc:'Open this page inside the Trust Wallet browser', icon:'🛡️', bg:'#3375bb22', action:() => { showToast('Open this URL inside Trust Wallet app browser', 'e'); onClose() }, live:false },
-    { name:'Coinbase Wallet', desc: window.coinbaseWalletExtension ? 'Detected — ready to connect' : 'Install extension or open in Coinbase browser', icon:'🔵', bg:'#0052ff22', action:connectWalletConnect, live:true },
+    { name:'Trust Wallet', desc:'Open this page inside the Trust Wallet browser', icon:'🛡️', bg:'#3375bb22', action:connectWalletConnect, live:true },
+    { name:'Coinbase Wallet', desc: 'Desktop extension & Coinbase mobile app', icon:'🔵', bg:'#0052ff22', action:connectWalletConnect, live:true },
   ]
 
   return (
@@ -1078,6 +1044,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
   const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
       const [balance, setBalance] = useState(0)
+  const { data: walletClient } = useWalletClient()
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
   const [toast, showToast] = useToast()
@@ -1087,8 +1054,13 @@ export default function App() {
     { k:'nfts', l:'NFTs' }, { k:'submit', l:'Submit' }, { k:'refer', l:'Refer' }, { k:'howto', l:'How to Win' }, { k:'faqs', l:'FAQs' },
   ]
 
-  const sp = { balance, setBalance, showToast, connected: isConnected }
+  const sp = { balance, setBalance, showToast, connected: isConnected, address, walletClient }
 
+
+  useEffect(() => {
+    if (!isConnected || !address) { setBalance(0); return }
+    readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address]).then(raw => { if (raw != null) setBalance(Math.floor(Number(raw) / 1e18)) })
+  }, [isConnected, address])
   useEffect(() => {
     const style = document.createElement('style')
     style.textContent = S
