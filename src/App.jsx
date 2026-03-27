@@ -1,5 +1,45 @@
+
+// ── CONTRACT ADDRESSES (Base Mainnet) ────────────────────────────────────────
+const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
+const VOTING_ADDRESS  = '0x08CEDe65eb4A6DbB6586E59Ff57CdE78e940Eb2D'
+const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
+const AIRDROP_ADDRESS = '0x214f482ae7DC1C48A4761759Dc70B6545ff36f0f'
+const NFT_ADDRESS     = '0x8b1EFa595a9c6b670078701069EADC5ae857091f'
+const BASE_CHAIN_ID   = 8453
+
+const TTS_ABI = [
+  'function balanceOf(address) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+]
+const VOTING_ABI = [
+  'function submitEntry(string displayName, string ipfsHash, address payoutWallet, uint8 tier) returns ()',
+  'function vote(uint256 entryId, uint256 amount) returns ()',
+]
+const AIRDROP_ABI = [
+  'function claim() returns ()',
+  'function claimWithReferral(address referrer) returns ()',
+  'function hasClaimed(address) view returns (bool)',
+]
+
+async function readContract(address, abi, fn, args = []) {
+  try {
+    const { createPublicClient, http, parseAbi } = await import('https://esm.sh/viem@2.21.19')
+    const client = createPublicClient({
+      chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
+      transport: http()
+    })
+    return await client.readContract({ address, abi: parseAbi(abi), functionName: fn, args })
+  } catch(e) { console.error('readContract:', e); return null }
+}
+
+async function writeContract(walletClient, address, abi, fn, args = []) {
+  const { parseAbi } = await import('https://esm.sh/viem@2.21.19')
+  return await walletClient.writeContract({ address, abi: parseAbi(abi), functionName: fn, args })
+}
+
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useAccount, useDisconnect } from 'wagmi'
+import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
@@ -1037,7 +1077,7 @@ export default function App() {
   const [tab, setTab] = useState('play')
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
   const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
-      const [balance, setBalance] = useState(100)
+      const [balance, setBalance] = useState(0)
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
   const [toast, showToast] = useToast()
