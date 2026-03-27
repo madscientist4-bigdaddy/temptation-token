@@ -39,6 +39,7 @@ async function writeContract(walletClient, address, abi, fn, args = []) {
 }
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import TTSChatbot from './TTSChatbot.jsx'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
 
@@ -1116,6 +1117,7 @@ export default function App() {
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
       {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} />}
 
+      <TTSChatbot />
       {/* TOAST */}
       <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>
       {showWelcome && (
