@@ -1,167 +1,128 @@
-import os
-import asyncio
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-import hashlib
+import os, json, urllib.request, urllib.parse, hashlib, time
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+TOKEN = os.environ.get("BOT_TOKEN", "")
+BASE = f"https://api.telegram.org/bot{TOKEN}"
+APP = "https://app.temptationtoken.io"
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
-APP_URL = 'https://app.temptationtoken.io'
+def api(method, data=None):
+    url = f"{BASE}/{method}"
+    payload = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, payload, {"Content-Type":"application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        print(f"API error {method}: {e}"); return None
 
-users = {}
+def send(cid, text, kb=None):
+    d = {"chat_id":cid,"text":text,"parse_mode":"Markdown"}
+    if kb: d["reply_markup"] = json.dumps(kb)
+    return api("sendMessage", d)
 
-def get_ref_code(uid):
-    return hashlib.md5(str(uid).encode()).hexdigest()[:8]
+def edit(cid, mid, text, kb=None):
+    d = {"chat_id":cid,"message_id":mid,"text":text,"parse_mode":"Markdown"}
+    if kb: d["reply_markup"] = json.dumps(kb)
+    return api("editMessageText", d)
 
-def main_kb(uid):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎮 Play TTS Now", web_app=WebAppInfo(url=APP_URL))],
-        [InlineKeyboardButton("💰 How to Earn", callback_data='earn'),
-         InlineKeyboardButton("📊 Stats", callback_data='stats')],
-        [InlineKeyboardButton("⭐ VIP Access", callback_data='vip'),
-         InlineKeyboardButton("🏆 Leaderboard", callback_data='lb')],
-        [InlineKeyboardButton("🔗 My Referral Link", callback_data='ref')],
-    ])
+def main_kb():
+    return {"inline_keyboard":[
+        [{"text":"🎮 Play TTS Now","web_app":{"url":APP}}],
+        [{"text":"💰 How to Earn","callback_data":"earn"},{"text":"📊 Stats","callback_data":"stats"}],
+        [{"text":"⭐ VIP","callback_data":"vip"},{"text":"🏆 Leaderboard","callback_data":"lb"}],
+        [{"text":"🔗 My Referral Link","callback_data":"ref"}],
+    ]}
 
-async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    u = update.effective_user
-    users[u.id] = {'name': u.first_name, 'ref': get_ref_code(u.id)}
-    if ctx.args and ctx.args[0].startswith('ref_'):
-        users[u.id]['referred_by'] = ctx.args[0][4:]
-    await update.message.reply_text(
-        f"🔥 *Welcome to Temptation Token, {u.first_name}!*\n\n"
-        "The world's first crypto Hot or Not voting game on Base blockchain.\n\n"
+def on_start(cid, name):
+    send(cid,
+        f"🔥 *Welcome to Temptation Token, {name}!*\n\n"
+        "The world\'s first crypto Hot or Not voting game on Base blockchain.\n\n"
         "🗳 Vote $TTS on profiles\n"
-        "🏆 Top voter wins 40% of the weekly pot\n"
+        "🏆 Top voter wins 40% of weekly pot\n"
         "🔥 Losing votes burned — deflationary\n"
         "💎 Stake to multiply vote power up to 3x\n\n"
-        "*New user bonus:* 100 $TTS just for signing up!\n\n"
-        "Tap *Play TTS Now* to start 👇",
-        parse_mode='Markdown',
-        reply_markup=main_kb(u.id)
-    )
+        "*New user bonus:* 100 $TTS free!\n\nTap *Play TTS Now* 👇",
+        main_kb())
 
-async def earn(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    await q.edit_message_text(
-        "💰 *Ways to Earn $TTS*\n\n"
-        "*Vote & Win:* Put the most TTS on the winning profile → win 40% of the pot\n\n"
-        "*Submit Your Profile:* Get voted on and win 40% as top profile\n\n"
-        "*Stake Your TTS:*\n"
-        "• Bronze $50+ → 8% APR, 1.1x votes\n"
-        "• Silver $100+ → 12% APR, 1.25x votes\n"
-        "• Gold $250+ → 18% APR, 1.5x votes\n"
-        "• Platinum $500+ → 24% APR, 1.75x votes\n"
-        "• Diamond $1000+ → 32% APR, 2x votes\n"
-        "• VIP $5000+ → 45% APR, 3x votes 🔥\n\n"
-        "*Refer Friends:* Earn 10 TTS per referral",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎮 Start Playing", web_app=WebAppInfo(url=APP_URL))],
-            [InlineKeyboardButton("⬅️ Back", callback_data='back')]
-        ])
-    )
+def on_cb(cid, mid, cbid, data, uid):
+    api("answerCallbackQuery",{"callback_query_id":cbid})
+    if data=="earn":
+        edit(cid,mid,
+            "💰 *Ways to Earn $TTS*\n\n"
+            "*Vote & Win:* Most TTS on winning profile → 40% of pot\n\n"
+            "*Stake Your TTS:*\n"
+            "• Bronze $50+ → 8% APR 1.1x votes\n"
+            "• Silver $100+ → 12% APR 1.25x votes\n"
+            "• Gold $250+ → 18% APR 1.5x votes\n"
+            "• Diamond $1000+ → 32% APR 2x votes\n"
+            "• VIP $5000+ → 45% APR 3x votes 🔥\n\n"
+            "*Refer Friends:* Earn 100 TTS per referral",
+            {"inline_keyboard":[[{"text":"🎮 Play Now","web_app":{"url":APP}}],[{"text":"⬅️ Back","callback_data":"back"}]]})
+    elif data=="stats":
+        edit(cid,mid,
+            "📊 *TTS Stats*\n\n"
+            "🪙 $TTS on Base Mainnet\n"
+            "📍 `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9`\n"
+            "🔥 Deflationary — losing votes burned\n"
+            "💧 Uniswap v3 ETH/TTS pool\n\n"
+            "Buy: app.uniswap.org",
+            {"inline_keyboard":[[{"text":"🎮 Play Now","web_app":{"url":APP}}],[{"text":"⬅️ Back","callback_data":"back"}]]})
+    elif data=="vip":
+        edit(cid,mid,
+            "⭐ *TTS VIP Vault*\n\n"
+            "*Exclusive access for serious players.*\n\n"
+            "🥉 *Bronze* — 500 TTS/mo\n"
+            "→ Early previews 24hr before voting\n"
+            "→ 1.5x vote multiplier\n\n"
+            "🥈 *Silver* — 2,000 TTS/mo\n"
+            "→ Full gallery + strategy hints\n"
+            "→ 1.75x vote multiplier\n\n"
+            "🥇 *Gold* — 5,000 TTS/mo\n"
+            "→ Creator interaction + NFT drops\n"
+            "→ 2x vote multiplier\n\n"
+            "💎 *Diamond* — 10,000 TTS/mo\n"
+            "→ Kingmaker badge + weekly AMA\n"
+            "→ 3x vote multiplier + priority payouts\n\n"
+            "Stake TTS in app to earn up to 45% APR.",
+            {"inline_keyboard":[[{"text":"💎 Open Staking","web_app":{"url":APP+"#stake"}}],[{"text":"⬅️ Back","callback_data":"back"}]]})
+    elif data=="lb":
+        edit(cid,mid,
+            "🏆 *TTS Leaderboard*\n\n"
+            "Weekly round live! Top voter wins 40% of pot.\n"
+            "Round closes Sunday 23:59 UTC\n\n"
+            "Tap below to see live standings 👇",
+            {"inline_keyboard":[[{"text":"📊 View Leaderboard","web_app":{"url":APP+"#leaderboard"}}],[{"text":"⬅️ Back","callback_data":"back"}]]})
+    elif data=="ref":
+        code=hashlib.md5(str(uid).encode()).hexdigest()[:8]
+        link=f"https://t.me/TTSGameBot?start=ref_{code}"
+        edit(cid,mid,
+            f"🔗 *Your Referral Link*\n\n"
+            f"Share and earn *100 TTS* per friend who joins!\n\n"
+            f"`{link}`\n\n"
+            "Your friend gets 10 TTS signup bonus.\n"
+            "You earn 100 TTS automatically! 🔥\n\n"
+            "High-profile influencer? Email support@temptationtoken.io for custom rates.",
+            {"inline_keyboard":[[{"text":"📤 Share","url":f"https://t.me/share/url?url={urllib.parse.quote(link)}&text=Join+TTS+%26+get+100+TTS+free+%F0%9F%94%A5"}],[{"text":"⬅️ Back","callback_data":"back"}]]})
+    elif data=="back":
+        edit(cid,mid,"🔥 *Temptation Token*\n\nVote. Stake. Win real $TTS every week.",main_kb())
 
-async def stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    await q.edit_message_text(
-        "📊 *TTS Live Stats*\n\n"
-        "🪙 Token: $TTS on Base Mainnet\n"
-        "📍 Contract:\n`0x5570eA97d53A53170e973894A9Fa7feb5785d3b9`\n"
-        "🔥 Deflationary — losing votes burned\n"
-        "💧 Uniswap v3 Base ETH/TTS pool\n\n"
-        "Buy on Uniswap: app.uniswap.org\n"
-        "View on Basescan: basescan.org",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎮 Play Now", web_app=WebAppInfo(url=APP_URL))],
-            [InlineKeyboardButton("⬅️ Back", callback_data='back')]
-        ])
-    )
+def run():
+    offset=0
+    print(f"TTS Bot starting... token={TOKEN[:8]}...")
+    while True:
+        try:
+            r=api("getUpdates",{"offset":offset,"timeout":30,"limit":100})
+            if not r or not r.get("ok"): time.sleep(2); continue
+            for u in r.get("result",[]):
+                offset=u["update_id"]+1
+                try:
+                    if "message" in u:
+                        m=u["message"]; cid=m["chat"]["id"]; name=m["from"].get("first_name","Friend"); txt=m.get("text","")
+                        if txt.startswith("/start"): on_start(cid,name)
+                        else: send(cid,"Use the menu buttons 👇",main_kb())
+                    elif "callback_query" in u:
+                        cb=u["callback_query"]; cid=cb["message"]["chat"]["id"]; mid=cb["message"]["message_id"]
+                        on_cb(cid,mid,cb["id"],cb.get("data",""),cb["from"]["id"])
+                except Exception as e: print(f"Update error: {e}")
+        except Exception as e: print(f"Poll error: {e}"); time.sleep(5)
 
-async def vip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    await q.edit_message_text(
-        "⭐ *TTS VIP Vault*\n\n"
-        "🥉 Bronze 500 TTS/mo → Early photo previews\n"
-        "🥈 Silver 2,000 TTS/mo → Full gallery + hints\n"
-        "🥇 Gold 5,000 TTS/mo → Creator access + NFTs\n"
-        "💎 Diamond 10,000 TTS/mo → 3x votes + AMA\n\n"
-        "Stake TTS in the app now to unlock vote multipliers and APR rewards.",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎮 Stake in App", web_app=WebAppInfo(url=APP_URL))],
-            [InlineKeyboardButton("⬅️ Back", callback_data='back')]
-        ])
-    )
-
-async def leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    await q.edit_message_text(
-        "🏆 *TTS Leaderboard*\n\n"
-        "Weekly voting round is live!\n\n"
-        "Top voter at round close wins 40% of the prize pool.\n"
-        "Round closes: Sunday 23:59 UTC\n\n"
-        "Tap below to see live standings 👇",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📊 View Leaderboard", web_app=WebAppInfo(url=APP_URL))],
-            [InlineKeyboardButton("⬅️ Back", callback_data='back')]
-        ])
-    )
-
-async def refer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    uid = q.from_user.id
-    code = get_ref_code(uid)
-    link = f'https://t.me/TTSGameBot?start=ref_{code}'
-    await q.edit_message_text(
-        f"🔗 *Your Referral Link*\n\n"
-        f"Share and earn *10 TTS* per friend who joins!\n\n"
-        f"`{link}`\n\n"
-        "They get 100 TTS signup bonus + 10 TTS extra.\nYou get 10 TTS automatically. 🔥",
-        parse_mode='Markdown',
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📤 Share Link", url=f'https://t.me/share/url?url={link}&text=Join+Temptation+Token+%26+get+100+TTS+free+%F0%9F%94%A5')],
-            [InlineKeyboardButton("⬅️ Back", callback_data='back')]
-        ])
-    )
-
-async def back(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    await q.edit_message_text(
-        "🔥 *Temptation Token — Main Menu*\n\nVote. Stake. Win real $TTS every week.",
-        parse_mode='Markdown',
-        reply_markup=main_kb(q.from_user.id)
-    )
-
-async def message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Use the menu buttons below 👇",
-        reply_markup=main_kb(update.effective_user.id)
-    )
-
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CallbackQueryHandler(earn, pattern='^earn$'))
-    app.add_handler(CallbackQueryHandler(stats, pattern='^stats$'))
-    app.add_handler(CallbackQueryHandler(vip, pattern='^vip$'))
-    app.add_handler(CallbackQueryHandler(leaderboard, pattern='^lb$'))
-    app.add_handler(CallbackQueryHandler(refer, pattern='^ref$'))
-    app.add_handler(CallbackQueryHandler(back, pattern='^back$'))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
-    logger.info("TTS Bot starting...")
-    app.run_polling()
-
-if __name__ == '__main__':
-    main()
+run()
