@@ -277,7 +277,7 @@ def run():
                             on_start(cid, uid, name, uname, txt[7:].strip())
                         elif uid in ADMIN_IDS and txt.startswith("/adminstats"):
                             s = get_stats()
-                            send(cid, f"📊 *Admin Stats*\n\nUsers: {s[\'total\']:,}\nVIP: {s[\'vip\']:,}\nReferrals: {s[\'refs\']:,}\nNew today: {s[\'new_today\']:,}")
+                            send(cid, '📊 *Admin Stats*\n\nUsers: ' + str(s['total']) + '\nVIP: ' + str(s['vip']) + '\nReferrals: ' + str(s['refs']) + '\nNew today: ' + str(s['new_today']))
                         elif uid in ADMIN_IDS and txt.startswith("/broadcast "):
                             msg = txt[11:]
                             api("sendMessage",{"chat_id":CHANNEL,"text":msg,"parse_mode":"Markdown"})
