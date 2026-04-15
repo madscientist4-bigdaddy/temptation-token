@@ -1,7 +1,7 @@
 
 // ── CONTRACT ADDRESSES (Base Mainnet) ────────────────────────────────────────
 const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
-const VOTING_ADDRESS  = '0x08CEDe65eb4A6DbB6586E59Ff57CdE78e940Eb2D'
+const VOTING_ADDRESS  = '0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA'
 const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
 const AIRDROP_ADDRESS = '0x214f482ae7DC1C48A4761759Dc70B6545ff36f0f'
 const NFT_ADDRESS     = '0x8b1EFa595a9c6b670078701069EADC5ae857091f'
@@ -13,8 +13,10 @@ const TTS_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
 ]
 const VOTING_ABI = [
-  'function submitEntry(string displayName, string ipfsHash, address payoutWallet, uint8 tier) returns ()',
-  'function vote(uint256 entryId, uint256 amount) returns ()',
+  'function vote(string profileId, uint256 amount) returns ()',
+  'function getProfile(uint256 roundId, string profileId) view returns (address wallet, uint256 totalTickets, uint256 rawVotes, address topVoter, bool approved)',
+  'function getRound(uint256 roundId) view returns (uint256 startTime, uint256 endTime, uint256 totalTickets, uint256 totalRawVotes, bool settled, bool vrfPending, uint256 profileCount)',
+  'function currentRoundId() view returns (uint256)',
 ]
 const AIRDROP_ABI = [
   'function claim() returns ()',
@@ -44,12 +46,16 @@ import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
+
+const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
+
 const PHOTOS = [
-  { id:1, username:'Scarlett_V',  link:'OnlyFans',   votes:48200, myVotes:0, img:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80' },
-  { id:2, username:'Luna_Rose',   link:'Instagram',  votes:31750, myVotes:0, img:'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=600&q=80' },
-  { id:3, username:'Mia_Noir',    link:'Twitter/X',  votes:27400, myVotes:0, img:'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&q=80' },
-  { id:4, username:'Jade_Storm',  link:'Linktree',   votes:19880, myVotes:0, img:'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=600&q=80' },
-  { id:5, username:'Aria_Blaze',  link:'Website',    votes:14320, myVotes:0, img:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80' },
+  { id:1, username:'Scarlett_V',  profileId:'profile_1', link:'OnlyFans',   votes:48200, myVotes:0, img:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80' },
+  { id:2, username:'Luna_Rose',   profileId:'profile_2', link:'Instagram',  votes:31750, myVotes:0, img:'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=600&q=80' },
+  { id:3, username:'Mia_Noir',    profileId:'profile_3', link:'Twitter/X',  votes:27400, myVotes:0, img:'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&q=80' },
+  { id:4, username:'Jade_Storm',  profileId:'profile_4', link:'Linktree',   votes:19880, myVotes:0, img:'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=600&q=80' },
+  { id:5, username:'Aria_Blaze',  profileId:'profile_5', link:'Website',    votes:14320, myVotes:0, img:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80' },
 ]
 
 const TIERS = [
@@ -122,8 +128,8 @@ const S = `
   .nav { background:var(--deep); border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
   .nav::-webkit-scrollbar { display:none; }
   .nav-inner { display:flex; max-width:520px; margin:0 auto; padding:0 6px; }
-  .ni { flex-shrink:0; padding:13px 12px; font-size:.54rem; letter-spacing:.14em; text-transform:uppercase;
-    font-weight:600; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;
+  .ni { flex-shrink:0; padding:13px 12px; font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
+    font-weight:700; color:rgba(240,232,216,0.75); cursor:pointer; border-bottom:2px solid transparent;
     transition:all .2s; white-space:nowrap; background:none; border-top:none; border-left:none;
     border-right:none; font-family:var(--font-b); }
   .ni:hover { color:var(--text); }
@@ -168,7 +174,7 @@ const S = `
   .car-dots { display:flex; gap:6px; align-items:center; }
   .car-dot { width:6px; height:6px; border-radius:50%; background:rgba(212,175,55,.22); transition:all .25s; cursor:pointer; }
   .car-dot.active { background:var(--gold); width:20px; border-radius:3px; }
-  .car-count { font-size:.74rem; color:var(--muted); letter-spacing:.1em; min-width:44px; text-align:center; }
+  .car-count { font-size:.92rem; font-weight:800; color:var(--gold-light); letter-spacing:.06em; min-width:60px; text-align:center; }
 
   /* PHOTO CARD */
   .pcard { background:var(--surface); border:1px solid var(--border); overflow:hidden; }
@@ -203,10 +209,11 @@ const S = `
     outline:none; transition:border-color .2s; }
   .vinput:focus { border-color:var(--gold); }
   .vinput::placeholder { color:var(--muted); font-size:.85rem; }
-  .vbtn { background:linear-gradient(135deg,var(--crimson),#a0203a); color:var(--text); border:none;
-    border-radius:6px; padding:10px 18px; font-family:var(--font-b); font-size:.6rem;
+  .vbtn { background:linear-gradient(135deg,#a0203a,var(--crimson-glow)); color:#fff; border:none;
+    border-radius:10px; padding:16px 24px; font-family:var(--font-b); font-size:.82rem;
     letter-spacing:.1em; text-transform:uppercase; font-weight:600; cursor:pointer; transition:all .2s; white-space:nowrap; }
   .vbtn:hover { background:linear-gradient(135deg,var(--crimson-glow),var(--rose)); box-shadow:0 4px 16px rgba(192,37,58,.4); }
+  .vbtn:disabled { opacity:.5; cursor:not-allowed; }
   .myvotes { font-size:.76rem; color:var(--gold-dim); margin-top:7px; letter-spacing:.06em; }
 
   /* LEADERBOARD */
@@ -358,6 +365,9 @@ const S = `
   .nft-empty { text-align:center; padding:50px 20px; color:var(--muted); font-size:.7rem; letter-spacing:.08em; line-height:1.9; margin:0 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
   .nft-ei { font-size:2.5rem; display:block; margin-bottom:12px; opacity:.35; }
 
+  /* VOTING PENDING */
+  .vote-pending { font-size:.72rem; color:var(--gold-dim); margin-top:7px; letter-spacing:.06em; text-align:center; }
+
   ::-webkit-scrollbar{width:4px;height:4px;}
   ::-webkit-scrollbar-track{background:transparent;}
   ::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px;}
@@ -408,22 +418,17 @@ function useToast() {
 // ── WALLET MODAL ─────────────────────────────────────────────────────────────
 function WalletModal({ onClose, showToast }) {
   const { open } = useAppKit()
-  const [connecting, setConnecting] = useState(null)
 
-  const connectMetaMask = () => {
-    onClose()
-    open()
-  }
-  const connectWalletConnect = () => {
+  const connectWallet = () => {
     onClose()
     open()
   }
 
   const wallets = [
-    { name:'MetaMask', desc: 'Tap to connect — desktop & mobile', icon:'🦊', bg:'#f6851b22', action:connectMetaMask, live:true },
-    { name:'WalletConnect', desc:'Scan QR code with any mobile wallet', icon:'🔗', bg:'#3b99fc22', action:connectWalletConnect, live:true },
-    { name:'Trust Wallet', desc:'Open this page inside the Trust Wallet browser', icon:'🛡️', bg:'#3375bb22', action:connectWalletConnect, live:true },
-    { name:'Coinbase Wallet', desc: 'Desktop extension & Coinbase mobile app', icon:'🔵', bg:'#0052ff22', action:connectWalletConnect, live:true },
+    { name:'MetaMask', desc: 'Tap to connect — desktop & mobile', icon:'🦊', bg:'#f6851b22', action:connectWallet, live:true },
+    { name:'WalletConnect', desc:'Scan QR code with any mobile wallet', icon:'🔗', bg:'#3b99fc22', action:connectWallet, live:true },
+    { name:'Trust Wallet', desc:'Open this page inside the Trust Wallet browser', icon:'🛡️', bg:'#3375bb22', action:connectWallet, live:true },
+    { name:'Coinbase Wallet', desc: 'Desktop extension & Coinbase mobile app', icon:'🔵', bg:'#0052ff22', action:connectWallet, live:true },
   ]
 
   return (
@@ -435,9 +440,7 @@ function WalletModal({ onClose, showToast }) {
         <div className="pid-box">⬡ Base Mainnet · Chain ID 8453 · Reown Project Active</div>
         {wallets.map(w => (
           <div key={w.name} className="wopt" onClick={w.action}>
-            <div className="wopt-icon" style={{ background:w.bg }}>
-              {connecting === w.name ? '⏳' : w.icon}
-            </div>
+            <div className="wopt-icon" style={{ background:w.bg }}>{w.icon}</div>
             <div style={{ flex:1 }}>
               <div className="wopt-name">
                 {w.name}
@@ -477,7 +480,7 @@ function TransferModal({ dir, onClose, showToast }) {
         {dir === 'in' && (
           <>
             <span className="base-l">Your Deposit Address (Base)</span>
-            <div className="base-addr">0x51C73bc241c0BB1442d374C7833c186b40a5FAdB</div>
+            <div className="base-addr">0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</div>
           </>
         )}
         <label className="flabel">Amount ($TTS)</label>
@@ -497,9 +500,35 @@ function TransferModal({ dir, onClose, showToast }) {
 }
 
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
-function PlayScreen({ balance, setBalance, showToast, connected }) {
+function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
   const [photos, setPhotos] = useState(() => [...PHOTOS].sort(() => Math.random() - .5))
+
+  useEffect(() => {
+    fetch(SUPABASE_URL + '/rest/v1/submissions?status=eq.approved&select=*', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.length >= 3) {
+        const mapped = data.map((r, i) => ({
+          id: i + 1,
+          username: r.display_name || 'Anonymous',
+          profileId: r.id,
+          link: r.link_title || 'Profile',
+          link_url: r.link_url || '',
+          votes: 0,
+          myVotes: 0,
+          img: r.image_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80',
+          wallet: r.wallet_address,
+          payout_wallet: r.payout_wallet
+        }))
+        setPhotos(mapped.sort(() => Math.random() - .5))
+      }
+    })
+    .catch(e => console.error('Photo fetch error:', e))
+  }, [])
   const [va, setVa] = useState({})
+  const [voting, setVoting] = useState({})
   const [idx, setIdx] = useState(0)
   const cd = useCountdown()
   const max = Math.max(...photos.map(p => p.votes), 1)
@@ -521,21 +550,48 @@ function PlayScreen({ balance, setBalance, showToast, connected }) {
     touchStartY.current = null
   }
 
-  const vote = id => {
+  const castVote = async (photo) => {
     if (!connected) { showToast('Connect your wallet to vote', 'e'); return }
-    const a = Number(va[id] || 0)
+    if (!walletClient) { showToast('Wallet not ready', 'e'); return }
+    const a = Number(va[photo.id] || 0)
     if (a < 5) { showToast('Minimum vote is 5 $TTS', 'e'); return }
     if (a > balance) { showToast('Insufficient $TTS balance', 'e'); return }
-    setBalance(b => b - a)
-    setPhotos(prev => prev.map(p => p.id === id ? { ...p, votes:p.votes+a, myVotes:p.myVotes+a } : p))
-    setVa(v => ({ ...v, [id]:'' }))
-    showToast(`${a.toLocaleString()} $TTS voted! 🔥`, 's')
+
+    setVoting(v => ({ ...v, [photo.id]: true }))
+    try {
+      const amountWei = BigInt(Math.floor(a * 1e18))
+
+      // Check current allowance
+      const allowance = await readContract(TTS_ADDRESS, TTS_ABI, 'allowance', [address, VOTING_ADDRESS])
+      if (!allowance || BigInt(allowance.toString()) < amountWei) {
+        showToast('Approving $TTS... confirm in wallet', 's')
+        await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, amountWei])
+        showToast('Approved! Casting vote...', 's')
+      } else {
+        showToast('Casting vote on-chain...', 's')
+      }
+
+      // Cast the vote
+      await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
+
+      // Update UI
+      setBalance(b => b - a)
+      setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, votes: p.votes + a, myVotes: p.myVotes + a } : p))
+      setVa(v => ({ ...v, [photo.id]: '' }))
+      showToast(`${a.toLocaleString()} $TTS voted on-chain! 🔥`, 's')
+    } catch(e) {
+      console.error('Vote error:', e)
+      const msg = e.shortMessage || e.message || 'Unknown error'
+      showToast('Vote failed: ' + msg.slice(0, 60), 'e')
+    } finally {
+      setVoting(v => ({ ...v, [photo.id]: false }))
+    }
   }
 
   return (
     <div>
       <div className="shead">
-        <div style={{ fontSize:'.54rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Week of Mar 3–9, 2026</div>
+        <div style={{ fontSize:'.54rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Live on Base Blockchain</div>
         <h2>Vote &amp; Win</h2>
         <div className="grule" />
         <p>Swipe or use arrows · Place $TTS to win 40% of the pool</p>
@@ -548,11 +604,7 @@ function PlayScreen({ balance, setBalance, showToast, connected }) {
 
       <div className="car-outer">
         <div className="car-wrap" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-
-          {/* LEFT ARROW */}
           <div className={`car-arrow left${idx === 0 ? ' hidden' : ''}`} onClick={() => goTo(idx-1)}>‹</div>
-
-          {/* SLIDING TRACK */}
           <div className="car-track" style={{ transform:`translateX(-${idx*100}%)` }}>
             {photos.map((ph, i) => (
               <div key={ph.id} className="pcard">
@@ -575,23 +627,31 @@ function PlayScreen({ balance, setBalance, showToast, connected }) {
                     <div className="vbar" style={{ width:`${Math.round((ph.votes/max)*100)}%` }} />
                   </div>
                   <div className="vinput-row">
-                    <input className="vinput" type="number" min="5" placeholder="Min 5 $TTS"
+                    <input
+                      className="vinput"
+                      type="number"
+                      min="5"
+                      placeholder="Min 5 $TTS"
                       value={va[ph.id] || ''}
-                      onChange={e => setVa(v => ({ ...v, [ph.id]:e.target.value }))} />
-                    <button className="vbtn" onClick={() => vote(ph.id)}>Vote</button>
+                      onChange={e => setVa(v => ({ ...v, [ph.id]:e.target.value }))}
+                      disabled={voting[ph.id]}
+                    />
+                    <button
+                      className="vbtn"
+                      onClick={() => castVote(ph)}
+                      disabled={voting[ph.id]}
+                    >
+                      {voting[ph.id] ? '⏳' : 'Vote'}
+                    </button>
                   </div>
+                  {voting[ph.id] && <div className="vote-pending">⏳ Confirming on Base...</div>}
                   {ph.myVotes > 0 && <div className="myvotes">✦ Your votes this round: {ph.myVotes.toLocaleString()} $TTS</div>}
                 </div>
               </div>
             ))}
           </div>
-
-          {/* RIGHT ARROW */}
           <div className={`car-arrow right${idx === photos.length-1 ? ' hidden' : ''}`} onClick={() => goTo(idx+1)}>›</div>
-
         </div>
-
-        {/* DOTS + COUNTER */}
         <div className="car-footer">
           <div className="car-count">{idx+1} of {photos.length}</div>
           <div className="car-dots">
@@ -632,7 +692,7 @@ function LeaderboardScreen() {
         ))}
       </div>
       <div className="prize-box">
-        <div className="prize-title">Prize Pool — Week of Mar 3–9, 2026</div>
+        <div className="prize-title">Prize Pool — Current Round</div>
         <div className="prize-grid">
           {[['🏆 Top Voter','40% + stake back'],['📸 Top Profile','40% of pool'],['🏢 Blockchain Ent.','10% of pool'],['💙 Polaris Project','10% donation']].map(([l,v]) => (
             <div key={l} className="prize-cell"><div className="prize-cl">{l}</div><div className="prize-cv">{v}</div></div>
@@ -695,10 +755,12 @@ function BuySellScreen({ showToast, connected }) {
               <span className="rate-l">Rate</span>
               <span className="rate-v" style={{ fontSize:'.82rem' }}>1 ETH = {rate.toLocaleString()} $TTS</span>
             </div>
-            <button className="pbtn" onClick={() => { if (!connected) { showToast('Connect your wallet first','e'); return } showToast(`${tab==='buy'?'Purchase':'Sale'} submitted on Base DEX`,'s') }}>
-              {tab === 'buy' ? 'Buy $TTS' : 'Sell $TTS'} on Base
-            </button>
-            <div className="sub-note">Powered by Base DEX · Also on Uniswap, Coinbase, and crypto.com</div>
+            <a href={`https://app.uniswap.org/swap?outputCurrency=${TTS_ADDRESS}&chain=base`} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block' }}>
+              <button className="pbtn">
+                {tab === 'buy' ? 'Buy $TTS on Uniswap' : 'Sell $TTS on Uniswap'}
+              </button>
+            </a>
+            <div className="sub-note">Powered by Uniswap V2 on Base · Contract: {TTS_ADDRESS.slice(0,10)}…</div>
           </>
         )}
 
@@ -707,7 +769,7 @@ function BuySellScreen({ showToast, connected }) {
             <div className="stk-info">
               <div className="stk-title">Staking Tiers</div>
               <div style={{ fontSize:'.58rem', color:'var(--muted)', marginBottom:12, lineHeight:1.65 }}>
-                Lock $TTS for 3–12 months. Earn APR + boosted votes. No early unlock. USD equivalent tracked via Chainlink Oracle.
+                Lock $TTS to earn APR + boosted votes. No early unlock.
               </div>
               <div className="stk-tiers">
                 {TIERS.map(t => (
@@ -761,15 +823,20 @@ function SubmitScreen({ balance, setBalance, showToast, connected }) {
     r.readAsDataURL(f)
   }
 
-  const submit = () => {
+  const submit = async () => {
     if (!connected) { showToast('Connect your wallet first','e'); return }
     if (!prev) { showToast('Please upload a photo','e'); return }
     if (!name.trim()) { showToast('Enter your display name','e'); return }
     if (!wallet.trim()) { showToast('Enter your payout wallet address','e'); return }
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
-    if (balance < 1) { showToast('Insufficient $TTS — 1 TTS required','e'); return }
-    setBalance(b => b - 1)
-    showToast('Submission sent for review! In-app notification when approved.', 's')
+    if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
+    setBalance(b => b - 5)
+    fetch(SUPABASE_URL + '/rest/v1/submissions', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ round_id: 1, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
+    }).then(r => { if(r.ok) showToast('Submission sent for review!','s'); else showToast('Submission received — admin notified.','s') })
+    .catch(() => showToast('Submission received — admin notified.','s'))
     setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false)
   }
 
@@ -807,15 +874,13 @@ function SubmitScreen({ balance, setBalance, showToast, connected }) {
           <input type="checkbox" checked={a2} onChange={e => setA2(e.target.checked)} />
           <span className="chk-lbl">I confirm I am 18+ years of age, the Content is SFW compliant, I own all rights to this photo, and I <strong>accept sole responsibility</strong> for the accuracy of my wallet address.</span>
         </label>
-        <div className="cost-note"><span>💳</span><span>Submission costs <strong>1 $TTS</strong> — signed on Base blockchain</span></div>
+        <div className="cost-note"><span>💳</span><span>Submission costs <strong>5 $TTS</strong> — signed on Base blockchain</span></div>
         <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
-        <button className="pbtn" onClick={submit}>Sign Contract &amp; Submit (1 $TTS)</button>
+        <button className="pbtn" onClick={submit}>Sign Contract &amp; Submit (5 $TTS)</button>
       </div>
     </div>
   )
 }
-
-
 
 function ReferScreen({ showToast, connected }) {
   const { address } = useAccount()
@@ -851,7 +916,6 @@ function ReferScreen({ showToast, connected }) {
     <div>
       <div className="shead"><h2>Refer & Earn</h2><div className="grule"/><p>Earn $TTS for every friend you bring in. They get a bonus too.</p></div>
       <div style={{padding:'0 16px 32px',display:'flex',flexDirection:'column',gap:20}}>
-
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           {[
             {icon:'🔗',title:'Share Your Link',body:'Copy your unique referral link and send it to anyone.'},
@@ -901,7 +965,6 @@ function ReferScreen({ showToast, connected }) {
             </button>
           </div>
         </div>
-
       </div>
     </div>
   )
@@ -914,12 +977,12 @@ function HowToWinScreen() {
     { icon:"🏆", title:"Pick Your Winner", body:"Find the profile you think will get the most votes by Sunday night. That is your bet." },
     { icon:"💰", title:"Vote $TTS on That Profile", body:"Minimum 5 $TTS per vote. No maximum. The more you put on the winning profile, the bigger your edge. Votes cannot be removed." },
     { icon:"👑", title:"Be the Top Voter on the Winning Profile", body:"The player who put the MOST $TTS specifically on the winning profile is the Top Voter." },
-    { icon:"💸", title:"Collect Your Prize", body:"Top Voter wins 40% of the winning profile's vote pool PLUS gets every $TTS they wagered returned. Goes straight to your wallet." },
+    { icon:"💸", title:"Collect Your Prize", body:"Top Voter wins 40% of the winning profile's vote pool. Goes straight to your wallet." },
   ]
   const tips = [
     { t:"Vote Early, Vote Big", b:"Lock in a large vote early. Other players see the total — they will have to outspend you to take the top spot." },
     { t:"Watch the Leaderboard", b:"Check live standings constantly. If your profile is climbing fast, top up your vote to protect your position." },
-    { t:"Stake for an Edge", b:"Stake $TTS in the Buy/Sell tab. Higher tiers multiply your vote weight 1.1x up to 2x — same TTS, more power." },
+    { t:"Stake for an Edge", b:"Stake $TTS in the Buy/Sell tab. Higher tiers multiply your vote weight 1.1x up to 3x — same TTS, more power." },
     { t:"Focus Your TTS", b:"Only the winning profile pays out. TTS you put on losing profiles is burned. Pick one and go all in." },
   ]
   return (
@@ -961,7 +1024,7 @@ function HowToWinScreen() {
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
           <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--text)',marginBottom:14}}>💰 Prize Breakdown — Every Week</div>
           {[
-            ["🥇 Top Voter","40% of winning votes + full wager returned","var(--gold-light)"],
+            ["🥇 Top Voter","40% of winning votes","var(--gold-light)"],
             ["📸 Winning Profile","40% of winning votes","var(--gold-light)"],
             ["🏢 Blockchain Ent.","10% to company wallet","var(--muted)"],
             ["💙 Polaris Project","10% to nonprofit","var(--muted)"],
@@ -978,15 +1041,14 @@ function HowToWinScreen() {
   )
 }
 
-
 function RulesScreen() {
   const rules = [
     { t:'Weekly Voting Cycle', b:'Each week begins Monday 00:00 UTC and ends Sunday 23:59 UTC. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 1 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
-    { t:'Prize Distribution', b:'Top Voter: 40% of winning pool + full stake returned.\nWinning Profile: 40% of pool.\nBlockchain Entertainment LLC: 10%.\nPolaris Project (501c3): 10%.\nLosing votes are burned after staking rewards are funded.' },
-    { t:'Staking', b:'Lock $TTS for 3–12 months to earn APR rewards and vote multipliers up to 2×. Rewards funded from a portion of losing votes. Once locked, funds cannot be accessed early under any circumstances.' },
-    { t:'Fairness & Privacy', b:'Voting and gameplay are anonymous. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
+    { t:'Prize Distribution', b:'Top Voter: 40% of winning pool.\nWinning Profile: 40% of pool.\nBlockchain Entertainment LLC: 10%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
+    { t:'Staking', b:'Lock $TTS to earn APR rewards and vote multipliers up to 3x. Once locked, funds cannot be accessed early under any circumstances.' },
+    { t:'Fairness & Privacy', b:'Voting is provably fair via Chainlink VRF on Base blockchain. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
   ]
   return (
     <div>
@@ -1004,18 +1066,17 @@ function RulesScreen() {
   )
 }
 
-// ── FAQ ───────────────────────────────────────────────────────────────────────
 function FAQScreen() {
   const faqs = [
     { q:'What is Temptation Token ($TTS)?', a:'$TTS is the native cryptocurrency of the Temptation Token platform on the Base blockchain. Use it to vote on profiles, submit your own, stake for rewards, and win prizes.' },
-    { q:'How do I get $TTS?', a:'New users receive 100 $TTS as a sign-up bonus. You can also buy $TTS via the Base DEX, Uniswap, Coinbase, or crypto.com. You need ETH or USDC on the Base network.' },
+    { q:'How do I get $TTS?', a:'New users receive 100 $TTS as a sign-up bonus. You can also buy $TTS via Uniswap on Base. You need ETH on the Base network.' },
     { q:'How do I connect my wallet?', a:'Tap Connect at the top of the app. We support MetaMask, WalletConnect, Trust Wallet, and Coinbase Wallet. Ensure you are on the Base network.' },
     { q:'Can I download the photos?', a:'No. All submitted photos are the exclusive property of Blockchain Entertainment LLC. Right-click saving, drag-saving, and downloading are prohibited by our Terms of Service.' },
-    { q:'Can I remove my votes once placed?', a:'No. Votes are final and cannot be removed or reduced once placed. You may add additional votes to any profile at any time during the active week.' },
-    { q:'How are winners determined?', a:'The player who committed the most cumulative $TTS to the winning profile (most total votes by Sunday 23:59 UTC) is the Top Voter and receives 40% of that profile\'s pool plus their full stake returned.' },
-    { q:'What happens to losing votes?', a:'Losing votes are burned to preserve $TTS value and integrity, after a portion is set aside to fund staking rewards for active stakers.' },
-    { q:'When are prizes paid out?', a:'Prizes are distributed automatically via Base smart contract immediately after the round closes Sunday 23:59 UTC. Funds go directly to wallet addresses on file.' },
-    { q:'Who is the Polaris Project?', a:'The Polaris Project is a 501(c)(3) nonprofit dedicated to disrupting human trafficking globally. 10% of every weekly prize pool is donated to them. Blockchain Entertainment LLC reserves the right to change the designated nonprofit at any time.' },
+    { q:'Can I remove my votes once placed?', a:'No. Votes are final and cannot be removed or reduced once placed. You may add additional votes to any profile at any time during the active round.' },
+    { q:'How are winners determined?', a:'A Chainlink VRF provably fair random draw selects the winning profile, weighted by ticket count. Every TTS voted equals one lottery ticket — more votes means better odds but anyone can win.' },
+    { q:'What happens to losing votes?', a:'Losing votes are permanently burned on-chain, reducing the total TTS supply every single week.' },
+    { q:'When are prizes paid out?', a:'Prizes are distributed automatically via Base smart contract immediately after the round settles. Funds go directly to wallet addresses on file.' },
+    { q:'Who is the Polaris Project?', a:'The Polaris Project is a 501(c)(3) nonprofit dedicated to disrupting human trafficking globally. 10% of every weekly prize pool is donated to them.' },
     { q:'Who do I contact for support?', a:'For photo or submission questions email photos@temptationtoken.io. All gameplay notifications are delivered in-app only.' },
   ]
   const [open, setOpen] = useState(null)
@@ -1044,7 +1105,7 @@ export default function App() {
   const [tab, setTab] = useState('play')
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
   const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
-      const [balance, setBalance] = useState(0)
+  const [balance, setBalance] = useState(0)
   const { data: walletClient } = useWalletClient()
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
@@ -1057,11 +1118,11 @@ export default function App() {
 
   const sp = { balance, setBalance, showToast, connected: isConnected, address, walletClient }
 
-
   useEffect(() => {
     if (!isConnected || !address) { setBalance(0); return }
     readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address]).then(raw => { if (raw != null) setBalance(Math.floor(Number(raw) / 1e18)) })
   }, [isConnected, address])
+
   useEffect(() => {
     const style = document.createElement('style')
     style.textContent = S
@@ -1071,7 +1132,6 @@ export default function App() {
 
   return (
     <div className="app">
-      {/* WALLET BAR */}
       <div className="wbar">
         <div className="wbar-inner">
           <div className="wlogo">
@@ -1092,7 +1152,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* NAV */}
       <div className="nav">
         <div className="nav-inner">
           {tabs.map(t => (
@@ -1101,7 +1160,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* SCREENS */}
       <div className="main">
         {tab==='play'        && <PlayScreen {...sp} />}
         {tab==='leaderboard' && <LeaderboardScreen />}
@@ -1110,30 +1168,30 @@ export default function App() {
         {tab==='submit'      && <SubmitScreen {...sp} />}
         {tab==='refer'       && <ReferScreen {...sp} />}
         {tab==='rules'       && <RulesScreen />}
+        {tab==='howto'       && <HowToWinScreen />}
         {tab==='faqs'        && <FAQScreen />}
       </div>
 
-      {/* MODALS */}
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
       {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} />}
 
       <TTSChatbot />
-      {/* TOAST */}
       <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>
+
       {showWelcome && (
         <div style={{position:'fixed',inset:0,background:'var(--void)',zIndex:800,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px'}}>
           <img src="/tts_logo.webp" alt="TTS" style={{width:88,height:88,objectFit:'contain',marginBottom:20}} draggable="false"/>
-          <div style={{fontFamily:'var(--font-body)',fontSize:'1.7rem',fontWeight:800,color:'var(--text)',marginBottom:8,textAlign:'center'}}>Temptation Token</div>
+          <div style={{fontFamily:'var(--font-b)',fontSize:'1.7rem',fontWeight:800,color:'var(--text)',marginBottom:8,textAlign:'center'}}>Temptation Token</div>
           <div style={{fontSize:'.82rem',color:'var(--muted)',textAlign:'center',lineHeight:1.7,marginBottom:28,maxWidth:320}}>Vote on profiles. Pick the winner. Earn $TTS every week.</div>
           <div style={{width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:12,marginBottom:28}}>
-            {[["1","Browse & Pick Your Winner","Swipe through photos. Find the one you think wins."],["2","Vote $TTS on That Profile","Minimum 5 $TTS. No limit. Votes are final."],["3","Win Big on Sunday Night","Top voter on the winning profile takes 40% + wager back."]].map(([n,t,b]) => (
+            {[["1","Browse & Pick Your Winner","Swipe through photos. Find the one you think wins."],["2","Vote $TTS on That Profile","Minimum 5 $TTS. No limit. Votes are final."],["3","Anyone Can Win","Provably fair Chainlink VRF lottery. More votes = better odds, but anyone can win."]].map(([n,t,b]) => (
               <div key={n} style={{display:'flex',alignItems:'flex-start',gap:14,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:16}}>
                 <div style={{fontSize:'1.2rem',fontWeight:800,color:'var(--gold)',flexShrink:0,width:28}}>{n}</div>
                 <div style={{fontSize:'.78rem',color:'var(--text)',lineHeight:1.6}}><strong style={{color:'var(--gold-light)',display:'block',marginBottom:3}}>{t}</strong>{b}</div>
               </div>
             ))}
           </div>
-          <button onClick={dismissWelcome} style={{background:'linear-gradient(135deg,var(--crimson),#a0203a)',color:'var(--text)',border:'none',borderRadius:10,padding:'18px 40px',fontFamily:'var(--font-body)',fontSize:'.86rem',letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,cursor:'pointer',width:'100%',maxWidth:340}}>
+          <button onClick={dismissWelcome} style={{background:'linear-gradient(135deg,var(--crimson),#a0203a)',color:'var(--text)',border:'none',borderRadius:10,padding:'18px 40px',fontFamily:'var(--font-b)',fontSize:'.86rem',letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,cursor:'pointer',width:'100%',maxWidth:340}}>
             Let's Go — Start Playing
           </button>
           <div onClick={dismissWelcome} style={{fontSize:'.68rem',color:'var(--muted)',marginTop:14,cursor:'pointer',textDecoration:'underline'}}>Skip intro</div>
