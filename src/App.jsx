@@ -509,7 +509,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
     })
     .then(r => r.json())
     .then(data => {
-      if (data && data.length >= 3) {
+      if (data && data.length >= 1) {
         const mapped = data.map((r, i) => ({
           id: i + 1,
           username: r.display_name || 'Anonymous',
