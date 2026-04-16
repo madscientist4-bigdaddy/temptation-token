@@ -802,12 +802,12 @@ function BuySellScreen({ showToast, connected }) {
 }
 
 // ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
-function SubmitScreen({ balance, setBalance, showToast, connected }) {
+function SubmitScreen({ balance, setBalance, showToast, connected, address }) {
   const [prev, setPrev] = useState(null)
   const [name, setName] = useState('')
   const [lt, setLt] = useState('')
   const [lu, setLu] = useState('')
-  const [wallet, setWallet] = useState('')
+  const [wallet, setWallet] = useState(address || '')
   const [a1, setA1] = useState(false)
   const [a2, setA2] = useState(false)
   const fRef = useRef()
