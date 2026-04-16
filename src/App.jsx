@@ -190,9 +190,7 @@ const S = `
   .pno-dl { position:absolute; inset:0; z-index:10; cursor:default; }
   .pinfo { padding:14px 16px; }
   .pname { font-family:var(--font-b); font-size:1.25rem; font-weight:800; margin-bottom:5px; }
-  .plink { display:inline-flex; align-items:center; gap:5px; font-size:.56rem; letter-spacing:.1em;
-    text-transform:uppercase; color:var(--gold-dim); border:1px solid rgba(212,175,55,.2);
-    padding:4px 10px; border-radius:20px; cursor:pointer; transition:all .2s; background:none; font-family:var(--font-b); }
+  .plink { display:flex; align-items:center; justify-content:center; gap:8px; font-size:.85rem; letter-spacing:.12em; text-transform:uppercase; color:#fff; border:none; padding:16px 24px; border-radius:10px; cursor:pointer; transition:all .25s; background:linear-gradient(135deg,#FF6B00,#FF8C00); font-family:var(--font-b); font-weight:700; width:100%; box-shadow:0 4px 20px rgba(255,107,0,.45); }
   .plink:hover { color:var(--gold); border-color:var(--gold); }
 
   /* VOTE SECTION */
