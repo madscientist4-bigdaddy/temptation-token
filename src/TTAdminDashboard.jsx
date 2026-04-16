@@ -821,16 +821,47 @@ function OverviewScreen() {
   );
 }
 
+const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k';
+
 function ReviewScreen({ showToast }) {
-  const [queue, setQueue] = useState(PENDING_SUBMISSIONS);
-  const [confirmed, setConfirmed] = useState(null); // { id, action }
+  const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [confirmed, setConfirmed] = useState(null);
+
+  useEffect(() => {
+    fetch(SUPABASE_URL + '/rest/v1/submissions?status=eq.pending&select=*&order=created_at.asc', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    })
+    .then(r => r.json())
+    .then(data => {
+      setQueue(data.map(r => ({
+        id: r.id,
+        name: r.display_name,
+        wallet: r.payout_wallet,
+        link: r.link_title,
+        linkUrl: r.link_url,
+        img: r.image_url,
+        submittedAt: r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Unknown'
+      })));
+      setLoading(false);
+    })
+    .catch(() => setLoading(false));
+  }, []);
 
   const execute = () => {
     const { id, action } = confirmed;
-    setQueue(q => q.filter(s => s.id !== id));
-    if (action === "approve") showToast("✓ Profile approved — user notified in-app", "success");
-    else showToast("✕ Profile denied — user notified in-app per policy", "info");
-    setConfirmed(null);
+    const status = action === "approve" ? "approved" : "rejected";
+    fetch(SUPABASE_URL + '/rest/v1/submissions?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status })
+    }).then(() => {
+      setQueue(q => q.filter(s => s.id !== id));
+      if (action === "approve") showToast("✓ Profile approved — now live in Play tab", "success");
+      else showToast("✕ Profile denied", "info");
+      setConfirmed(null);
+    });
   };
 
   return (
