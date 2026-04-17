@@ -1,4 +1,25 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+
+// ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
+const SB_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k';
+const sb = {
+  get: (table, query='') => fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+  }).then(r => r.json()),
+  patch: (table, query, body) => fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    body: JSON.stringify(body)
+  }),
+  post: (table, body) => fetch(`${SB_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    body: JSON.stringify(body)
+  })
+};
+
+
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const injectStyles = () => {
@@ -1294,6 +1315,160 @@ function SettingsScreen() {
   );
 }
 
+
+// ─── SYSTEM HEALTH SCREEN ─────────────────────────────────────────────────────
+const VOTING_ADDRESS = '0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA';
+const LINK_TOKEN = '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196';
+const UPKEEPS = [
+  { name: 'TTS Link Reserve Monitor', address: '0x3bc527a635098aafedce236c3c49ead1a1c76325' },
+  { name: 'TTS Settle Or Rollover',   address: '0x5d044296f371629e5f2749c7008b9b4ce78d6d0b' },
+  { name: 'TTS Midpoint Snapshot',    address: '0x0157d5dec47c1d210effe7d4b5878db3e28793e9' },
+  { name: 'TTS Start Round',          address: '0xe6d775528c806b05988742041120b51548c75089' },
+];
+const BASE_RPC = 'https://mainnet.base.org';
+
+async function rpcCall(method, params) {
+  const r = await fetch(BASE_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+  });
+  const d = await r.json();
+  return d.result;
+}
+
+async function getRoundInfo() {
+  // currentRoundId
+  const idHex = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: '0x92642744' }, 'latest']);
+  const roundId = parseInt(idHex, 16);
+  // getRound(roundId)
+  const encoded = '0x' + 'a087a87d' + roundId.toString(16).padStart(64, '0');
+  const result = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: encoded }, 'latest']);
+  if (!result || result === '0x') return { roundId, error: true };
+  const startTime = parseInt(result.slice(2, 66), 16);
+  const endTime = parseInt(result.slice(66, 130), 16);
+  const settled = parseInt(result.slice(194, 258), 16) === 1;
+  const vrfPending = parseInt(result.slice(258, 322), 16) === 1;
+  const profileCount = parseInt(result.slice(322, 386), 16);
+  return { roundId, startTime, endTime, settled, vrfPending, profileCount };
+}
+
+async function getLinkBalance(address) {
+  // balanceOf(address)
+  const data = '0x70a08231' + address.toLowerCase().replace('0x','').padStart(64,'0');
+  const result = await rpcCall('eth_call', [{ to: LINK_TOKEN, data }, 'latest']);
+  return parseInt(result, 16) / 1e18;
+}
+
+function StatusBadge({ status }) {
+  const colors = { ok: '#2ecc71', warn: '#f39c12', critical: '#e84040', unknown: '#666' };
+  const labels = { ok: '● Healthy', warn: '● Warning', critical: '● Critical', unknown: '● Unknown' };
+  return <span style={{ color: colors[status], fontSize: '.72rem', fontWeight: 700, letterSpacing: '.06em' }}>{labels[status]}</span>;
+}
+
+function SystemScreen() {
+  const [round, setRound] = React.useState(null);
+  const [links, setLinks] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [lastRefresh, setLastRefresh] = React.useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [roundInfo, ...linkBals] = await Promise.all([
+        getRoundInfo(),
+        ...UPKEEPS.map(u => getLinkBalance(u.address))
+      ]);
+      setRound(roundInfo);
+      setLinks(UPKEEPS.map((u, i) => ({ ...u, balance: linkBals[i] })));
+      setLastRefresh(new Date().toLocaleTimeString());
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
+
+  const now = Math.floor(Date.now() / 1000);
+  const roundOverdue = round && !round.settled && now > round.endTime;
+  const roundEndsIn = round ? Math.max(0, round.endTime - now) : 0;
+  const days = Math.floor(roundEndsIn / 86400);
+  const hrs = Math.floor((roundEndsIn % 86400) / 3600);
+  const mins = Math.floor((roundEndsIn % 3600) / 60);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">System Health</div>
+        <div className="gold-rule" />
+        <div className="page-sub" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span>Live monitoring — auto-refreshes every 60 seconds</span>
+          <button onClick={load} style={{ background:'none', border:'1px solid rgba(212,175,55,.3)', color:'var(--gold-dim)', padding:'4px 12px', borderRadius:6, cursor:'pointer', fontSize:'.7rem' }}>
+            {loading ? '⟳ Refreshing...' : '⟳ Refresh Now'}
+          </button>
+        </div>
+        {lastRefresh && <div style={{ fontSize:'.65rem', color:'var(--muted)', marginTop:4 }}>Last updated: {lastRefresh}</div>}
+      </div>
+
+      {/* ROUND STATUS */}
+      <div className="table-card" style={{ marginBottom: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">🔄 Round Status</div>
+          {round && <StatusBadge status={round.error ? 'unknown' : round.vrfPending ? 'warn' : roundOverdue ? 'critical' : 'ok'} />}
+        </div>
+        {loading && !round ? <div style={{ padding: 20, color: 'var(--muted)', fontSize: '.8rem' }}>Loading round data...</div> : round && !round.error ? (
+          <table className="adm-table">
+            <tbody>
+              <tr><td style={{ color:'var(--muted)' }}>Round ID</td><td><strong>{round.roundId}</strong></td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Status</td><td>
+                {round.settled ? <span style={{ color:'#2ecc71' }}>✅ Settled</span>
+                  : roundOverdue ? <span style={{ color:'#e84040' }}>⚠️ OVERDUE — needs settlement</span>
+                  : round.vrfPending ? <span style={{ color:'#f39c12' }}>⏳ VRF Pending — awaiting randomness</span>
+                  : <span style={{ color:'#2ecc71' }}>🟢 Active</span>}
+              </td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Time Remaining</td><td>
+                {roundOverdue ? <span style={{ color:'#e84040' }}>Round ended — awaiting Chainlink</span>
+                  : <strong>{days}d {hrs}h {mins}m</strong>}
+              </td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>End Time</td><td>{new Date(round.endTime * 1000).toLocaleString()}</td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Profiles</td><td>{round.profileCount}</td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Settled</td><td>{round.settled ? '✅ Yes' : '❌ No'}</td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>VRF Pending</td><td>{round.vrfPending ? '⏳ Yes' : '✅ No'}</td></tr>
+            </tbody>
+          </table>
+        ) : <div style={{ padding: 20, color: '#e84040', fontSize: '.8rem' }}>Failed to load round data</div>}
+      </div>
+
+      {/* CHAINLINK UPKEEP BALANCES */}
+      <div className="table-card">
+        <div className="table-head">
+          <div className="table-head-title">⛓ Chainlink Upkeep Balances</div>
+          <StatusBadge status={links.some(l => l.balance < 1) ? 'critical' : links.some(l => l.balance < 2) ? 'warn' : 'ok'} />
+        </div>
+        {links.length === 0 ? <div style={{ padding: 20, color: 'var(--muted)', fontSize: '.8rem' }}>Loading balances...</div> : (
+          <table className="adm-table">
+            <thead><tr><th>Upkeep</th><th>LINK Balance</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {links.map(u => (
+                <tr key={u.name}>
+                  <td style={{ fontSize: '.75rem' }}>{u.name}</td>
+                  <td><strong style={{ color: u.balance < 1 ? '#e84040' : u.balance < 2 ? '#f39c12' : '#2ecc71' }}>{u.balance.toFixed(3)} LINK</strong></td>
+                  <td><StatusBadge status={u.balance < 1 ? 'critical' : u.balance < 2 ? 'warn' : 'ok'} /></td>
+                  <td><a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>Fund →</a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* ALERT THRESHOLDS */}
+      <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.1)', borderRadius: 8, fontSize: '.72rem', color: 'var(--muted)' }}>
+        <strong style={{ color: 'var(--gold-dim)' }}>Alert thresholds:</strong> Critical (red) = below 1.0 LINK · Warning (amber) = below 2.0 LINK · Healthy (green) = above 2.0 LINK. Fund upkeeps at automation.chain.link/base before they hit Critical.
+      </div>
+    </div>
+  );
+}
+
 // ─── SIDEBAR NAV CONFIG ───────────────────────────────────────────────────────
 const NAV = [
   { section: "Dashboard", items: [
@@ -1305,6 +1480,7 @@ const NAV = [
     { key: "wallets",     icon: "💼", label: "Wallets" },
     { key: "referral",    icon: "🔗", label: "Referrals" },
     { key: "settings",    icon: "⚙️", label: "Settings" },
+    { key: "system",     icon: "🛡️", label: "System Health" },
   ]},
 ];
 
@@ -1327,11 +1503,12 @@ export default function AdminApp() {
     staking:  <StakingScreen />,
     referral: <ReferralScreen showToast={showToast} />,
     settings: <SettingsScreen />,
+    system:   <SystemScreen />,
   };
 
   const titles = {
     overview: "Overview", review: "Photo Review", users: "User Management",
-    wallets: "Wallets", payouts: "Payouts", staking: "Staking", settings: "Settings"
+    wallets: "Wallets", payouts: "Payouts", staking: "Staking", settings: "Settings", system: "System Health"
   };
 
   return (
