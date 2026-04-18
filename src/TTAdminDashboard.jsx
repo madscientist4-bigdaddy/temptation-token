@@ -992,12 +992,12 @@ function UsersScreen({ showToast }) {
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    sb.get('users', 'select=*&order=joined_at.desc').then(d => {
+    sb.get('users', 'select=*').then(d => {
       if (Array.isArray(d)) {
         setUsers(d.map(u => ({
-          id: u.uid,
+          id: u.id,
           handle: u.username || u.first_name || 'Anonymous',
-          wallet: u.uid ? String(u.uid).slice(0,6)+'...'+String(u.uid).slice(-4) : '—',
+          wallet: u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : '—',
           email: '—',
           joined: u.joined_at ? new Date(u.joined_at*1000).toLocaleDateString() : '—',
           balance: 0,
