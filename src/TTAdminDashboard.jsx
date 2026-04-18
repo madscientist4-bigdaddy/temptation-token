@@ -719,12 +719,12 @@ const WEEK_VOTES = [
 ];
 
 const WALLETS = [
-  { label: "Master Wallet", name: "Blockchain Entertainment LLC", addr: "0x — ADD ADDRESS", balance: "2,400,000", network: "Base Mainnet" },
-  { label: "Weekly Voting Pool", name: "Escrow — Weekly Votes", addr: "0x — ADD ADDRESS", balance: "141,550", network: "Base Mainnet" },
-  { label: "Staking Lock", name: "Locked Staking Vault", addr: "0x — ADD ADDRESS", balance: "890,000", network: "Base Mainnet" },
-  { label: "Sign-Up Bonus", name: "New User Airdrop Wallet", addr: "0x — ADD ADDRESS", balance: "690,000", network: "Base Mainnet" },
-  { label: "Company Revenue", name: "Blockchain Entertainment LLC — Revenue", addr: "0x — ADD ADDRESS", balance: "48,200", network: "Base Mainnet" },
-  { label: "Nonprofit", name: "Polaris Project Donations", addr: "0x — ADD ADDRESS", balance: "9,640", network: "Base Mainnet" },
+  { label: "Master Wallet", name: "Blockchain Entertainment LLC", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "2,400,000", network: "Base Mainnet" },
+  { label: "Weekly Voting Pool", name: "Escrow — Weekly Votes", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "141,550", network: "Base Mainnet" },
+  { label: "Staking Lock", name: "Locked Staking Vault", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "890,000", network: "Base Mainnet" },
+  { label: "Sign-Up Bonus", name: "New User Airdrop Wallet", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "690,000", network: "Base Mainnet" },
+  { label: "Company Revenue", name: "Blockchain Entertainment LLC — Revenue", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "48,200", network: "Base Mainnet" },
+  { label: "Nonprofit", name: "Polaris Project Donations", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "9,640", network: "Base Mainnet" },
 ];
 
 const TOTAL_POOL = 141550;
@@ -771,19 +771,51 @@ function LoginScreen({ onLogin }) {
 // ─── SCREENS ──────────────────────────────────────────────────────────────────
 
 function OverviewScreen() {
-  const stats = [
-    { label: "Total Users", value: "1,284", sub: "↑ 48 this week", cls: "" },
-    { label: "Active This Week", value: "891", sub: "69% engagement", cls: "" },
-    { label: "Total Pool This Week", value: "141,550", sub: "$TTS in escrow", cls: "gold" },
-    { label: "Submissions Pending", value: "6", sub: "Awaiting review", cls: "rose" },
-    { label: "Approved Profiles", value: "38", sub: "Active this week", cls: "green" },
-  ];
+  const [stats, setStats] = useState([
+    { label: "Total Users", value: "...", sub: "Loading", cls: "" },
+    { label: "Active This Week", value: "...", sub: "Loading", cls: "" },
+    { label: "Total Pool This Week", value: "...", sub: "$TTS in escrow", cls: "gold" },
+    { label: "Submissions Pending", value: "...", sub: "Awaiting review", cls: "rose" },
+    { label: "Approved Profiles", value: "...", sub: "Active this week", cls: "green" },
+  ]);
+  const [votes, setVotes] = useState([]);
+  const [totalPool, setTotalPool] = useState(0);
+
+  useEffect(() => {
+    // Total users
+    sb.get('users', 'select=id').then(d => {
+      if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 0 ? { ...st, value: d.length.toLocaleString(), sub: "registered wallets" } : st));
+    }).catch(() => {});
+    // Pending submissions
+    sb.get('submissions', 'status=eq.pending&select=id').then(d => {
+      if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 3 ? { ...st, value: d.length.toString() } : st));
+    }).catch(() => {});
+    // Approved profiles
+    sb.get('submissions', 'status=eq.approved&select=id').then(d => {
+      if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 4 ? { ...st, value: d.length.toString() } : st));
+    }).catch(() => {});
+    // Votes this week
+    sb.get('votes', 'select=profile_id,amount').then(d => {
+      if (Array.isArray(d)) {
+        const totals = {};
+        let pool = 0;
+        d.forEach(v => {
+          totals[v.profile_id] = (totals[v.profile_id] || 0) + (Number(v.amount) || 0);
+          pool += Number(v.amount) || 0;
+        });
+        setTotalPool(pool);
+        setStats(s => s.map((st, i) => i === 2 ? { ...st, value: Math.round(pool).toLocaleString() } : st));
+        const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        setVotes(sorted.map(([id, amt]) => ({ name: id, votes: Math.round(amt), pct: pool > 0 ? Math.round((amt / pool) * 100) : 0 })));
+      }
+    }).catch(() => {});
+  }, []);
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Overview</div>
         <div className="gold-rule" />
-        <div className="page-sub"><span className="dot-live" />Live · Week of March 3–9, 2026 · Base Mainnet</div>
+        <div className="page-sub"><span className="dot-live" />Live · Week of Apr 13–19, 2026 · Base Mainnet</div>
       </div>
       <div className="stat-grid">
         {stats.map((s, i) => (
@@ -799,7 +831,7 @@ function OverviewScreen() {
       <div className="table-card">
         <div className="table-head">
           <span className="table-head-title">📊 Live Vote Rankings</span>
-          <span className="table-count">Week of Mar 3–9</span>
+          <span className="table-count">Week of Apr 13–19, 2026</span>
         </div>
         <table className="adm-table">
           <thead>
@@ -812,13 +844,13 @@ function OverviewScreen() {
             </tr>
           </thead>
           <tbody>
-            {WEEK_VOTES.map((v, i) => (
+            {votes.map((v, i) => (
               <tr key={i}>
                 <td style={{ color: i === 0 ? "var(--gold)" : "var(--muted)", fontFamily: "var(--font-display)", fontSize: "1rem" }}>{i + 1}</td>
                 <td style={{ fontFamily: "var(--font-display)", fontSize: "0.95rem", fontStyle: "italic" }}>{v.name}</td>
                 <td style={{ fontFamily: "var(--font-display)", fontSize: "0.95rem", color: "var(--gold-light)" }}>{v.votes.toLocaleString()}</td>
                 <td style={{ width: 140 }}>
-                  <div style={{ fontSize: "0.6rem", color: "var(--muted)", marginBottom: 3 }}>{Math.round((v.votes / TOTAL_POOL) * 100)}% of pool</div>
+                  <div style={{ fontSize: "0.6rem", color: "var(--muted)", marginBottom: 3 }}>{Math.round((v.votes / (totalPool || 1)) * 100)}% of pool</div>
                   <div className="progress-bar-wrap"><div className="progress-bar" style={{ width: `${v.pct}%` }} /></div>
                 </td>
                 <td style={{ color: "var(--green)", fontSize: "0.65rem" }}>↑ Live</td>
@@ -830,7 +862,7 @@ function OverviewScreen() {
 
       {/* Payout preview */}
       <div className="payout-breakdown">
-        <div className="payout-title">Projected Prize Distribution — Week of Mar 3–9</div>
+        <div className="payout-title">Projected Prize Distribution — Week of Apr 13–19, 2026</div>
         <div className="payout-row"><span className="payout-label">Total Pool</span><span className="payout-amount">{TOTAL_POOL.toLocaleString()} $TTS</span></div>
         <div className="payout-row"><span className="payout-label">🏆 Top Voter (40% + stake returned)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>~56,620 $TTS</span></div>
         <div className="payout-row"><span className="payout-label">📸 Winning Profile (40%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>56,620 $TTS</span></div>
@@ -1039,7 +1071,7 @@ function WalletsScreen() {
         <div className="page-sub">All operational wallets on Base Mainnet · Add your addresses below</div>
       </div>
       <div style={{ background: "rgba(243,156,18,0.07)", border: "1px solid rgba(243,156,18,0.25)", borderRadius: 10, padding: "12px 16px", marginBottom: 22, fontSize: "0.65rem", color: "var(--amber)", lineHeight: 1.7, letterSpacing: "0.04em" }}>
-        ⚠ Wallet addresses below are placeholders. Replace each "0x — ADD ADDRESS" with your actual Base wallet address before going live. Verify every address triple-checked. Funds sent to incorrect addresses are irrecoverable.
+        ⚠ Wallet addresses below are placeholders. Replace each "0xb1e991bf617459b58964eef7756b350e675c53b5" with your actual Base wallet address before going live. Verify every address triple-checked. Funds sent to incorrect addresses are irrecoverable.
       </div>
       <div className="wallet-panel-grid">
         {WALLETS.map((w, i) => (
@@ -1057,7 +1089,7 @@ function WalletsScreen() {
 }
 
 function PayoutsScreen({ showToast }) {
-  const [week, setWeek] = useState("Mar 3–9, 2026");
+  const [week, setWeek] = useState("Apr 13–19, 2026");
   return (
     <div>
       <div className="page-header">
@@ -1068,7 +1100,7 @@ function PayoutsScreen({ showToast }) {
       <div className="week-select-row">
         <span className="week-select-label">Week:</span>
         <select className="filter-select" value={week} onChange={e => setWeek(e.target.value)}>
-          <option>Mar 3–9, 2026</option>
+          <option>Apr 13–19, 2026</option>
           <option>Feb 24 – Mar 2, 2026</option>
           <option>Feb 17–23, 2026</option>
         </select>
@@ -1086,8 +1118,8 @@ function PayoutsScreen({ showToast }) {
             {[
               { r: "VoterKing99", role: "Top Voter", amt: "56,620 + stake", wallet: "0x11aa...2233", status: "pending" },
               { r: "Scarlett_V", role: "Winning Profile", amt: "56,620", wallet: "0x4a3b...c291", status: "pending" },
-              { r: "Blockchain Ent. LLC", role: "Company (10%)", amt: "14,155", wallet: "0x — MASTER", status: "pending" },
-              { r: "Polaris Project", role: "Nonprofit (10%)", amt: "14,155", wallet: "0x — POLARIS", status: "pending" },
+              { r: "Blockchain Ent. LLC", role: "Company (10%)", amt: "14,155", wallet: "0xb1e991bf617459b58964eef7756b350e675c53b5", status: "pending" },
+              { r: "Polaris Project", role: "Nonprofit (10%)", amt: "14,155", wallet: "0xf7dd429d679cb61231e73785fd1737e60138aba3", status: "pending" },
             ].map((row, i) => (
               <tr key={i}>
                 <td style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "0.95rem" }}>{row.r}</td>
@@ -1569,7 +1601,7 @@ export default function AdminApp() {
           <div className="topbar">
             <div className="topbar-title">{titles[active]}</div>
             <div className="topbar-right">
-              <span className="topbar-week"><span className="dot-live" />Week of Mar 3–9, 2026</span>
+              <span className="topbar-week"><span className="dot-live" />Week of Apr 13–19, 2026</span>
               <span className="admin-pill">Admin · Blockchain Entertainment LLC</span>
             </div>
           </div>
