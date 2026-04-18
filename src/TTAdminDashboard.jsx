@@ -986,9 +986,29 @@ function ReviewScreen({ showToast }) {
 }
 
 function UsersScreen({ showToast }) {
-  const [users, setUsers] = useState(ALL_USERS);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    sb.get('users', 'select=*&order=joined_at.desc').then(d => {
+      if (Array.isArray(d)) {
+        setUsers(d.map(u => ({
+          id: u.uid,
+          handle: u.username || u.first_name || 'Anonymous',
+          wallet: u.uid ? String(u.uid).slice(0,6)+'...'+String(u.uid).slice(-4) : '—',
+          email: '—',
+          joined: u.joined_at ? new Date(u.joined_at*1000).toLocaleDateString() : '—',
+          balance: 0,
+          status: 'active',
+          vip: u.vip_tier || 'none',
+          ref_code: u.ref_code || '—'
+        })));
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
