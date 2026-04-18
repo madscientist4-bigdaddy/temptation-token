@@ -746,7 +746,7 @@ function LoginScreen({ onLogin }) {
   const [err, setErr] = useState("");
 
   const handle = () => {
-    if (user === "admin" && pass === "TTS2026!") { onLogin(); }
+    if (user === "admin" && pass === "YOURNEWPASSWORD") { onLogin(); }
     else { setErr("Invalid credentials. Contact your system administrator."); }
   };
 
@@ -773,7 +773,7 @@ function LoginScreen({ onLogin }) {
 function OverviewScreen() {
   const [stats, setStats] = useState([
     { label: "Total Users", value: "...", sub: "Loading", cls: "" },
-    { label: "Active This Week", value: "...", sub: "Loading", cls: "" },
+    { label: "Active This Week", value: "0", sub: "unique voters this week", cls: "" },
     { label: "Total Pool This Week", value: "...", sub: "$TTS in escrow", cls: "gold" },
     { label: "Submissions Pending", value: "...", sub: "Awaiting review", cls: "rose" },
     { label: "Approved Profiles", value: "...", sub: "Active this week", cls: "green" },
@@ -1155,7 +1155,7 @@ function PayoutsScreen({ showToast }) {
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button className="login-btn" style={{ flex: 1, minWidth: 200 }} onClick={() => showToast("Payout transaction broadcast on Base — TX pending confirmation", "success")}>
-          Execute Payouts on Base
+          Payouts Execute Automatically On-Chain
         </button>
         <button className="login-btn" style={{ flex: 1, minWidth: 200, background: "var(--surface2)", color: "var(--muted)", border: "1px solid var(--border)" }} onClick={() => showToast("Payout report exported", "info")}>
           Export Report
