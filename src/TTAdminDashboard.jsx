@@ -1169,12 +1169,26 @@ function PayoutsScreen({ showToast }) {
 }
 
 function StakingScreen() {
-  const stakers = [
-    { handle: "CryptoQueen", wallet: "0x22bb...3344", amount: "8,750", tier: "Gold", boost: "1.5×", apr: "18%", locked: "6 months", unlocks: "Aug 3, 2026" },
-    { handle: "FlameVoter", wallet: "0x55ee...6677", amount: "5,100", tier: "Silver", boost: "1.25×", apr: "12%", locked: "3 months", unlocks: "Jun 3, 2026" },
-    { handle: "TokenHunter", wallet: "0x33cc...4455", amount: "350", tier: "Bronze", boost: "1.1×", apr: "8%", locked: "3 months", unlocks: "Jun 8, 2026" },
-  ];
-  const totalStaked = stakers.reduce((a, s) => a + parseInt(s.amount.replace(",", "")), 0);
+  const [stakers, setStakers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    sb.get('stakes', 'select=*').then(d => {
+      if (Array.isArray(d)) setStakers(d.map(s => ({
+        handle: s.wallet_address ? s.wallet_address.slice(0,6)+'...'+s.wallet_address.slice(-4) : 'Unknown',
+        wallet: s.wallet_address || '—',
+        amount: s.amount ? Math.round(Number(s.amount)).toLocaleString() : '0',
+        tier: s.tier || 'Bronze',
+        boost: s.vote_boost || '1.1x',
+        apr: s.apr || '8%',
+        locked: s.lock_period || '—',
+        unlocks: s.unlock_date ? new Date(s.unlock_date).toLocaleDateString() : '—'
+      })));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const totalStaked = stakers.reduce((a, s) => a + parseInt((s.amount||'0').replace(/,/g,'')), 0);
 
   return (
     <div>
@@ -1327,7 +1341,7 @@ function SettingsScreen() {
             { label: "Max Profiles Per Week", value: "50" },
             { label: "Max Submissions Per Wallet", value: "3 per week" },
             { label: "Minimum Vote Amount", value: "5 $TTS" },
-            { label: "Profile Submission Cost", value: "1 $TTS" },
+            { label: "Profile Submission Cost", value: "5 $TTS" },
           ]
         },
         {
