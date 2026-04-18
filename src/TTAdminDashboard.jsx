@@ -1200,7 +1200,7 @@ function StakingScreen() {
       <div className="stat-grid" style={{ marginBottom: 24 }}>
         <div className="stat-card"><div className="stat-label">Total Staked</div><div className="stat-value gold">{totalStaked.toLocaleString()}</div><div className="stat-sub">$TTS locked on Base</div></div>
         <div className="stat-card"><div className="stat-label">Active Stakers</div><div className="stat-value">{stakers.length}</div><div className="stat-sub">Across all tiers</div></div>
-        <div className="stat-card"><div className="stat-label">Est. APR Obligations</div><div className="stat-value rose">~1,840</div><div className="stat-sub">$TTS owed this period</div></div>
+        <div className="stat-card"><div className="stat-label">Est. APR Obligations</div><div className="stat-value rose">0</div><div className="stat-sub">$TTS owed this period</div></div>
       </div>
       <div className="table-card">
         <div className="table-head">
