@@ -795,13 +795,13 @@ function OverviewScreen() {
       if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 4 ? { ...st, value: d.length.toString() } : st));
     }).catch(() => {});
     // Votes this week
-    sb.get('votes', 'select=profile_id,amount').then(d => {
+    sb.get('votes', 'select=submission_id,tts_amount').then(d => {
       if (Array.isArray(d)) {
         const totals = {};
         let pool = 0;
         d.forEach(v => {
-          totals[v.profile_id] = (totals[v.profile_id] || 0) + (Number(v.amount) || 0);
-          pool += Number(v.amount) || 0;
+          totals[v.submission_id] = (totals[v.submission_id] || 0) + (Number(v.tts_amount) || 0);
+          pool += Number(v.tts_amount) || 0;
         });
         setTotalPool(pool);
         setStats(s => s.map((st, i) => i === 2 ? { ...st, value: Math.round(pool).toLocaleString() } : st));
