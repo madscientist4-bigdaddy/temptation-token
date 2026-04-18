@@ -724,7 +724,7 @@ const WALLETS = [
   { label: "Staking Lock", name: "Locked Staking Vault", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "890,000", network: "Base Mainnet" },
   { label: "Sign-Up Bonus", name: "New User Airdrop Wallet", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "690,000", network: "Base Mainnet" },
   { label: "Company Revenue", name: "Blockchain Entertainment LLC — Revenue", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "48,200", network: "Base Mainnet" },
-  { label: "Nonprofit", name: "Polaris Project Donations", addr: "0xb1e991bf617459b58964eef7756b350e675c53b5", balance: "9,640", network: "Base Mainnet" },
+  { label: "Nonprofit", name: "Polaris Project Donations", addr: "0xf7dd429d679cb61231e73785fd1737e60138aba3", balance: "9,640", network: "Base Mainnet" },
 ];
 
 const TOTAL_POOL = 141550;
@@ -1136,10 +1136,10 @@ function PayoutsScreen({ showToast }) {
           </thead>
           <tbody>
             {[
-              { r: "VoterKing99", role: "Top Voter", amt: "56,620 + stake", wallet: "0x11aa...2233", status: "pending" },
-              { r: "Scarlett_V", role: "Winning Profile", amt: "56,620", wallet: "0x4a3b...c291", status: "pending" },
-              { r: "Blockchain Ent. LLC", role: "Company (10%)", amt: "14,155", wallet: "0xb1e991bf617459b58964eef7756b350e675c53b5", status: "pending" },
-              { r: "Polaris Project", role: "Nonprofit (10%)", amt: "14,155", wallet: "0xf7dd429d679cb61231e73785fd1737e60138aba3", status: "pending" },
+              { r: "Top Voter", role: "Top Voter (40%)", amt: "TBD", wallet: "Via smart contract", status: "paid" },
+              { r: "Winning Profile", role: "Profile (40%)", amt: "TBD", wallet: "Via smart contract", status: "paid" },
+              { r: "Blockchain Ent. LLC", role: "Company (10%)", amt: "TBD", wallet: "0xb1e991...53b5", status: "paid" },
+              { r: "Polaris Project", role: "Nonprofit (10%)", amt: "TBD", wallet: "0xf7dd42...aba3", status: "paid" },
             ].map((row, i) => (
               <tr key={i}>
                 <td style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "0.95rem" }}>{row.r}</td>
