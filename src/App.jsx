@@ -40,6 +40,15 @@ async function writeContract(walletClient, address, abi, fn, args = []) {
   return await walletClient.writeContract({ address, abi: parseAbi(abi), functionName: fn, args })
 }
 
+async function waitForReceipt(hash) {
+  const { createPublicClient, http } = await import('https://esm.sh/viem@2.21.19')
+  const client = createPublicClient({
+    chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
+    transport: http()
+  })
+  return await client.waitForTransactionReceipt({ hash, timeout: 60_000 })
+}
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import TTSChatbot from './TTSChatbot.jsx'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
@@ -502,28 +511,47 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [photos, setPhotos] = useState(() => [...PHOTOS].sort(() => Math.random() - .5))
 
   useEffect(() => {
-    fetch(SUPABASE_URL + '/rest/v1/submissions?status=eq.approved&select=*', {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data && data.length >= 1) {
-        const mapped = data.map((r, i) => ({
-          id: i + 1,
-          username: r.display_name || 'Anonymous',
-          profileId: r.id,
-          link: r.link_title || 'Profile',
-          link_url: r.link_url || '',
-          votes: 0,
-          myVotes: 0,
-          img: r.image_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80',
-          wallet: r.wallet_address,
-          payout_wallet: r.payout_wallet
+    async function loadPhotos() {
+      // Get current round ID first so we filter submissions to the active round
+      const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
+      const currentRound = roundId != null ? Number(roundId) : 1
+
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/submissions?status=eq.approved&round_id=eq.${currentRound}&select=*`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
+      )
+      const data = await res.json()
+
+      if (!data || data.length < 1) return
+
+      const mapped = data.map((r, i) => ({
+        id: i + 1,
+        username: r.display_name || 'Anonymous',
+        profileId: r.id,
+        link: r.link_title || 'Profile',
+        link_url: r.link_url || '',
+        votes: 0,
+        myVotes: 0,
+        img: r.image_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80',
+        wallet: r.wallet_address,
+        payout_wallet: r.payout_wallet
+      }))
+      const shuffled = mapped.sort(() => Math.random() - .5)
+      setPhotos(shuffled)
+
+      // Load on-chain vote counts in parallel
+      if (roundId != null) {
+        const withVotes = await Promise.all(shuffled.map(async p => {
+          try {
+            const profile = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId, p.profileId])
+            if (profile) return { ...p, votes: Math.floor(Number(profile[2]) / 1e18) }
+          } catch(_) {}
+          return p
         }))
-        setPhotos(mapped.sort(() => Math.random() - .5))
+        setPhotos(withVotes)
       }
-    })
-    .catch(e => console.error('Photo fetch error:', e))
+    }
+    loadPhotos().catch(e => console.error('Photo fetch error:', e))
   }, [])
   const [va, setVa] = useState({})
   const [voting, setVoting] = useState({})
@@ -557,26 +585,38 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
 
     setVoting(v => ({ ...v, [photo.id]: true }))
     try {
+      // Verify an active round exists before touching the wallet
+      const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId')
+      const round = roundId != null ? await readContract(VOTING_ADDRESS, VOTING_ABI, 'getRound', [roundId]) : null
+      const now = Math.floor(Date.now() / 1000)
+      if (!round || Number(round[0]) > now || now > Number(round[1])) {
+        showToast('No active voting round right now — check back soon', 'e')
+        return
+      }
+
       const amountWei = BigInt(Math.floor(a * 1e18))
 
       // Check current allowance
       const allowance = await readContract(TTS_ADDRESS, TTS_ABI, 'allowance', [address, VOTING_ADDRESS])
       if (!allowance || BigInt(allowance.toString()) < amountWei) {
         showToast('Approving $TTS... confirm in wallet', 's')
-        await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, amountWei])
+        const approveTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, amountWei])
+        showToast('Waiting for approval...', 's')
+        await waitForReceipt(approveTx)
         showToast('Approved! Casting vote...', 's')
       } else {
         showToast('Casting vote on-chain...', 's')
       }
 
       // Cast the vote
-      await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
+      const voteTx = await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
+      await waitForReceipt(voteTx)
 
       // Update UI
       setBalance(b => b - a)
       setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, votes: p.votes + a, myVotes: p.myVotes + a } : p))
       setVa(v => ({ ...v, [photo.id]: '' }))
-      showToast(`${a.toLocaleString()} $TTS voted on-chain! 🔥`, 's')
+      showToast(`${a.toLocaleString()} $TTS voted on-chain!`, 's')
     } catch(e) {
       console.error('Vote error:', e)
       const msg = e.shortMessage || e.message || 'Unknown error'
@@ -829,10 +869,11 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address }) {
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
     if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
     setBalance(b => b - 5)
+    const currentRoundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').then(r => r != null ? Number(r) : 1).catch(() => 1)
     fetch(SUPABASE_URL + '/rest/v1/submissions', {
       method: 'POST',
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ round_id: 1, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
+      body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
     }).then(r => { if(r.ok) showToast('Submission sent for review!','s'); else showToast('Submission received — admin notified.','s') })
     .catch(() => showToast('Submission received — admin notified.','s'))
     setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false)
