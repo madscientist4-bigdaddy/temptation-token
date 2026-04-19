@@ -746,7 +746,7 @@ function LoginScreen({ onLogin }) {
   const [err, setErr] = useState("");
 
   const handle = () => {
-    if (user === "admin" && pass === "YOURNEWPASSWORD") { onLogin(); }
+    if (user === "admin" && pass === "Sexxxyfit69!") { onLogin(); }
     else { setErr("Invalid credentials. Contact your system administrator."); }
   };
 
