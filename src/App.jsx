@@ -1,7 +1,7 @@
 
 // ── CONTRACT ADDRESSES (Base Mainnet) ────────────────────────────────────────
 const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
-const VOTING_ADDRESS  = '0x18c063BA1b7eA495d5E69f40d220A0639fD5FB9d'
+const VOTING_ADDRESS  = '0x4aCeD9cB97eA45a5Ef7B1f6d6888264FaB45b218'
 const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
 const AIRDROP_ADDRESS = '0x214f482ae7DC1C48A4761759Dc70B6545ff36f0f'
 const NFT_ADDRESS     = '0x8b1EFa595a9c6b670078701069EADC5ae857091f'
@@ -654,7 +654,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                 </div>
                 <div className="pinfo">
                   <div className="pname">{ph.username}</div>
-                  <button className="plink">🔗 {ph.link}</button>
+                  {ph.link_url && <button className="plink" onClick={() => window.open(ph.link_url, '_blank')}>🔗 {ph.link}</button>}
                 </div>
                 <div className="vsec">
                   <div className="vtotal">
