@@ -343,16 +343,6 @@ contract TTSVotingV3 is Ownable, VRFConsumerBaseV2Plus {
         Profile storage p = _profiles[currentRoundId][profileId];
         require(p.approved, "Profile not approved");
 
-        uint256 newProfileRaw = p.rawVotes + amount;
-        uint256 newRoundRaw   = r.totalRawVotes + amount;
-        // Cap only enforced once a profile already has votes — first vote on any
-        // profile is always allowed regardless of round totals.
-        require(
-            p.rawVotes == 0 ||
-            newProfileRaw * 10000 <= newRoundRaw * MAX_VOTE_CAP_BPS,
-            "Exceeds vote cap"
-        );
-
         require(ttsToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
         uint256 tickets = _applyMultiplier(msg.sender, amount);

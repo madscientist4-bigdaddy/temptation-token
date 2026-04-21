@@ -353,8 +353,8 @@ const S = `
 
   /* VOTE CELEBRATION */
   .cel-overlay { position:fixed; inset:0; z-index:9000; pointer-events:none; overflow:hidden; }
-  .cel-particle { position:absolute; bottom:-10%; font-size:2rem; animation:flyUp var(--dur,1.8s) cubic-bezier(.2,.8,.4,1) forwards; opacity:0; }
-  @keyframes flyUp { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg);} 80%{opacity:.8;} 100%{opacity:0;transform:translateY(-110vh) scale(1.4) rotate(var(--rot,30deg));} }
+  .cel-particle { position:absolute; bottom:-5%; font-size:3rem; animation:flyUp var(--dur,1.2s) cubic-bezier(.1,.9,.3,1) forwards; opacity:0; }
+  @keyframes flyUp { 0%{opacity:1;transform:translateY(0) scale(.8) rotate(0deg);} 60%{opacity:1;} 100%{opacity:0;transform:translateY(-115vh) scale(2) rotate(var(--rot,45deg));} }
   .cel-banner { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9001; text-align:center; animation:bannerPop .4s cubic-bezier(.34,1.56,.64,1) forwards; }
   @keyframes bannerPop { from{opacity:0;transform:translate(-50%,-50%) scale(.5);} to{opacity:1;transform:translate(-50%,-50%) scale(1);} }
   .cel-title { font-family:var(--font-b); font-size:1.6rem; font-weight:900; color:#fff; text-shadow:0 0 30px rgba(255,200,0,.9),0 2px 8px rgba(0,0,0,.8); line-height:1.2; }
@@ -672,14 +672,14 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
     }
   }
 
-  const EMOJIS = ['🔥','💎','🏆','⭐','💰','🎉','✨','💫']
-  const particles = celebrate ? Array.from({length:18}, (_,i) => ({
+  const EMOJIS = ['🔥','💎','💸','🏆','🍑','🏎️','💵','🎰','⚡','🔥']
+  const particles = celebrate ? Array.from({length:30}, (_,i) => ({
     id: i,
     emoji: EMOJIS[i % EMOJIS.length],
     left: `${5 + Math.random()*90}%`,
-    dur: `${1.4 + Math.random()*0.8}s`,
-    delay: `${Math.random()*0.6}s`,
-    rot: `${-40 + Math.random()*80}deg`,
+    dur: `${0.8 + Math.random()*0.6}s`,
+    delay: `${Math.random()*0.35}s`,
+    rot: `${-60 + Math.random()*120}deg`,
   })) : []
 
   return (
@@ -695,7 +695,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
             <div className="cel-title">🔥 {celebrate.amount.toLocaleString()} $TTS VOTED!</div>
             <div className="cel-sub">YOU'RE IN THE GAME · {celebrate.name.toUpperCase()}</div>
             <button className="cel-share" onClick={() => {
-              const txt = encodeURIComponent(`🔥 Just voted ${celebrate.amount.toLocaleString()} $TTS on ${celebrate.name} on @TemptationToken! Play and win on Base. #TTS #Web3`)
+              const txt = encodeURIComponent(`I just voted $TTS on Temptation Token - the crypto Hot or Not where winners get PAID 🔥 app.temptationtoken.io #TTS #Base #Crypto`)
               window.open(`https://twitter.com/intent/tweet?text=${txt}`, '_blank')
             }}>𝕏 Share Your Vote</button>
           </div>
@@ -741,7 +741,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                 </div>
                 <div className="pinfo">
                   <div className="pname">{ph.username}</div>
-                  {ph.link_url && ph.link_url.includes('.') && <button className="plink" onClick={() => window.open(ph.link_url.startsWith('http') ? ph.link_url : 'https://' + ph.link_url, '_blank')}>🔗 {ph.link}</button>}
+                  <button className="plink" onClick={() => { const raw = ph.link_url || ''; const url = raw.startsWith('http') ? raw : raw.includes('.') ? 'https://' + raw : 'https://app.temptationtoken.io'; window.open(url, '_blank') }}>🔗 {ph.link || 'Profile'}</button>
                 </div>
                 <div className="vsec">
                   <div className="vtotal">
