@@ -344,6 +344,25 @@ const S = `
   .faq-ch.open { transform:rotate(180deg); }
   .faq-a { padding:0 17px 14px; font-size:.63rem; color:var(--muted); line-height:1.78; border-top:1px solid var(--border); padding-top:12px; }
 
+  /* LOADING SKELETON */
+  .skel-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .skel-img { aspect-ratio:3/4; background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+  .skel-line { height:14px; border-radius:4px; margin:12px 16px 6px; background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+  .skel-line.short { width:55%; height:10px; margin-top:4px; }
+  @keyframes shimmer { to { background-position:-200% 0; } }
+
+  /* VOTE CELEBRATION */
+  .cel-overlay { position:fixed; inset:0; z-index:9000; pointer-events:none; overflow:hidden; }
+  .cel-particle { position:absolute; bottom:-10%; font-size:2rem; animation:flyUp var(--dur,1.8s) cubic-bezier(.2,.8,.4,1) forwards; opacity:0; }
+  @keyframes flyUp { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg);} 80%{opacity:.8;} 100%{opacity:0;transform:translateY(-110vh) scale(1.4) rotate(var(--rot,30deg));} }
+  .cel-banner { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9001; text-align:center; animation:bannerPop .4s cubic-bezier(.34,1.56,.64,1) forwards; }
+  @keyframes bannerPop { from{opacity:0;transform:translate(-50%,-50%) scale(.5);} to{opacity:1;transform:translate(-50%,-50%) scale(1);} }
+  .cel-title { font-family:var(--font-b); font-size:1.6rem; font-weight:900; color:#fff; text-shadow:0 0 30px rgba(255,200,0,.9),0 2px 8px rgba(0,0,0,.8); line-height:1.2; }
+  .cel-sub { font-size:.75rem; color:var(--gold-light); letter-spacing:.1em; margin-top:6px; text-shadow:0 1px 4px rgba(0,0,0,.8); }
+  .cel-share { margin-top:14px; padding:10px 22px; border-radius:8px; border:none; background:linear-gradient(135deg,#1da1f2,#0d8fd9); color:#fff; font-family:var(--font-b); font-size:.76rem; font-weight:700; letter-spacing:.08em; cursor:pointer; pointer-events:all; box-shadow:0 4px 16px rgba(29,161,242,.5); }
+  @keyframes vflash { 0%,100%{color:var(--gold-light);} 50%{color:#fff;text-shadow:0 0 20px #fff,0 0 40px var(--gold);} }
+  .vta.flash { animation:vflash .6s ease 3; }
+
   /* MODAL */
   .moverlay { position:fixed; inset:0; background:rgba(0,0,0,.86); z-index:500;
     display:flex; align-items:flex-end; justify-content:center; backdrop-filter:blur(6px); animation:fadeIn .2s ease; }
@@ -519,11 +538,11 @@ function TransferModal({ dir, onClose, showToast }) {
 
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
 function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
-  const [photos, setPhotos] = useState(() => [...PHOTOS].sort(() => Math.random() - .5))
+  const [photos, setPhotos] = useState([])
+  const [photosLoading, setPhotosLoading] = useState(true)
 
   useEffect(() => {
     async function loadPhotos() {
-      // Get current round ID first so we filter submissions to the active round
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
       const currentRound = roundId != null ? Number(roundId) : 1
 
@@ -533,7 +552,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       )
       const data = await res.json()
 
-      if (!data || data.length < 1) return
+      if (!data || data.length < 1) { setPhotosLoading(false); return }
 
       const mapped = data.map((r, i) => ({
         id: i + 1,
@@ -549,8 +568,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       }))
       const shuffled = mapped.sort(() => Math.random() - .5)
       setPhotos(shuffled)
+      setPhotosLoading(false)
 
-      // Load on-chain vote counts in parallel
       if (roundId != null) {
         const withVotes = await Promise.all(shuffled.map(async p => {
           try {
@@ -562,10 +581,12 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         setPhotos(withVotes)
       }
     }
-    loadPhotos().catch(e => console.error('Photo fetch error:', e))
+    loadPhotos().catch(e => { console.error('Photo fetch error:', e); setPhotosLoading(false) })
   }, [])
   const [va, setVa] = useState({})
   const [voting, setVoting] = useState({})
+  const [flashId, setFlashId] = useState(null)
+  const [celebrate, setCelebrate] = useState(null)
   const [idx, setIdx] = useState(0)
   const cd = useCountdown()
   const max = Math.max(...photos.map(p => p.votes), 1)
@@ -627,7 +648,21 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       setBalance(b => b - a)
       setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, votes: p.votes + a, myVotes: p.myVotes + a } : p))
       setVa(v => ({ ...v, [photo.id]: '' }))
-      showToast(`${a.toLocaleString()} $TTS voted on-chain!`, 's')
+      setFlashId(photo.id)
+      setTimeout(() => setFlashId(null), 2000)
+      setCelebrate({ amount: a, name: photo.username })
+      setTimeout(() => setCelebrate(null), 4500)
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)()
+        const osc = ctx.createOscillator(); const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.setValueAtTime(523, ctx.currentTime)
+        osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1)
+        osc.frequency.setValueAtTime(784, ctx.currentTime + 0.2)
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+        osc.start(); osc.stop(ctx.currentTime + 0.5)
+      } catch(_) {}
     } catch(e) {
       console.error('Vote error:', e)
       const msg = e.shortMessage || e.message || 'Unknown error'
@@ -637,8 +672,36 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
     }
   }
 
+  const EMOJIS = ['🔥','💎','🏆','⭐','💰','🎉','✨','💫']
+  const particles = celebrate ? Array.from({length:18}, (_,i) => ({
+    id: i,
+    emoji: EMOJIS[i % EMOJIS.length],
+    left: `${5 + Math.random()*90}%`,
+    dur: `${1.4 + Math.random()*0.8}s`,
+    delay: `${Math.random()*0.6}s`,
+    rot: `${-40 + Math.random()*80}deg`,
+  })) : []
+
   return (
     <div>
+      {celebrate && (
+        <>
+          <div className="cel-overlay">
+            {particles.map(p => (
+              <span key={p.id} className="cel-particle" style={{ left:p.left, '--dur':p.dur, '--rot':p.rot, animationDelay:p.delay }}>{p.emoji}</span>
+            ))}
+          </div>
+          <div className="cel-banner">
+            <div className="cel-title">🔥 {celebrate.amount.toLocaleString()} $TTS VOTED!</div>
+            <div className="cel-sub">YOU'RE IN THE GAME · {celebrate.name.toUpperCase()}</div>
+            <button className="cel-share" onClick={() => {
+              const txt = encodeURIComponent(`🔥 Just voted ${celebrate.amount.toLocaleString()} $TTS on ${celebrate.name} on @TemptationToken! Play and win on Base. #TTS #Web3`)
+              window.open(`https://twitter.com/intent/tweet?text=${txt}`, '_blank')
+            }}>𝕏 Share Your Vote</button>
+          </div>
+        </>
+      )}
+
       <div className="shead">
         <div style={{ fontSize:'.54rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Live on Base Blockchain</div>
         <h2>Vote &amp; Win</h2>
@@ -652,6 +715,19 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       </div>
 
       <div className="car-outer">
+        {photosLoading ? (
+          <div className="car-wrap">
+            <div className="car-track">
+              <div className="pcard skel-card">
+                <div className="skel-img" />
+                <div style={{ padding:'12px 0 8px' }}>
+                  <div className="skel-line" />
+                  <div className="skel-line short" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="car-wrap" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <div className={`car-arrow left${idx === 0 ? ' hidden' : ''}`} onClick={() => goTo(idx-1)}>‹</div>
           <div className="car-track" style={{ transform:`translateX(-${idx*100}%)` }}>
@@ -665,12 +741,12 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                 </div>
                 <div className="pinfo">
                   <div className="pname">{ph.username}</div>
-                  {ph.link_url && ph.link_url.startsWith('http') && <button className="plink" onClick={() => window.open(ph.link_url, '_blank')}>🔗 {ph.link}</button>}
+                  {ph.link_url && ph.link_url.includes('.') && <button className="plink" onClick={() => window.open(ph.link_url.startsWith('http') ? ph.link_url : 'https://' + ph.link_url, '_blank')}>🔗 {ph.link}</button>}
                 </div>
                 <div className="vsec">
                   <div className="vtotal">
                     <span className="vtl">Total Votes</span>
-                    <span className="vta">{ph.votes.toLocaleString()} <span>$TTS</span></span>
+                    <span className={`vta${flashId === ph.id ? ' flash' : ''}`}>{ph.votes.toLocaleString()} <span>$TTS</span></span>
                   </div>
                   <div className="vbar-wrap">
                     <div className="vbar" style={{ width:`${Math.round((ph.votes/max)*100)}%` }} />
@@ -701,6 +777,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
           </div>
           <div className={`car-arrow right${idx === photos.length-1 ? ' hidden' : ''}`} onClick={() => goTo(idx+1)}>›</div>
         </div>
+        )}
+        {!photosLoading && photos.length > 0 && (
         <div className="car-footer">
           <div className="car-count">{idx+1} of {photos.length}</div>
           <div className="car-dots">
@@ -710,6 +788,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
           </div>
           <div className="car-count" style={{ textAlign:'right' }}>{Math.round((photos[idx].votes/max)*100)}% votes</div>
         </div>
+        )}
       </div>
     </div>
   )

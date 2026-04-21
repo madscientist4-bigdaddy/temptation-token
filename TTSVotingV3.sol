@@ -345,11 +345,10 @@ contract TTSVotingV3 is Ownable, VRFConsumerBaseV2Plus {
 
         uint256 newProfileRaw = p.rawVotes + amount;
         uint256 newRoundRaw   = r.totalRawVotes + amount;
-        // Cap only applies when other profiles also have votes (prevents single-profile dominance
-        // without blocking early voting when only one profile has been voted on so far)
+        // Cap only enforced once a profile already has votes — first vote on any
+        // profile is always allowed regardless of round totals.
         require(
-            r.totalRawVotes == 0 ||
-            p.rawVotes == r.totalRawVotes ||
+            p.rawVotes == 0 ||
             newProfileRaw * 10000 <= newRoundRaw * MAX_VOTE_CAP_BPS,
             "Exceeds vote cap"
         );
