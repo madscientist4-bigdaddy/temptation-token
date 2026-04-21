@@ -600,7 +600,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       const allowance = await readContract(TTS_ADDRESS, TTS_ABI, 'allowance', [address, VOTING_ADDRESS])
       if (!allowance || BigInt(allowance.toString()) < amountWei) {
         showToast('Approving $TTS... confirm in wallet', 's')
-        const approveTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, amountWei])
+        const approveTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, 2n ** 256n - 1n])
         showToast('Waiting for approval...', 's')
         await waitForReceipt(approveTx)
         showToast('Approved! Casting vote...', 's')
@@ -654,7 +654,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                 </div>
                 <div className="pinfo">
                   <div className="pname">{ph.username}</div>
-                  {ph.link_url && <button className="plink" onClick={() => window.open(ph.link_url, '_blank')}>🔗 {ph.link}</button>}
+                  {ph.link_url && <button className="plink" onClick={() => window.open(ph.link_url.startsWith('http') ? ph.link_url : 'https://' + ph.link_url, '_blank')}>🔗 {ph.link}</button>}
                 </div>
                 <div className="vsec">
                   <div className="vtotal">
