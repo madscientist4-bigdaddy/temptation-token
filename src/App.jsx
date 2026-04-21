@@ -27,19 +27,18 @@ const AIRDROP_ABI = [
   'function hasClaimed(address) view returns (bool)',
 ]
 
+const _baseClient = createPublicClient({
+  chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
+  transport: http('https://mainnet.base.org')
+})
+
 async function readContract(address, abi, fn, args = []) {
   try {
-    const { createPublicClient, http, parseAbi } = await import('https://esm.sh/viem@2.21.19')
-    const client = createPublicClient({
-      chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
-      transport: http()
-    })
-    return await client.readContract({ address, abi: parseAbi(abi), functionName: fn, args })
+    return await _baseClient.readContract({ address, abi: parseAbi(abi), functionName: fn, args })
   } catch(e) { console.error('readContract:', e); return null }
 }
 
 async function writeContract(walletClient, address, abi, fn, args = []) {
-  const { parseAbi } = await import('https://esm.sh/viem@2.21.19')
   return await walletClient.writeContract({ address, abi: parseAbi(abi), functionName: fn, args })
 }
 
@@ -64,6 +63,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import TTSChatbot from './TTSChatbot.jsx'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
+import { createPublicClient, http, parseAbi } from 'viem'
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 
@@ -544,6 +544,21 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [photosLoading, setPhotosLoading] = useState(true)
 
   useEffect(() => {
+    const CACHE_KEY = 'tt_photos_v1'
+
+    // Serve from cache immediately so photos appear without delay
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed && parsed.length > 0) {
+          setPhotos(parsed)
+          setPhotosLoading(false)
+          if (parsed[0]?.img) { const p = new Image(); p.src = parsed[0].img }
+        }
+      }
+    } catch(_) {}
+
     async function loadPhotos() {
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
       const currentRound = roundId != null ? Number(roundId) : 1
@@ -571,6 +586,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       const shuffled = mapped.sort(() => Math.random() - .5)
       setPhotos(shuffled)
       setPhotosLoading(false)
+      // Preload first image
+      if (shuffled[0]?.img) { const p = new Image(); p.src = shuffled[0].img }
 
       if (roundId != null) {
         const withVotes = await Promise.all(shuffled.map(async p => {
@@ -581,6 +598,9 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
           return p
         }))
         setPhotos(withVotes)
+        try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(withVotes)) } catch(_) {}
+      } else {
+        try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(shuffled)) } catch(_) {}
       }
     }
     loadPhotos().catch(e => { console.error('Photo fetch error:', e); setPhotosLoading(false) })
