@@ -41,12 +41,20 @@ async function writeContract(walletClient, address, abi, fn, args = []) {
 }
 
 async function waitForReceipt(hash) {
-  const { createPublicClient, http } = await import('https://esm.sh/viem@2.21.19')
-  const client = createPublicClient({
-    chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
-    transport: http()
-  })
-  return await client.waitForTransactionReceipt({ hash, timeout: 60_000 })
+  for (let i = 0; i < 60; i++) {
+    const res = await fetch('https://mainnet.base.org', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [hash] })
+    })
+    const { result } = await res.json()
+    if (result) {
+      if (result.status === '0x0') throw new Error('Transaction reverted on-chain')
+      return result
+    }
+    await new Promise(r => setTimeout(r, 2000))
+  }
+  throw new Error('Receipt timeout after 120s')
 }
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -654,7 +662,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                 </div>
                 <div className="pinfo">
                   <div className="pname">{ph.username}</div>
-                  {ph.link_url && <button className="plink" onClick={() => window.open(ph.link_url.startsWith('http') ? ph.link_url : 'https://' + ph.link_url, '_blank')}>🔗 {ph.link}</button>}
+                  {ph.link_url && ph.link_url.startsWith('http') && <button className="plink" onClick={() => window.open(ph.link_url, '_blank')}>🔗 {ph.link}</button>}
                 </div>
                 <div className="vsec">
                   <div className="vtotal">
