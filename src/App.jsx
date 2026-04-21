@@ -360,6 +360,8 @@ const S = `
   .cel-title { font-family:var(--font-b); font-size:1.6rem; font-weight:900; color:#fff; text-shadow:0 0 30px rgba(255,200,0,.9),0 2px 8px rgba(0,0,0,.8); line-height:1.2; }
   .cel-sub { font-size:.75rem; color:var(--gold-light); letter-spacing:.1em; margin-top:6px; text-shadow:0 1px 4px rgba(0,0,0,.8); }
   .cel-share { margin-top:14px; padding:10px 22px; border-radius:8px; border:none; background:linear-gradient(135deg,#1da1f2,#0d8fd9); color:#fff; font-family:var(--font-b); font-size:.76rem; font-weight:700; letter-spacing:.08em; cursor:pointer; pointer-events:all; box-shadow:0 4px 16px rgba(29,161,242,.5); }
+  .share-float { position:fixed; bottom:24px; right:18px; z-index:8000; padding:13px 20px; border-radius:12px; border:none; background:linear-gradient(135deg,#1da1f2,#0d8fd9); color:#fff; font-family:var(--font-b); font-size:.8rem; font-weight:700; letter-spacing:.08em; cursor:pointer; box-shadow:0 6px 24px rgba(29,161,242,.6); transition:opacity 1.2s ease; }
+  .share-float.fadeout { opacity:0; pointer-events:none; }
   @keyframes vflash { 0%,100%{color:var(--gold-light);} 50%{color:#fff;text-shadow:0 0 20px #fff,0 0 40px var(--gold);} }
   .vta.flash { animation:vflash .6s ease 3; }
 
@@ -587,6 +589,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [voting, setVoting] = useState({})
   const [flashId, setFlashId] = useState(null)
   const [celebrate, setCelebrate] = useState(null)
+  const [shareVote, setShareVote] = useState(null)
+  const [shareFading, setShareFading] = useState(false)
   const [idx, setIdx] = useState(0)
   const cd = useCountdown()
   const max = Math.max(...photos.map(p => p.votes), 1)
@@ -652,6 +656,10 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       setTimeout(() => setFlashId(null), 2000)
       setCelebrate({ amount: a, name: photo.username })
       setTimeout(() => setCelebrate(null), 4500)
+      setShareFading(false)
+      setShareVote({ amount: a, name: photo.username })
+      setTimeout(() => setShareFading(true), 13800)
+      setTimeout(() => setShareVote(null), 15000)
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)()
         const osc = ctx.createOscillator(); const gain = ctx.createGain()
@@ -694,12 +702,14 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
           <div className="cel-banner">
             <div className="cel-title">🔥 {celebrate.amount.toLocaleString()} $TTS VOTED!</div>
             <div className="cel-sub">YOU'RE IN THE GAME · {celebrate.name.toUpperCase()}</div>
-            <button className="cel-share" onClick={() => {
-              const txt = encodeURIComponent(`I just voted $TTS on Temptation Token - the crypto Hot or Not where winners get PAID 🔥 app.temptationtoken.io #TTS #Base #Crypto`)
-              window.open(`https://twitter.com/intent/tweet?text=${txt}`, '_blank')
-            }}>𝕏 Share Your Vote</button>
           </div>
         </>
+      )}
+      {shareVote && (
+        <button className={`share-float${shareFading ? ' fadeout' : ''}`} onClick={() => {
+          const txt = encodeURIComponent(`I just voted $TTS on Temptation Token - the crypto Hot or Not where winners get PAID 🔥 app.temptationtoken.io #TTS #Base #Crypto`)
+          window.open(`https://twitter.com/intent/tweet?text=${txt}`, '_blank')
+        }}>𝕏 Share Your Vote</button>
       )}
 
       <div className="shead">
