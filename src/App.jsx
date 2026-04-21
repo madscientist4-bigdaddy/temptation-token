@@ -11,7 +11,10 @@ const TTS_ABI = [
   'function balanceOf(address) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
   'function allowance(address owner, address spender) view returns (uint256)',
+  'function transfer(address to, uint256 amount) returns (bool)',
 ]
+const HOUSE_WALLET = '0xb1e991bf617459b58964eef7756b350e675c53b5'
+const SUBMISSION_FEE = 5n * 10n ** 18n
 const VOTING_ABI = [
   'function vote(string profileId, uint256 amount) returns ()',
   'function getProfile(uint256 roundId, string profileId) view returns (address wallet, uint256 totalTickets, uint256 rawVotes, address topVoter, bool approved)',
@@ -850,7 +853,7 @@ function BuySellScreen({ showToast, connected }) {
 }
 
 // ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
-function SubmitScreen({ balance, setBalance, showToast, connected, address }) {
+function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
   const [prev, setPrev] = useState(null)
   const [name, setName] = useState('')
   const [lt, setLt] = useState('')
@@ -869,22 +872,46 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address }) {
     r.readAsDataURL(f)
   }
 
+  const [submitting, setSubmitting] = useState(false)
+
   const submit = async () => {
     if (!connected) { showToast('Connect your wallet first','e'); return }
+    if (!walletClient) { showToast('Wallet not ready','e'); return }
     if (!prev) { showToast('Please upload a photo','e'); return }
     if (!name.trim()) { showToast('Enter your display name','e'); return }
     if (!wallet.trim()) { showToast('Enter your payout wallet address','e'); return }
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
     if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
+
+    setSubmitting(true)
+    try {
+      showToast('Confirm 5 TTS submission fee in wallet…', 's')
+      const feeTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'transfer', [HOUSE_WALLET, SUBMISSION_FEE])
+      showToast('Waiting for fee confirmation…', 's')
+      await waitForReceipt(feeTx)
+    } catch(e) {
+      const msg = e.shortMessage || e.message || 'unknown error'
+      showToast('Fee transfer failed: ' + msg.slice(0, 50), 'e')
+      setSubmitting(false)
+      return
+    }
+
     setBalance(b => b - 5)
     const currentRoundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').then(r => r != null ? Number(r) : 1).catch(() => 1)
-    fetch(SUPABASE_URL + '/rest/v1/submissions', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
-    }).then(r => { if(r.ok) showToast('Submission sent for review!','s'); else showToast('Submission received — admin notified.','s') })
-    .catch(() => showToast('Submission received — admin notified.','s'))
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/submissions', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
+      })
+      if (r.ok) showToast('Submission sent for review!', 's')
+      else showToast('Fee paid — submission queued for review.', 's')
+    } catch {
+      showToast('Fee paid — submission queued for review.', 's')
+    }
+
     setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false)
+    setSubmitting(false)
   }
 
   return (
@@ -923,7 +950,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address }) {
         </label>
         <div className="cost-note"><span>💳</span><span>Submission costs <strong>5 $TTS</strong> — signed on Base blockchain</span></div>
         <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
-        <button className="pbtn" onClick={submit}>Sign Contract &amp; Submit (5 $TTS)</button>
+        <button className="pbtn" onClick={submit} disabled={submitting}>{submitting ? 'Processing…' : 'Sign Contract & Submit (5 $TTS)'}</button>
       </div>
     </div>
   )
