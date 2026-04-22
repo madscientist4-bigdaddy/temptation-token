@@ -70,12 +70,11 @@ import { createPublicClient, http, parseAbi } from 'viem'
 const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 
-const PHOTOS = [
-  { id:1, username:'Scarlett_V',  profileId:'profile_1', link:'OnlyFans',   votes:48200, myVotes:0, img:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80' },
-  { id:2, username:'Luna_Rose',   profileId:'profile_2', link:'Instagram',  votes:31750, myVotes:0, img:'https://images.unsplash.com/photo-1524502397800-2eeaad7c3fe5?w=600&q=80' },
-  { id:3, username:'Mia_Noir',    profileId:'profile_3', link:'Twitter/X',  votes:27400, myVotes:0, img:'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&q=80' },
-  { id:4, username:'Jade_Storm',  profileId:'profile_4', link:'Linktree',   votes:19880, myVotes:0, img:'https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=600&q=80' },
-  { id:5, username:'Aria_Blaze',  profileId:'profile_5', link:'Website',    votes:14320, myVotes:0, img:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80' },
+// Hardcoded fallback — renders at frame 1 before Supabase loads, swapped immediately on fetch
+const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='534'%3E%3Crect width='400' height='534' fill='%231a1a2e'/%3E%3Ctext x='200' y='290' font-family='sans-serif' font-size='48' fill='%23d4af3740' text-anchor='middle'%3E%E2%8F%B3%3C/text%3E%3C/svg%3E"
+const FALLBACK_PHOTOS = [
+  { id:1, username:'Dance TTS', profileId:'fafaae5c-8e42-4674-b120-5501880d1b8b', link:'Get TTS', link_url:'https://temptationtoken.io', votes:0, myVotes:0, img:PLACEHOLDER_IMG, wallet:'0xB1E991bF617459B58964eEf7756B350e675C53b5', payout_wallet:'0xB1E991bF617459B58964eEf7756B350e675C53b5' },
+  { id:2, username:'Bunny Butt', profileId:'4df8fee6-3da3-49d2-8cc3-200e7c767ba3', link:'Play TTS', link_url:'https://app.temptationtoken.io', votes:0, myVotes:0, img:PLACEHOLDER_IMG, wallet:'0xB1E991bF617459B58964eEf7756B350e675C53b5', payout_wallet:'0xB1E991bF617459B58964eEf7756B350e675C53b5' },
 ]
 
 const TIERS = [
@@ -424,15 +423,13 @@ function shortAddr(a) {
   return a.slice(0,6) + '…' + a.slice(-4)
 }
 
-function useCountdown() {
-  const [t, setT] = useState('')
+function useCountdown(endTime) {
+  const [t, setT] = useState('...')
   useEffect(() => {
     const tick = () => {
-      const now = new Date()
-      const sun = new Date(now)
-      sun.setUTCHours(23,59,59,999)
-      while (sun.getUTCDay() !== 0) sun.setUTCDate(sun.getUTCDate()+1)
-      const d = sun - now
+      if (!endTime) { setT('...'); return }
+      const d = endTime * 1000 - Date.now()
+      if (d <= 0) { setT('Round ended'); return }
       const da = Math.floor(d/86400000)
       const h = Math.floor((d%86400000)/3600000)
       const m = Math.floor((d%3600000)/60000)
@@ -442,7 +439,7 @@ function useCountdown() {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [endTime])
   return t
 }
 
@@ -500,39 +497,59 @@ function WalletModal({ onClose, showToast }) {
 }
 
 // ── TRANSFER MODAL ────────────────────────────────────────────────────────────
-function TransferModal({ dir, onClose, showToast }) {
+function TransferModal({ dir, onClose, showToast, address, walletClient }) {
   const [amt, setAmt] = useState('')
-  const [addr, setAddr] = useState('')
+  const [toAddr, setToAddr] = useState('')
+  const [sending, setSending] = useState(false)
 
-  const go = () => {
+  const go = async () => {
+    if (dir === 'in') {
+      window.open(`https://app.uniswap.org/swap?outputCurrency=${TTS_ADDRESS}&chain=base`, '_blank')
+      onClose()
+      return
+    }
     if (!amt || isNaN(amt) || Number(amt) <= 0) { showToast('Enter a valid amount', 'e'); return }
-    if (dir === 'out' && !addr) { showToast('Enter destination address', 'e'); return }
-    showToast(`${dir === 'in' ? 'Deposit' : 'Withdrawal'} of ${amt} $TTS initiated on Base`, 's')
-    onClose()
+    if (!toAddr || !/^0x[0-9a-fA-F]{40}$/.test(toAddr)) { showToast('Enter a valid Base wallet address', 'e'); return }
+    if (!walletClient) { showToast('Wallet not ready', 'e'); return }
+    setSending(true)
+    try {
+      const amountWei = BigInt(Math.floor(Number(amt) * 1e18))
+      showToast('Confirm transfer in wallet…', 's')
+      const tx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'transfer', [toAddr, amountWei])
+      showToast('Waiting for confirmation…', 's')
+      await waitForReceipt(tx)
+      showToast(`Sent ${amt} $TTS to ${toAddr.slice(0,8)}…`, 's')
+      onClose()
+    } catch(e) {
+      showToast('Transfer failed: ' + (e.shortMessage || e.message || '').slice(0,50), 'e')
+    }
+    setSending(false)
   }
 
   return (
     <div className="moverlay" onClick={onClose}>
       <div className="msheet" onClick={e => e.stopPropagation()}>
         <div className="mhandle" />
-        <div className="mtitle">{dir === 'in' ? 'Deposit $TTS' : 'Withdraw $TTS'}</div>
-        <div className="msub">{dir === 'in' ? 'Send $TTS from your external wallet to your in-app wallet on Base.' : 'Withdraw $TTS to an external Base wallet address.'}</div>
-        {dir === 'in' && (
+        <div className="mtitle">{dir === 'in' ? 'Get $TTS' : 'Send $TTS'}</div>
+        <div className="msub">{dir === 'in' ? 'Buy TTS on Uniswap and receive it at your wallet.' : 'Send TTS to any Base wallet address.'}</div>
+        {dir === 'in' && address && (
           <>
-            <span className="base-l">Your Deposit Address (Base)</span>
-            <div className="base-addr">0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</div>
+            <span className="base-l">Your Wallet Address (receive TTS here)</span>
+            <div className="base-addr">{address}</div>
           </>
         )}
-        <label className="flabel">Amount ($TTS)</label>
-        <input className="finput" type="number" min="1" placeholder="Enter amount" value={amt} onChange={e => setAmt(e.target.value)} />
         {dir === 'out' && (
           <>
+            <label className="flabel">Amount ($TTS)</label>
+            <input className="finput" type="number" min="1" placeholder="Enter amount" value={amt} onChange={e => setAmt(e.target.value)} />
             <label className="flabel">Destination Wallet Address (Base)</label>
-            <input className="finput" type="text" placeholder="0x…" value={addr} onChange={e => setAddr(e.target.value)} />
+            <input className="finput" type="text" placeholder="0x…" value={toAddr} onChange={e => setToAddr(e.target.value)} />
             <div className="irrev">⚠ Verify your address carefully. Transactions on Base are irreversible. Blockchain Entertainment LLC bears no responsibility for funds sent to incorrect addresses.</div>
           </>
         )}
-        <button className="pbtn" onClick={go}>{dir === 'in' ? 'Confirm Deposit' : 'Confirm Withdrawal'}</button>
+        <button className="pbtn" onClick={go} disabled={sending}>
+          {sending ? '⏳ Sending…' : dir === 'in' ? 'Buy $TTS on Uniswap →' : 'Send $TTS'}
+        </button>
         <button className="mclose" onClick={onClose}>Cancel</button>
       </div>
     </div>
@@ -544,20 +561,28 @@ let photoCache = null
 
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
 function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
-  const [photos, setPhotos] = useState(() => photoCache || [])
-  const [photosLoading, setPhotosLoading] = useState(!photoCache)
+  const [photos, setPhotos] = useState(() => photoCache || FALLBACK_PHOTOS)
+  const [photosLoading, setPhotosLoading] = useState(false)
+  const [roundEndTime, setRoundEndTime] = useState(null)
 
   useEffect(() => {
-    // If we already have cached data, show it immediately (synchronous, no delay)
     if (photoCache && photoCache.length > 0) {
       setPhotos(photoCache)
-      setPhotosLoading(false)
-      if (photoCache[0]?.img) { const p = new Image(); p.src = photoCache[0].img }
+      if (photoCache[0]?.img && !photoCache[0].img.startsWith('data:image/svg')) {
+        const p = new Image(); p.src = photoCache[0].img
+      }
     }
 
     async function loadPhotos() {
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
       const currentRound = roundId != null ? Number(roundId) : 1
+
+      // Fetch on-chain round end time for accurate countdown
+      if (roundId != null) {
+        readContract(VOTING_ADDRESS, VOTING_ABI, 'getRound', [roundId]).then(round => {
+          if (round) setRoundEndTime(Number(round[1]))
+        }).catch(() => {})
+      }
 
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/submissions?status=eq.approved&round_id=eq.${currentRound}&select=*`,
@@ -607,7 +632,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [shareFading, setShareFading] = useState(false)
   const shareTimerRef = useRef(null)
   const [idx, setIdx] = useState(0)
-  const cd = useCountdown()
+  const cd = useCountdown(roundEndTime)
   const max = Math.max(...photos.map(p => p.votes), 1)
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
@@ -828,33 +853,77 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
 
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
 function LeaderboardScreen() {
-  const sorted = [...PHOTOS].sort((a,b) => b.votes - a.votes)
-  const maxV = sorted[0].votes
-  const medals = ['🥇','🥈','🥉','4','5']
+  const [items, setItems] = useState(() => {
+    if (photoCache && photoCache.length > 0) return [...photoCache].sort((a,b) => b.votes - a.votes)
+    return []
+  })
+  const [loading, setLoading] = useState(!photoCache || photoCache.length === 0)
+  const [totalPool, setTotalPool] = useState(0)
+
+  useEffect(() => {
+    async function load() {
+      const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
+      const currentRound = roundId != null ? Number(roundId) : 1
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/submissions?status=eq.approved&round_id=eq.${currentRound}&select=id,display_name,image_url`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }
+      )
+      const data = await res.json()
+      if (!data || data.length < 1) { setLoading(false); return }
+      const withVotes = await Promise.all(data.map(async (r, i) => {
+        let votes = 0
+        try {
+          const profile = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId || 1n, r.id])
+          if (profile) votes = Math.floor(Number(profile[2]) / 1e18)
+        } catch(_) {}
+        return { id: i+1, username: r.display_name || 'Anonymous', profileId: r.id, img: r.image_url || '', votes, myVotes: 0, link_url: '', link: '' }
+      }))
+      const sorted = withVotes.sort((a,b) => b.votes - a.votes)
+      setItems(sorted)
+      setTotalPool(sorted.reduce((s,p) => s + p.votes, 0))
+      setLoading(false)
+    }
+    load().catch(() => setLoading(false))
+    const interval = setInterval(() => load().catch(() => {}), 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const maxV = Math.max(...items.map(p => p.votes), 1)
+  const medals = ['🥇','🥈','🥉','4','5','6','7','8','9','10']
   const rcs = ['r1','r2','r3','r4','r5']
+
   return (
     <div>
-      <div className="shead"><h2>Leaderboard</h2><div className="grule" /><p>Live rankings · Updated in real time</p></div>
+      <div className="shead"><h2>Leaderboard</h2><div className="grule" /><p>Live on-chain rankings · Auto-refreshes every 30s</p></div>
       <div style={{ padding:'0 16px 13px', display:'flex', justifyContent:'space-between', fontSize:'.56rem', color:'var(--muted)', letterSpacing:'.1em', textTransform:'uppercase' }}>
         <span>Profile</span><span>Total $TTS</span>
       </div>
-      <div className="lb-list">
-        {sorted.map((p,i) => (
-          <div key={p.id} className="lbc">
-            <div className={`lbrank ${rcs[i]}`}>{medals[i]}</div>
-            <img className="lbthumb" src={p.img} alt="" draggable="false" onContextMenu={e => e.preventDefault()} />
-            <div className="lbinfo">
-              <div className="lbname">{p.username}</div>
-              <div className="lbvotes"><strong>{p.votes.toLocaleString()}</strong> $TTS</div>
-              <div className="lb-bar-w"><div className="lb-bar" style={{ width:`${(p.votes/maxV)*100}%` }} /></div>
+      {loading && items.length === 0 ? (
+        <div style={{ padding:'40px 16px', textAlign:'center', color:'var(--muted)', fontSize:'.82rem' }}>Loading rankings from Base...</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding:'40px 16px', textAlign:'center', color:'var(--muted)', fontSize:'.82rem' }}>No approved profiles in this round yet.</div>
+      ) : (
+        <div className="lb-list">
+          {items.map((p,i) => (
+            <div key={p.id} className="lbc">
+              <div className={`lbrank ${rcs[Math.min(i,4)]}`}>{medals[i] ?? i+1}</div>
+              {p.img
+                ? <img className="lbthumb" src={p.img} alt="" draggable="false" onContextMenu={e => e.preventDefault()} />
+                : <div className="lbthumb" style={{ background:'var(--surface2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem' }}>📸</div>
+              }
+              <div className="lbinfo">
+                <div className="lbname">{p.username}</div>
+                <div className="lbvotes"><strong>{p.votes.toLocaleString()}</strong> $TTS {totalPool > 0 && <span style={{ color:'var(--muted)', fontSize:'.7rem' }}>· {Math.round((p.votes/totalPool)*100)}%</span>}</div>
+                <div className="lb-bar-w"><div className="lb-bar" style={{ width:`${(p.votes/maxV)*100}%` }} /></div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <div className="prize-box">
-        <div className="prize-title">Prize Pool — Current Round</div>
+        <div className="prize-title">Prize Pool — Current Round{totalPool > 0 && ` · ${totalPool.toLocaleString()} $TTS`}</div>
         <div className="prize-grid">
-          {[['🏆 Top Voter','40% + stake back'],['📸 Top Profile','40% of pool'],['🏢 Blockchain Ent.','10% of pool'],['💙 Polaris Project','10% donation']].map(([l,v]) => (
+          {[['🏆 Top Voter','40% of pool'],['📸 Winning Profile','40% of pool'],['🏢 Blockchain Ent.','10% of pool'],['💙 Polaris Project','10% donation']].map(([l,v]) => (
             <div key={l} className="prize-cell"><div className="prize-cl">{l}</div><div className="prize-cv">{v}</div></div>
           ))}
         </div>
@@ -867,11 +936,31 @@ function LeaderboardScreen() {
 function NFTScreen() {
   return (
     <div>
-      <div className="shead"><h2>My NFTs</h2><div className="grule" /><p>Weekly winners receive exclusive on-chain NFT trophies</p></div>
+      <div className="shead"><h2>NFT Trophies</h2><div className="grule" /><p>Weekly round winners earn exclusive on-chain NFTs</p></div>
       <div className="nft-empty">
         <span className="nft-ei">💎</span>
+        <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>No NFTs yet</div>
         Win a weekly round to receive your exclusive NFT trophy.<br />
         NFTs are minted on Base and held permanently in your wallet.
+      </div>
+      <div style={{ margin:'0 16px 24px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, padding:20 }}>
+        <div style={{ fontSize:'.72rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--gold)', fontWeight:700, marginBottom:12 }}>How NFT Trophies Work</div>
+        {[
+          ['🏆','Win a round','Be the top voter on the winning profile — or be the winning profile'],
+          ['💎','Get minted','Your NFT is minted automatically on Base when the round settles'],
+          ['🔗','Yours forever','The NFT lives in your wallet permanently — verifiable on Base'],
+        ].map(([icon,title,body]) => (
+          <div key={title} style={{ display:'flex', gap:12, marginBottom:14, alignItems:'flex-start' }}>
+            <div style={{ fontSize:'1.4rem', flexShrink:0, width:32, textAlign:'center' }}>{icon}</div>
+            <div>
+              <div style={{ fontSize:'.82rem', fontWeight:700, color:'var(--text)', marginBottom:3 }}>{title}</div>
+              <div style={{ fontSize:'.76rem', color:'var(--muted)', lineHeight:1.6 }}>{body}</div>
+            </div>
+          </div>
+        ))}
+        <a href={`https://basescan.org/address/${NFT_ADDRESS}`} target="_blank" rel="noopener noreferrer" style={{ display:'block', marginTop:16, textAlign:'center', fontSize:'.72rem', color:'var(--gold-dim)', textDecoration:'none' }}>
+          View NFT Contract on BaseScan →
+        </a>
       </div>
     </div>
   )
@@ -953,9 +1042,10 @@ function BuySellScreen({ showToast, connected }) {
               <option>3 months</option><option>6 months</option><option>12 months</option>
             </select>
             <div className="warn-box">⚠ Once staked, funds are locked for the full selected period and cannot be unlocked early under any circumstances whatsoever.</div>
-            <button className="pbtn" onClick={() => { if (!connected) { showToast('Connect your wallet first','e'); return } showToast('Staking transaction submitted on Base','s') }}>
-              Stake $TTS
-            </button>
+            <a href={`https://basescan.org/address/${STAKING_ADDRESS}#writeContract`} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block' }}>
+              <button className="pbtn">Stake via BaseScan →</button>
+            </a>
+            <div className="sub-note">Contract: {STAKING_ADDRESS.slice(0,10)}… · Opens BaseScan Write Contract</div>
           </>
         )}
       </div>
@@ -974,13 +1064,34 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [a2, setA2] = useState(false)
   const fRef = useRef()
 
+  const [subRemaining, setSubRemaining] = useState(null)
+  useEffect(() => {
+    if (!address) return
+    const ago = new Date(Date.now() - 7*24*60*60*1000).toISOString()
+    fetch(`${SUPABASE_URL}/rest/v1/submissions?wallet_address=eq.${address}&created_at=gte.${ago}&select=id`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(r => r.json()).then(d => { if (Array.isArray(d)) setSubRemaining(3 - d.length) }).catch(() => {})
+  }, [address])
+
+  const [nameErr, setNameErr] = useState('')
+  const [luErr, setLuErr] = useState('')
+  const [walletErr, setWalletErr] = useState('')
+
   const handleFile = e => {
     const f = e.target.files[0]
     if (!f) return
     if (!['image/jpeg','image/jpg','image/png'].includes(f.type)) { showToast('Only JPEG and PNG accepted','e'); return }
-    const r = new FileReader()
-    r.onload = ev => setPrev(ev.target.result)
-    r.readAsDataURL(f)
+    if (f.size > 10 * 1024 * 1024) { showToast('Image must be under 10MB','e'); return }
+    const img = new window.Image()
+    const url = URL.createObjectURL(f)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      if (img.width < 400 || img.height < 400) { showToast('Minimum image size: 400×400 pixels','e'); return }
+      const r = new FileReader()
+      r.onload = ev => setPrev(ev.target.result)
+      r.readAsDataURL(f)
+    }
+    img.src = url
   }
 
   const [submitting, setSubmitting] = useState(false)
@@ -990,9 +1101,31 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     if (!walletClient) { showToast('Wallet not ready','e'); return }
     if (!prev) { showToast('Please upload a photo','e'); return }
     if (!name.trim()) { showToast('Enter your display name','e'); return }
-    if (!wallet.trim()) { showToast('Enter your payout wallet address','e'); return }
+
+    // Input sanitization
+    setNameErr(''); setLuErr(''); setWalletErr('')
+    if (!/^[a-zA-Z0-9_]{1,30}$/.test(name.trim())) {
+      setNameErr('Letters, numbers, underscore only · max 30 chars')
+      showToast('Display name: letters, numbers, underscore only (max 30 chars)','e'); return
+    }
+    if (lu.trim() && !/^https?:\/\/.+/.test(lu.trim())) {
+      setLuErr('Must start with http:// or https://')
+      showToast('Link URL must start with http:// or https://','e'); return
+    }
+    if (!wallet.trim() || !/^0x[0-9a-fA-F]{40}$/.test(wallet.trim())) {
+      setWalletErr('Must be a valid 0x wallet address')
+      showToast('Enter a valid 0x wallet address','e'); return
+    }
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
     if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
+
+    // Rate limiting: max 3 per wallet per week
+    const ago = new Date(Date.now() - 7*24*60*60*1000).toISOString()
+    const prevSubs = await fetch(`${SUPABASE_URL}/rest/v1/submissions?wallet_address=eq.${address}&created_at=gte.${ago}&select=id`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(r => r.json()).catch(() => [])
+    const used = Array.isArray(prevSubs) ? prevSubs.length : 0
+    if (used >= 3) { showToast('You have reached the 3 submissions per week limit','e'); return }
 
     setSubmitting(true)
     try {
@@ -1015,8 +1148,16 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
       })
-      if (r.ok) showToast('Submission sent for review!', 's')
-      else showToast('Fee paid — submission queued for review.', 's')
+      if (r.ok) {
+        showToast('Submission sent for review!', 's')
+        setSubRemaining(s => s !== null ? s - 1 : null)
+        // Notify admin via Telegram
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), wallet: wallet.trim(), link_url: lu.trim() })
+        }).catch(() => {})
+      } else showToast('Fee paid — submission queued for review.', 's')
     } catch {
       showToast('Fee paid — submission queued for review.', 's')
     }
@@ -1040,14 +1181,22 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
               <div className="uptxt">Tap to upload<br /><strong style={{ color:'var(--gold-dim)' }}>JPEG or PNG only</strong><br />High resolution · SFW required</div>
             </div>
         }
+        {subRemaining !== null && (
+          <div style={{ background: subRemaining > 0 ? 'rgba(46,204,113,.08)' : 'rgba(232,64,90,.08)', border: `1px solid ${subRemaining > 0 ? 'rgba(46,204,113,.25)' : 'rgba(232,64,90,.25)'}`, borderRadius: 8, padding:'10px 14px', fontSize:'.76rem', color: subRemaining > 0 ? 'var(--green)' : 'var(--rose)', marginBottom:14 }}>
+            {subRemaining > 0 ? `✓ ${subRemaining} submission${subRemaining===1?'':'s'} remaining this week` : '✗ Submission limit reached — resets next week'}
+          </div>
+        )}
         <label className="flabel">Display Name / Handle</label>
-        <input className="finput" type="text" placeholder="e.g. Scarlett_V" value={name} onChange={e => setName(e.target.value)} />
+        <input className="finput" type="text" placeholder="e.g. Scarlett_V (letters, numbers, _ only)" value={name} onChange={e => { setName(e.target.value); setNameErr('') }} />
+        {nameErr && <div style={{ color:'var(--rose)', fontSize:'.7rem', marginTop:-8, marginBottom:8 }}>⚠ {nameErr}</div>}
         <label className="flabel">Link Button Title</label>
         <input className="finput" type="text" placeholder='e.g. "Follow Me on Instagram"' value={lt} onChange={e => setLt(e.target.value)} />
         <label className="flabel">External Link URL</label>
-        <input className="finput" type="url" placeholder="https://yourlink.com" value={lu} onChange={e => setLu(e.target.value)} />
+        <input className="finput" type="url" placeholder="https://yourlink.com" value={lu} onChange={e => { setLu(e.target.value); setLuErr('') }} />
+        {luErr && <div style={{ color:'var(--rose)', fontSize:'.7rem', marginTop:-8, marginBottom:8 }}>⚠ {luErr}</div>}
         <label className="flabel">Your Base Wallet Address (prize payouts)</label>
-        <input className="finput" type="text" placeholder="0x…" value={wallet} onChange={e => setWallet(e.target.value)} />
+        <input className="finput" type="text" placeholder="0x…" value={wallet} onChange={e => { setWallet(e.target.value); setWalletErr('') }} />
+        {walletErr && <div style={{ color:'var(--rose)', fontSize:'.7rem', marginTop:-8, marginBottom:8 }}>⚠ {walletErr}</div>}
         <div className="addr-warn">⚠ Double-check this address. Prizes sent to an incorrect address are permanently lost. We cannot recover misdirected funds.</div>
         <div style={{ fontFamily:'var(--font-d)', fontSize:'1rem', fontStyle:'italic', marginBottom:9 }}>Legal Agreement</div>
         <div className="cbox"><div className="ctxt">{CONTRACT_TEXT}</div></div>
@@ -1291,6 +1440,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
   const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
   const [balance, setBalance] = useState(0)
+  const [balanceLoading, setBalanceLoading] = useState(false)
   const { data: walletClient } = useWalletClient()
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
@@ -1305,7 +1455,10 @@ export default function App() {
 
   useEffect(() => {
     if (!isConnected || !address) { setBalance(0); return }
-    readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address]).then(raw => { if (raw != null) setBalance(Math.floor(Number(raw) / 1e18)) })
+    setBalanceLoading(true)
+    readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address])
+      .then(raw => { if (raw != null) setBalance(Math.floor(Number(raw) / 1e18)) })
+      .finally(() => setBalanceLoading(false))
   }, [isConnected, address])
 
   useEffect(() => {
@@ -1324,7 +1477,7 @@ export default function App() {
           </div>
           <div className="wbal">
             <div className="wlabel">Balance</div>
-            <div className="wamt">{balance.toLocaleString()}<span>$TTS</span></div>
+            <div className="wamt">{balanceLoading ? '…' : balance.toLocaleString()}<span>$TTS</span></div>
             {isConnected && <div className="waddr">{shortAddr(address)} · Base</div>}
           </div>
           {isConnected
@@ -1358,7 +1511,7 @@ export default function App() {
       </div>
 
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
-      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} />}
+      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} />}
 
       <TTSChatbot />
       <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>

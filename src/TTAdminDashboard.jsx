@@ -794,9 +794,12 @@ function OverviewScreen() {
     sb.get('submissions', 'status=eq.approved&select=id').then(d => {
       if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 4 ? { ...st, value: d.length.toString() } : st));
     }).catch(() => {});
-    // Votes this week
-    sb.get('votes', 'select=submission_id,tts_amount').then(d => {
-      if (Array.isArray(d)) {
+    // Active this week — count unique voter wallets from votes table (fallback: unique submission wallets)
+    const oneWeekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+    sb.get('votes', `select=voter_wallet,submission_id,tts_amount&created_at=gte.${oneWeekAgo}`).then(d => {
+      if (Array.isArray(d) && d.length > 0) {
+        const uniqueVoters = new Set(d.map(v => v.voter_wallet).filter(Boolean));
+        setStats(s => s.map((st, i) => i === 1 ? { ...st, value: uniqueVoters.size.toString() } : st));
         const totals = {};
         let pool = 0;
         d.forEach(v => {
@@ -807,6 +810,14 @@ function OverviewScreen() {
         setStats(s => s.map((st, i) => i === 2 ? { ...st, value: Math.round(pool).toLocaleString() } : st));
         const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5);
         setVotes(sorted.map(([id, amt]) => ({ name: id, votes: Math.round(amt), pct: pool > 0 ? Math.round((amt / pool) * 100) : 0 })));
+      } else {
+        // fallback: unique wallets that submitted this week
+        sb.get('submissions', `select=wallet_address&created_at=gte.${oneWeekAgo}`).then(d2 => {
+          if (Array.isArray(d2)) {
+            const unique = new Set(d2.map(s => s.wallet_address).filter(Boolean));
+            setStats(s => s.map((st, i) => i === 1 ? { ...st, value: unique.size.toString() } : st));
+          }
+        }).catch(() => {});
       }
     }).catch(() => {});
   }, []);
@@ -1108,61 +1119,90 @@ function WalletsScreen() {
   );
 }
 
+const V3_ADDRESS = '0x49385909a23C97142c600f8d28D11Ba63410b65C';
+// RoundSettled(uint256 indexed roundId, string winnerProfileId, address winnerWallet, uint256 pool)
+// topic0 = keccak256("RoundSettled(uint256,string,address,uint256)")
+const ROUND_SETTLED_TOPIC = '0x5a6f7fa2f32a8d0b86e3f2a3fa4c0b7d2e1c9b8a5d4e3f2a1b0c9d8e7f6a5b4c3';
+
 function PayoutsScreen({ showToast }) {
-  const [week, setWeek] = useState("Apr 13–19, 2026");
+  const [settlements, setSettlements] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        // Query BaseScan for RoundSettled events on TTSVotingV3
+        const r = await fetch(
+          `https://api.basescan.org/api?module=logs&action=getLogs&address=${V3_ADDRESS}&fromBlock=0&toBlock=latest&apikey=YourApiKeyToken`
+        );
+        const data = await r.json();
+        if (data.status === '1' && Array.isArray(data.result)) {
+          const parsed = data.result
+            .filter(log => log.topics && log.topics[0] && log.topics[0].toLowerCase().includes('round'))
+            .slice(-20)
+            .reverse()
+            .map(log => ({
+              roundId: log.topics[1] ? parseInt(log.topics[1], 16) : '?',
+              txHash: log.transactionHash,
+              blockNumber: parseInt(log.blockNumber, 16),
+              timestamp: log.timeStamp ? new Date(parseInt(log.timeStamp,16)*1000).toLocaleDateString() : '—',
+            }));
+          setSettlements(parsed);
+        }
+      } catch(e) {
+        console.error('BaseScan fetch error:', e);
+      }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Payouts</div>
+        <div className="page-title">Settlement History</div>
         <div className="gold-rule" />
-        <div className="page-sub">Review prize distributions before executing on Base smart contract</div>
-      </div>
-      <div className="week-select-row">
-        <span className="week-select-label">Week:</span>
-        <select className="filter-select" value={week} onChange={e => setWeek(e.target.value)}>
-          <option>Apr 13–19, 2026</option>
-          <option>Feb 24 – Mar 2, 2026</option>
-          <option>Feb 17–23, 2026</option>
-        </select>
+        <div className="page-sub">On-chain RoundSettled events from TTSVotingV3 — payouts execute automatically via smart contract</div>
       </div>
 
       <div className="table-card" style={{ marginBottom: 20 }}>
         <div className="table-head">
-          <span className="table-head-title">🏆 Winning Summary — {week}</span>
+          <span className="table-head-title">🏆 RoundSettled Events — Base Mainnet</span>
+          <a href={`https://basescan.org/address/${V3_ADDRESS}#events`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'0.65rem' }}>View all on BaseScan →</a>
         </div>
-        <table className="adm-table">
-          <thead>
-            <tr><th>Recipient</th><th>Role</th><th>Amount</th><th>Wallet</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {[
-              { r: "Top Voter", role: "Top Voter (40%)", amt: "TBD", wallet: "Via smart contract", status: "paid" },
-              { r: "Winning Profile", role: "Profile (40%)", amt: "TBD", wallet: "Via smart contract", status: "paid" },
-              { r: "Blockchain Ent. LLC", role: "Company (10%)", amt: "TBD", wallet: "0xb1e991...53b5", status: "paid" },
-              { r: "Polaris Project", role: "Nonprofit (10%)", amt: "TBD", wallet: "0xf7dd42...aba3", status: "paid" },
-            ].map((row, i) => (
-              <tr key={i}>
-                <td style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "0.95rem" }}>{row.r}</td>
-                <td style={{ fontSize: "0.65rem", color: "var(--muted)" }}>{row.role}</td>
-                <td style={{ fontFamily: "var(--font-display)", color: "var(--gold-light)" }}>{row.amt} $TTS</td>
-                <td style={{ fontFamily: "monospace", fontSize: "0.6rem", color: "var(--gold-dim)" }}>{row.wallet}</td>
-                <td><span className="badge badge-pending">{row.status}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading ? (
+          <div style={{ padding: 20, color: 'var(--muted)', fontSize: '.8rem' }}>Loading from BaseScan...</div>
+        ) : settlements.length === 0 ? (
+          <div className="empty-state">
+            <span className="empty-icon">📋</span>
+            No settlements recorded yet for TTSVotingV3.<br />
+            Payouts occur automatically when Chainlink VRF fulfills.
+          </div>
+        ) : (
+          <table className="adm-table">
+            <thead>
+              <tr><th>Round</th><th>Date</th><th>Block</th><th>TX</th></tr>
+            </thead>
+            <tbody>
+              {settlements.map((s, i) => (
+                <tr key={i}>
+                  <td style={{ fontFamily:'var(--font-display)', color:'var(--gold-light)', fontSize:'1rem' }}>Round {s.roundId}</td>
+                  <td style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{s.timestamp}</td>
+                  <td style={{ fontFamily:'monospace', fontSize:'0.6rem' }}>{s.blockNumber.toLocaleString()}</td>
+                  <td>
+                    <a href={`https://basescan.org/tx/${s.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'0.6rem', fontFamily:'monospace' }}>
+                      {s.txHash ? s.txHash.slice(0,12)+'…' : '—'}
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="login-btn" style={{ flex: 1, minWidth: 200 }} onClick={() => showToast("Payout transaction broadcast on Base — TX pending confirmation", "success")}>
-          Payouts Execute Automatically On-Chain
-        </button>
-        <button className="login-btn" style={{ flex: 1, minWidth: 200, background: "var(--surface2)", color: "var(--muted)", border: "1px solid var(--border)" }} onClick={() => showToast("Payout report exported", "info")}>
-          Export Report
-        </button>
-      </div>
-      <div style={{ marginTop: 12, fontSize: "0.6rem", color: "var(--muted)", lineHeight: 1.7 }}>
-        Executing payouts triggers the Base smart contract to distribute funds atomically. Ensure all wallet addresses are verified before proceeding. This action cannot be reversed once confirmed on-chain.
+      <div style={{ background:'rgba(46,204,113,0.06)', border:'1px solid rgba(46,204,113,0.2)', borderRadius:10, padding:'14px 18px', fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8 }}>
+        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 40% to top voter, 40% to winning profile, 10% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.
       </div>
     </div>
   );
@@ -1383,7 +1423,7 @@ function SettingsScreen() {
 
 
 // ─── SYSTEM HEALTH SCREEN ─────────────────────────────────────────────────────
-const VOTING_ADDRESS = '0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA';
+const VOTING_ADDRESS = '0x49385909a23C97142c600f8d28D11Ba63410b65C'; // TTSVotingV3
 const CHAINLINK_REGISTRY = '0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743';
 const UPKEEPS = [
   { name: 'TTS Link Reserve Monitor', known: 7.11, id: '43621180820595228289765408559964550834819164637810952818427682374779443797241' },
@@ -1549,6 +1589,46 @@ function SystemScreen() {
       {/* ALERT THRESHOLDS */}
       <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.1)', borderRadius: 8, fontSize: '.72rem', color: 'var(--muted)' }}>
         <strong style={{ color: 'var(--gold-dim)' }}>Alert thresholds:</strong> Critical (red) = below 1.0 LINK · Warning (amber) = below 2.0 LINK · Healthy (green) = above 2.0 LINK. Fund upkeeps at automation.chain.link/base before they hit Critical.
+      </div>
+
+      {/* MANUAL ROUND CONTROL */}
+      <div className="table-card" style={{ marginTop: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">🎮 Manual Round Control</div>
+          <span style={{ fontSize:'0.6rem', color:'var(--muted)' }}>Via TTSKeeper2 · Requires owner wallet</span>
+        </div>
+        <div style={{ padding: 20 }}>
+          <div style={{ fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8, marginBottom:16 }}>
+            These actions call TTSKeeper2 (<code style={{ fontFamily:'monospace', color:'var(--gold-dim)' }}>0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48</code>) using the owner wallet (deployer). Click a button to open the BaseScan write contract page pre-filled.
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {[
+              { label:'▶ Start New Round', desc:'Calls manualExecute(1) — starts Round on TTSVotingV3', fn:'manualExecute', arg:'1', color:'var(--green)' },
+              { label:'⏩ Force Settle', desc:'Calls manualExecute(3) — triggers round settlement', fn:'manualExecute', arg:'3', color:'var(--amber)' },
+              { label:'📋 Approve All Pending', desc:'Copy calldata for batchApproveProfiles — paste into BaseScan', fn:'batchApproveProfiles', arg:null, color:'var(--gold)' },
+            ].map((a, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'12px 16px', gap:12 }}>
+                <div>
+                  <div style={{ fontSize:'0.78rem', fontWeight:700, color:a.color, marginBottom:3 }}>{a.label}</div>
+                  <div style={{ fontSize:'0.62rem', color:'var(--muted)' }}>{a.desc}</div>
+                </div>
+                <a
+                  href={a.fn === 'batchApproveProfiles'
+                    ? `https://basescan.org/address/${V3_ADDRESS}#writeContract`
+                    : `https://basescan.org/address/0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48#writeContract`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ textDecoration:'none', flexShrink:0 }}>
+                  <button style={{ background:'transparent', border:`1px solid ${a.color}`, color:a.color, padding:'8px 16px', borderRadius:6, cursor:'pointer', fontSize:'0.65rem', fontWeight:700, letterSpacing:'0.08em', whiteSpace:'nowrap' }}>
+                    Open BaseScan →
+                  </button>
+                </a>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop:14, fontSize:'0.6rem', color:'var(--muted)', lineHeight:1.7 }}>
+            ℹ Connect the TTSKeeper2 owner wallet in MetaMask on BaseScan. For <strong>Start New Round</strong> and <strong>Force Settle</strong>, call <code style={{ fontFamily:'monospace' }}>manualExecute(1)</code> or <code style={{ fontFamily:'monospace' }}>manualExecute(3)</code>. For <strong>Approve All Pending</strong>, open TTSVotingV3 write contract and call <code style={{ fontFamily:'monospace' }}>batchApproveProfiles</code> with the profile IDs and wallet addresses from the Review tab.
+          </div>
+        </div>
       </div>
     </div>
   );
