@@ -361,7 +361,7 @@ const S = `
   .cel-sub { font-size:.75rem; color:var(--gold-light); letter-spacing:.1em; margin-top:6px; text-shadow:0 1px 4px rgba(0,0,0,.8); }
   .cel-share { margin-top:14px; padding:10px 22px; border-radius:8px; border:none; background:linear-gradient(135deg,#1da1f2,#0d8fd9); color:#fff; font-family:var(--font-b); font-size:.76rem; font-weight:700; letter-spacing:.08em; cursor:pointer; pointer-events:all; box-shadow:0 4px 16px rgba(29,161,242,.5); }
   @keyframes share-pulse { 0%,100%{box-shadow:0 0 18px 4px rgba(255,200,0,.55),0 4px 24px rgba(0,0,0,.7);} 50%{box-shadow:0 0 32px 10px rgba(255,200,0,.85),0 4px 32px rgba(0,0,0,.8);} }
-  .share-float { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:99999; padding:15px 32px; border-radius:14px; border:2.5px solid #ffd700; background:linear-gradient(135deg,#1a1a00,#2d2600,#1a1a00); color:#ffd700; font-family:var(--font-b); font-size:1rem; font-weight:900; letter-spacing:.12em; cursor:pointer; white-space:nowrap; animation:share-pulse 1.4s ease-in-out infinite; transition:opacity 1.2s ease; }
+  .share-float { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:99999; padding:15px 32px; border-radius:14px; border:2.5px solid #ffd700; background:linear-gradient(135deg,#1a1a00,#2d2600,#1a1a00); color:#ffd700; font-family:var(--font-b); font-size:1rem; font-weight:900; letter-spacing:.12em; cursor:pointer; white-space:nowrap; animation:share-pulse 1.4s ease-in-out infinite; transition:opacity 0.5s ease; }
   .share-float.fadeout { opacity:0; pointer-events:none; }
   @keyframes vflash { 0%,100%{color:var(--gold-light);} 50%{color:#fff;text-shadow:0 0 20px #fff,0 0 40px var(--gold);} }
   .vta.flash { animation:vflash .6s ease 3; }
@@ -539,26 +539,21 @@ function TransferModal({ dir, onClose, showToast }) {
   )
 }
 
+// Module-level cache — survives re-renders and navigation within the same session
+let photoCache = null
+
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
 function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
-  const [photos, setPhotos] = useState([])
-  const [photosLoading, setPhotosLoading] = useState(true)
+  const [photos, setPhotos] = useState(() => photoCache || [])
+  const [photosLoading, setPhotosLoading] = useState(!photoCache)
 
   useEffect(() => {
-    const CACHE_KEY = 'tt_photos_v2'
-
-    // Serve from localStorage immediately — zero delay for returning users
-    try {
-      const cached = localStorage.getItem(CACHE_KEY)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (parsed && parsed.length > 0) {
-          setPhotos(parsed)
-          setPhotosLoading(false)
-          if (parsed[0]?.img) { const p = new Image(); p.src = parsed[0].img }
-        }
-      }
-    } catch(_) {}
+    // If we already have cached data, show it immediately (synchronous, no delay)
+    if (photoCache && photoCache.length > 0) {
+      setPhotos(photoCache)
+      setPhotosLoading(false)
+      if (photoCache[0]?.img) { const p = new Image(); p.src = photoCache[0].img }
+    }
 
     async function loadPhotos() {
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
@@ -584,8 +579,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         wallet: r.wallet_address,
         payout_wallet: r.payout_wallet
       }))
-      // Use stable order (by id) so returning users don't see reshuffled cards
       const sorted = mapped.sort((a, b) => String(a.profileId).localeCompare(String(b.profileId)))
+      photoCache = sorted
       setPhotos(sorted)
       setPhotosLoading(false)
       if (sorted[0]?.img) { const p = new Image(); p.src = sorted[0].img }
@@ -598,10 +593,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
           } catch(_) {}
           return p
         }))
+        photoCache = withVotes
         setPhotos(withVotes)
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(withVotes)) } catch(_) {}
-      } else {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify(sorted)) } catch(_) {}
       }
     }
     loadPhotos().catch(e => { console.error('Photo fetch error:', e); setPhotosLoading(false) })
@@ -612,13 +605,19 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [celebrate, setCelebrate] = useState(null)
   const [shareVote, setShareVote] = useState(null)
   const [shareFading, setShareFading] = useState(false)
+  const shareTimerRef = useRef(null)
   const [idx, setIdx] = useState(0)
   const cd = useCountdown()
   const max = Math.max(...photos.map(p => p.votes), 1)
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
 
-  const goTo = n => setIdx(Math.max(0, Math.min(photos.length - 1, n)))
+  const goTo = n => {
+    setIdx(Math.max(0, Math.min(photos.length - 1, n)))
+    // Clear share button when swiping
+    if (shareTimerRef.current) { clearTimeout(shareTimerRef.current[0]); clearTimeout(shareTimerRef.current[1]) }
+    setShareVote(null); setShareFading(false)
+  }
 
   const onTouchStart = e => {
     touchStartX.current = e.touches[0].clientX
@@ -677,10 +676,12 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       setTimeout(() => setFlashId(null), 2000)
       setCelebrate({ amount: a, name: photo.username })
       setTimeout(() => setCelebrate(null), 4500)
+      if (shareTimerRef.current) { clearTimeout(shareTimerRef.current[0]); clearTimeout(shareTimerRef.current[1]) }
       setShareFading(false)
       setShareVote({ amount: a, name: photo.username })
-      setTimeout(() => setShareFading(true), 13800)
-      setTimeout(() => setShareVote(null), 15000)
+      const t1 = setTimeout(() => setShareFading(true), 4500)
+      const t2 = setTimeout(() => { setShareVote(null); setShareFading(false) }, 5000)
+      shareTimerRef.current = [t1, t2]
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)()
         const osc = ctx.createOscillator(); const gain = ctx.createGain()
