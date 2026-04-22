@@ -360,7 +360,8 @@ const S = `
   .cel-title { font-family:var(--font-b); font-size:1.6rem; font-weight:900; color:#fff; text-shadow:0 0 30px rgba(255,200,0,.9),0 2px 8px rgba(0,0,0,.8); line-height:1.2; }
   .cel-sub { font-size:.75rem; color:var(--gold-light); letter-spacing:.1em; margin-top:6px; text-shadow:0 1px 4px rgba(0,0,0,.8); }
   .cel-share { margin-top:14px; padding:10px 22px; border-radius:8px; border:none; background:linear-gradient(135deg,#1da1f2,#0d8fd9); color:#fff; font-family:var(--font-b); font-size:.76rem; font-weight:700; letter-spacing:.08em; cursor:pointer; pointer-events:all; box-shadow:0 4px 16px rgba(29,161,242,.5); }
-  .share-float { position:fixed; bottom:24px; right:18px; z-index:8000; padding:13px 20px; border-radius:12px; border:none; background:linear-gradient(135deg,#1da1f2,#0d8fd9); color:#fff; font-family:var(--font-b); font-size:.8rem; font-weight:700; letter-spacing:.08em; cursor:pointer; box-shadow:0 6px 24px rgba(29,161,242,.6); transition:opacity 1.2s ease; }
+  @keyframes share-pulse { 0%,100%{box-shadow:0 0 18px 4px rgba(255,200,0,.55),0 4px 24px rgba(0,0,0,.7);} 50%{box-shadow:0 0 32px 10px rgba(255,200,0,.85),0 4px 32px rgba(0,0,0,.8);} }
+  .share-float { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:99999; padding:15px 32px; border-radius:14px; border:2.5px solid #ffd700; background:linear-gradient(135deg,#1a1a00,#2d2600,#1a1a00); color:#ffd700; font-family:var(--font-b); font-size:1rem; font-weight:900; letter-spacing:.12em; cursor:pointer; white-space:nowrap; animation:share-pulse 1.4s ease-in-out infinite; transition:opacity 1.2s ease; }
   .share-float.fadeout { opacity:0; pointer-events:none; }
   @keyframes vflash { 0%,100%{color:var(--gold-light);} 50%{color:#fff;text-shadow:0 0 20px #fff,0 0 40px var(--gold);} }
   .vta.flash { animation:vflash .6s ease 3; }
@@ -544,11 +545,11 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [photosLoading, setPhotosLoading] = useState(true)
 
   useEffect(() => {
-    const CACHE_KEY = 'tt_photos_v1'
+    const CACHE_KEY = 'tt_photos_v2'
 
-    // Serve from cache immediately so photos appear without delay
+    // Serve from localStorage immediately — zero delay for returning users
     try {
-      const cached = sessionStorage.getItem(CACHE_KEY)
+      const cached = localStorage.getItem(CACHE_KEY)
       if (cached) {
         const parsed = JSON.parse(cached)
         if (parsed && parsed.length > 0) {
@@ -583,14 +584,14 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         wallet: r.wallet_address,
         payout_wallet: r.payout_wallet
       }))
-      const shuffled = mapped.sort(() => Math.random() - .5)
-      setPhotos(shuffled)
+      // Use stable order (by id) so returning users don't see reshuffled cards
+      const sorted = mapped.sort((a, b) => String(a.profileId).localeCompare(String(b.profileId)))
+      setPhotos(sorted)
       setPhotosLoading(false)
-      // Preload first image
-      if (shuffled[0]?.img) { const p = new Image(); p.src = shuffled[0].img }
+      if (sorted[0]?.img) { const p = new Image(); p.src = sorted[0].img }
 
       if (roundId != null) {
-        const withVotes = await Promise.all(shuffled.map(async p => {
+        const withVotes = await Promise.all(sorted.map(async p => {
           try {
             const profile = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId, p.profileId])
             if (profile) return { ...p, votes: Math.floor(Number(profile[2]) / 1e18) }
@@ -598,9 +599,9 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
           return p
         }))
         setPhotos(withVotes)
-        try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(withVotes)) } catch(_) {}
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(withVotes)) } catch(_) {}
       } else {
-        try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(shuffled)) } catch(_) {}
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(sorted)) } catch(_) {}
       }
     }
     loadPhotos().catch(e => { console.error('Photo fetch error:', e); setPhotosLoading(false) })
@@ -729,7 +730,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         <button className={`share-float${shareFading ? ' fadeout' : ''}`} onClick={() => {
           const txt = encodeURIComponent(`I just voted $TTS on Temptation Token - the crypto Hot or Not where winners get PAID 🔥 app.temptationtoken.io #TTS #Base #Crypto`)
           window.open(`https://twitter.com/intent/tweet?text=${txt}`, '_blank')
-        }}>𝕏 Share Your Vote</button>
+        }}>𝕏 &nbsp;SHARE YOUR VOTE</button>
       )}
 
       <div className="shead">
