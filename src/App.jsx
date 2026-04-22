@@ -1015,14 +1015,19 @@ function BuySellScreen({ showToast, connected }) {
 
         {tab === 'stake' && (
           <>
-            <div className="stk-info">
-              <div className="stk-title">Staking Tiers</div>
-              <div style={{ fontSize:'.58rem', color:'var(--muted)', marginBottom:12, lineHeight:1.65 }}>
-                Lock $TTS to earn APR + boosted votes. No early unlock.
+            <div style={{ textAlign:'center', padding:'28px 0 20px' }}>
+              <div style={{ fontSize:'2.4rem', marginBottom:8 }}>🔒</div>
+              <div style={{ fontSize:'1.1rem', fontWeight:700, color:'var(--gold)', marginBottom:6 }}>Staking Coming Soon</div>
+              <div style={{ fontSize:'.75rem', color:'var(--muted)', lineHeight:1.7, maxWidth:280, margin:'0 auto 24px' }}>
+                Lock $TTS to earn APR and multiply your voting power.<br />
+                Dashboard launching with Round 3.
               </div>
+            </div>
+            <div className="stk-info">
+              <div className="stk-title" style={{ marginBottom:12 }}>Staking Tiers</div>
               <div className="stk-tiers">
                 {TIERS.map(t => (
-                  <div key={t.label} className={`stk-tier${selTier===t.label?' sel':''}`} onClick={() => setSelTier(t.label)}>
+                  <div key={t.label} className="stk-tier" style={{ opacity:0.7, cursor:'default' }}>
                     <div>
                       <div className={`tn ${t.label}`}>{t.label}</div>
                       <div className="tr2">${t.min}–{t.max===Infinity?'1,000+':t.max} USD eq.</div>
@@ -1035,17 +1040,10 @@ function BuySellScreen({ showToast, connected }) {
                 ))}
               </div>
             </div>
-            <label className="flabel">Amount to Stake ($TTS)</label>
-            <input className="finput" type="number" placeholder="Min equivalent of $50 USD" value={amt} onChange={e => setAmt(e.target.value)} />
-            <label className="flabel">Lock Period</label>
-            <select className="fselect" value={lockPd} onChange={e => setLockPd(e.target.value)}>
-              <option>3 months</option><option>6 months</option><option>12 months</option>
-            </select>
-            <div className="warn-box">⚠ Once staked, funds are locked for the full selected period and cannot be unlocked early under any circumstances whatsoever.</div>
-            <a href={`https://basescan.org/address/${STAKING_ADDRESS}#writeContract`} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block' }}>
-              <button className="pbtn">Stake via BaseScan →</button>
+            <a href="https://t.me/TTSCommunityChat" target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block', marginTop:20 }}>
+              <button className="pbtn">Join Community for Updates</button>
             </a>
-            <div className="sub-note">Contract: {STAKING_ADDRESS.slice(0,10)}… · Opens BaseScan Write Contract</div>
+            <div className="sub-note">Early stakers will receive bonus multipliers at launch</div>
           </>
         )}
       </div>
