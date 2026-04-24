@@ -4,7 +4,7 @@ const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 const VOTING_ADDRESS  = '0x49385909a23C97142c600f8d28D11Ba63410b65C'
 const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
 const AIRDROP_ADDRESS = '0x214f482ae7DC1C48A4761759Dc70B6545ff36f0f'
-const NFT_ADDRESS     = '0x8b1EFa595a9c6b670078701069EADC5ae857091f'
+const NFT_ADDRESS     = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2'
 const BASE_CHAIN_ID   = 8453
 
 const TTS_ABI = [
@@ -1377,7 +1377,7 @@ function RulesScreen() {
   const rules = [
     { t:'Weekly Voting Cycle', b:'Each week begins Monday 00:00 UTC and ends Sunday 23:59 UTC. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
-    { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 1 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
+    { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
     { t:'Prize Distribution', b:'Top Voter: 40% of winning pool.\nWinning Profile: 40% of pool.\nBlockchain Entertainment LLC: 10%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
     { t:'Staking', b:'Lock $TTS to earn APR rewards and vote multipliers up to 3x. Once locked, funds cannot be accessed early under any circumstances.' },
     { t:'Fairness & Privacy', b:'Voting is provably fair via Chainlink VRF on Base blockchain. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
@@ -1482,6 +1482,7 @@ export default function App() {
             ? <div className="wbtns">
                 <button className="btn-t" onClick={() => setTransDir('in')}>↓ In</button>
                 <button className="btn-t" onClick={() => setTransDir('out')}>↑ Out</button>
+                <button className="btn-t" onClick={() => disconnect()} style={{ color:'var(--muted)', fontSize:'.62rem' }}>Disconnect</button>
               </div>
             : <button className="btn-conn" onClick={() => setShowW(true)}>Connect</button>
           }
@@ -1503,7 +1504,6 @@ export default function App() {
         {tab==='buysell'     && <BuySellScreen {...sp} />}
         {tab==='submit'      && <SubmitScreen {...sp} />}
         {tab==='refer'       && <ReferScreen {...sp} />}
-        {tab==='rules'       && <RulesScreen />}
         {tab==='howto'       && <HowToWinScreen />}
         {tab==='faqs'        && <FAQScreen />}
       </div>
