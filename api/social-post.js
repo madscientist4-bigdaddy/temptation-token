@@ -97,14 +97,12 @@ export default async function handler(req, res) {
 
   // Mirror to Telegram channels
   const broadcastToken = process.env.BROADCAST_BOT_TOKEN
+  const mainChannelId   = process.env.MAIN_CHANNEL_ID   || '-1002207667493'
+  const communityChatId = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
   if (broadcastToken) {
-    const telegramText = text  // same content
-    if (process.env.MAIN_CHANNEL_ID) {
-      try { results.main_channel = await sendTelegram(process.env.MAIN_CHANNEL_ID, telegramText, broadcastToken) } catch(e) { results.main_channel_error = e.message }
-    }
-    if (process.env.COMMUNITY_CHAT_ID) {
-      try { results.community = await sendTelegram(process.env.COMMUNITY_CHAT_ID, telegramText, broadcastToken) } catch(e) { results.community_error = e.message }
-    }
+    const telegramText = text
+    try { results.main_channel = await sendTelegram(mainChannelId, telegramText, broadcastToken) } catch(e) { results.main_channel_error = e.message }
+    try { results.community    = await sendTelegram(communityChatId, telegramText, broadcastToken) } catch(e) { results.community_error = e.message }
   } else {
     results.telegram = 'skipped — BROADCAST_BOT_TOKEN not configured'
   }

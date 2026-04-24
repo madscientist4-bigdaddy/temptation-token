@@ -9,15 +9,17 @@
 //   4. Find "chat":{"id": ...} — that number is your ADMIN_CHAT_ID (negative for groups)
 //   5. Set it as ADMIN_CHAT_ID in Railway and Vercel env vars
 
+const ADMIN_CHAT_ID_DEFAULT = '-5273368658'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const { name, wallet, link_url } = req.body || {}
   const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.ADMIN_CHAT_ID
+  const chatId = process.env.ADMIN_CHAT_ID || ADMIN_CHAT_ID_DEFAULT
 
-  if (!token || !chatId) {
-    console.warn('Telegram not configured — set TELEGRAM_BOT_TOKEN and ADMIN_CHAT_ID')
+  if (!token) {
+    console.warn('Telegram not configured — set TELEGRAM_BOT_TOKEN')
     return res.status(200).json({ ok: true, skipped: true })
   }
 
