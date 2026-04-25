@@ -967,14 +967,41 @@ function NFTScreen() {
 }
 
 // ── BUY/SELL/STAKE ────────────────────────────────────────────────────────────
+const POOL_ADDRESS = '0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68'
+
+async function fetchPoolRate() {
+  // getReserves() selector — token0=WETH, token1=TTS (both 18 decimals)
+  const body = { jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: POOL_ADDRESS, data: '0x0902f1ac' }, 'latest'] }
+  const r = await fetch('/api/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const { result } = await r.json()
+  if (!result || result === '0x') return null
+  const hex = result.slice(2)
+  const r0 = BigInt('0x' + hex.slice(0, 64))   // WETH reserve
+  const r1 = BigInt('0x' + hex.slice(64, 128))  // TTS reserve
+  if (r0 === 0n) return null
+  // Both 18 decimals — ratio gives TTS per ETH directly
+  return Math.round(Number(r1 * 10000n / r0) / 10000)
+}
+
 function BuySellScreen({ showToast, connected }) {
   const [tab, setTab] = useState('buy')
   const [amt, setAmt] = useState('')
   const [cur, setCur] = useState('ETH')
   const [selTier, setSelTier] = useState(null)
   const [lockPd, setLockPd] = useState('3 months')
-  const rate = 1200
-  const recv = amt ? (Number(amt) * rate).toLocaleString() : '—'
+  const [rate, setRate] = useState(null)
+  const [rateLoading, setRateLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = () => fetchPoolRate().then(r => { if (!cancelled && r) setRate(r) }).catch(() => {}).finally(() => { if (!cancelled) setRateLoading(false) })
+    load()
+    const id = setInterval(load, 60000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  const rateDisplay = rateLoading ? '…' : rate ? rate.toLocaleString() : '—'
+  const recv = amt && rate ? (Number(amt) * rate).toLocaleString() : '—'
 
   return (
     <div>
@@ -998,11 +1025,14 @@ function BuySellScreen({ showToast, connected }) {
             </select>
             <div className="rate-box">
               <span className="rate-l">You Receive</span>
-              <span className="rate-v">{tab === 'buy' ? recv + ' $TTS' : (amt ? (Number(amt)/rate).toFixed(4)+' '+cur : '—')}</span>
+              <span className="rate-v">{tab === 'buy' ? recv + ' $TTS' : (amt && rate ? (Number(amt)/rate).toFixed(6)+' '+cur : '—')}</span>
             </div>
             <div className="rate-box">
-              <span className="rate-l">Rate</span>
-              <span className="rate-v" style={{ fontSize:'.82rem' }}>1 ETH = {rate.toLocaleString()} $TTS</span>
+              <span className="rate-l">Live Rate</span>
+              <span className="rate-v" style={{ fontSize:'.82rem' }}>
+                {rateLoading ? 'Loading…' : rate ? `1 ETH = ${rate.toLocaleString()} $TTS` : 'Unavailable'}
+                {!rateLoading && rate && <span style={{ fontSize:'.58rem', color:'var(--muted)', marginLeft:6 }}>· Uniswap V2 · updates every 60s</span>}
+              </span>
             </div>
             <a href={`https://app.uniswap.org/swap?outputCurrency=${TTS_ADDRESS}&chain=base`} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block' }}>
               <button className="pbtn">
