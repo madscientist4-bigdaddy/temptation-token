@@ -798,7 +798,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                 </div>
                 <div className="pinfo">
                   <div className="pname">{ph.username}</div>
-                  <button className="plink" onClick={() => { const raw = ph.link_url || ''; const url = raw.startsWith('http') ? raw : raw.includes('.') ? 'https://' + raw : 'https://app.temptationtoken.io'; window.open(url, '_blank') }}>🔗 {ph.link || 'Profile'}</button>
+                  <button className="plink" onClick={() => { const raw = ph.link_url || ''; const url = /^https?:\/\//.test(raw) ? raw : raw.includes('.') ? 'https://' + raw : 'https://app.temptationtoken.io'; window.open(url, '_blank') }}>🔗 {ph.link || 'Profile'}</button>
                 </div>
                 <div className="vsec">
                   <div className="vtotal">
@@ -1092,6 +1092,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [a2, setA2] = useState(false)
   const fRef = useRef()
 
+  useEffect(() => { setWallet(address || '') }, [address])
+
   const [subRemaining, setSubRemaining] = useState(null)
   useEffect(() => {
     if (!address) return
@@ -1188,6 +1190,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       } else showToast('Fee paid — submission queued for review.', 's')
     } catch {
       showToast('Fee paid — submission queued for review.', 's')
+      setSubmitting(false)
+      return
     }
 
     setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false)
@@ -1248,7 +1252,7 @@ function ReferScreen({ showToast, connected }) {
   const { address } = useAccount()
   const [copied, setCopied] = useState(false)
   const referralLink = address
-    ? `https://app.temptationtoken.io?ref=${address.slice(2,10)}`
+    ? `https://app.temptationtoken.io?ref=${address}`
     : 'Connect wallet to get your link'
 
   const copy = () => {

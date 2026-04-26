@@ -961,7 +961,7 @@ function ReviewScreen({ showToast }) {
                 <div className="review-info">
                   <div className="review-name">{s.name}</div>
                   <div className="review-wallet">{s.wallet}</div>
-                  <a className="review-link" href={s.linkUrl} target="_blank" rel="noopener noreferrer">🔗 {s.link}</a>
+                  <a className="review-link" href={/^https?:\/\//.test(s.linkUrl || '') ? s.linkUrl : '#'} target="_blank" rel="noopener noreferrer">🔗 {s.link}</a>
                   <div className="review-actions">
                     <button className="approve-btn" onClick={() => setConfirmed({ id: s.id, action: "approve" })}>✓ Approve</button>
                     <button className="deny-btn" onClick={() => setConfirmed({ id: s.id, action: "deny" })}>✕ Deny</button>
