@@ -721,6 +721,83 @@ const injectStyles = () => {
     .cal-copy-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:7px 14px; border-radius:6px; font-size:0.63rem; cursor:pointer; }
     .cal-insta-note { font-size:0.6rem; color:var(--muted); font-style:italic; padding:6px 10px; background:var(--surface2); border-radius:6px; border:1px dashed var(--border); }
     .cal-empty { text-align:center; padding:40px 20px; color:var(--muted); font-size:0.75rem; }
+
+    /* ── ALERTS BANNER ── */
+    .alert-banner-item {
+      padding: 10px 28px;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .alert-banner-item.critical { background: rgba(232,64,90,0.1); color: var(--rose); border-bottom: 1px solid rgba(232,64,90,0.2); }
+    .alert-banner-item.warn { background: rgba(243,156,18,0.1); color: var(--amber); border-bottom: 1px solid rgba(243,156,18,0.2); }
+
+    /* ── COMMAND CENTER ── */
+    .cmd-countdown {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .cmd-time { font-family: var(--font-display); font-size: 2.8rem; letter-spacing: .05em; line-height: 1; }
+    .cmd-time.ok { color: var(--text); }
+    .cmd-time.warn { color: var(--amber); }
+    .cmd-time.danger { color: var(--rose); }
+    .cmd-metric-label { font-size: .55rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+    .cmd-metric-value { font-family: var(--font-display); font-size: 1.8rem; }
+    .cmd-divider { border-left: 1px solid var(--border); padding-left: 28px; display: flex; gap: 24px; flex-wrap: wrap; }
+    .cmd-health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .cmd-health-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; border-left-width: 3px; border-left-style: solid; }
+    .cmd-health-label { font-size: .55rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .cmd-health-val { font-size: .82rem; font-weight: 700; }
+    .cmd-actions { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; }
+    .cmd-action-title { font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+    .cmd-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: .68rem; font-family: var(--font-body); font-weight: 600; text-decoration: none; display: inline-block; transition: all .15s; }
+    .cmd-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+    /* ── PRIORITIES ── */
+    .pri-task-row { padding: 13px 18px; border-bottom: 1px solid var(--border2); display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background .15s; }
+    .pri-task-row:hover { background: rgba(212,175,55,0.03); }
+    .pri-task-row.done { background: rgba(46,204,113,0.03); }
+    .pri-task-row:last-child { border-bottom: none; }
+    .pri-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s; }
+    .pri-check.checked { background: var(--green); border-color: var(--green); }
+    .pri-task-text { font-size: .72rem; flex: 1; line-height: 1.5; }
+    .pri-task-text.done { color: var(--muted); text-decoration: line-through; }
+
+    /* ── KPI ── */
+    .kpi-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+    .kpi-section-head { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    .kpi-cell { padding: 18px 20px; border-right: 1px solid var(--border2); border-bottom: 1px solid var(--border2); }
+    .kpi-cell-label { font-size: .55rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .kpi-cell-value { font-family: var(--font-display); font-size: 1.8rem; color: var(--gold-light); }
+    .kpi-cell-sub { font-size: .6rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── MANUAL ── */
+    .manual-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+    .manual-toggle { width: 100%; background: none; border: none; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; text-align: left; }
+    .manual-toggle-title { font-size: .75rem; font-weight: 700; letter-spacing: .08em; color: var(--text); }
+    .manual-arrow { color: var(--muted); font-size: .8rem; transition: transform .2s; }
+    .manual-arrow.open { transform: rotate(180deg); }
+    .manual-body { padding: 0 20px 18px; }
+    .manual-step { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border2); }
+    .manual-step-num { color: var(--gold); font-weight: 700; font-size: .75rem; flex-shrink: 0; width: 20px; }
+    .manual-step-text { font-size: .72rem; color: var(--text); line-height: 1.6; }
+    .manual-tpl { margin-top: 10px; padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; }
+    .manual-tpl-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .manual-tpl-name { font-size: .65rem; font-weight: 700; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+    .manual-copy-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: .6rem; font-family: var(--font-body); transition: all .15s; }
+    .manual-copy-btn.copied { background: var(--green-dim); border-color: rgba(46,204,113,.3); color: var(--green); }
+    .manual-tpl-text { font-size: .68rem; color: var(--text); font-family: var(--font-body); line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; }
   `;
   document.head.appendChild(s);
 };
@@ -1887,19 +1964,472 @@ function ContentCalendarScreen({ showToast }) {
   )
 }
 
+// ─── ALERTS BANNER ───────────────────────────────────────────────────────────
+function AlertsBanner() {
+  const [alerts, setAlerts] = useState([]);
+  useEffect(() => {
+    const items = [];
+    const now = Date.now();
+    const railwayExpiry = new Date('2026-04-27T00:00:00Z').getTime();
+    const msUntil = railwayExpiry - now;
+    const daysUntil = Math.ceil(msUntil / 86400000);
+    if (msUntil <= 0) {
+      items.push({ level: 'critical', msg: '🚨 Railway Trial expired — Telegram bot is OFFLINE. Go to railway.app → proud-unity → upgrade to Hobby ($5/mo)' });
+    } else if (daysUntil <= 3) {
+      items.push({ level: 'warn', msg: `⚠️ Railway Trial expires in ${daysUntil} day${daysUntil === 1 ? '' : 's'} — upgrade to Hobby plan at railway.app (proud-unity project)` });
+    }
+    sb.get('submissions', 'status=eq.pending&select=created_at').then(d => {
+      if (Array.isArray(d)) {
+        const stale = d.filter(s => s.created_at && now - new Date(s.created_at).getTime() > 48 * 3600000);
+        if (stale.length > 0) items.push({ level: 'warn', msg: `⚠️ ${stale.length} submission${stale.length > 1 ? 's have' : ' has'} been pending review for 48+ hours` });
+      }
+      setAlerts([...items]);
+    }).catch(() => setAlerts([...items]));
+  }, []);
+  if (alerts.length === 0) return null;
+  return (
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
+      {alerts.map((a, i) => (
+        <div key={i} className={`alert-banner-item ${a.level}`}>{a.msg}</div>
+      ))}
+    </div>
+  );
+}
+
+// ─── COMMAND CENTER ───────────────────────────────────────────────────────────
+function CommandScreen({ setActive }) {
+  const [round, setRound] = useState(null);
+  const [pool, setPool] = useState(0);
+  const [pendingSubs, setPendingSubs] = useState(0);
+  const [pendingContent, setPendingContent] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [, setTick] = useState(0);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const roundInfo = await getRoundInfo();
+      setRound(roundInfo);
+      if (roundInfo && !roundInfo.error) {
+        const encoded = '0x8f1327c0' + roundInfo.roundId.toString(16).padStart(64, '0');
+        const result = await ethCall(VOTING_ADDRESS, encoded);
+        if (result && result !== '0x') {
+          const raw = result.slice(2);
+          const rawVotesBig = BigInt('0x' + raw.slice(3 * 64, 4 * 64));
+          setPool(Number(rawVotesBig) / 1e18);
+        }
+      }
+      const [subs, posts] = await Promise.all([
+        sb.get('submissions', 'status=eq.pending&select=id'),
+        sb.get('scheduled_posts', 'status=eq.pending&select=id'),
+      ]);
+      if (Array.isArray(subs)) setPendingSubs(subs.length);
+      if (Array.isArray(posts)) setPendingContent(posts.length);
+      setLastRefresh(new Date().toLocaleTimeString());
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1000); return () => clearInterval(t); }, []);
+
+  const now = Math.floor(Date.now() / 1000);
+  const roundOverdue = round && !round.settled && now > (round?.endTime || 0);
+  const timeLeft = round && !round.settled ? Math.max(0, round.endTime - now) : 0;
+  const days = Math.floor(timeLeft / 86400);
+  const hrs = Math.floor((timeLeft % 86400) / 3600);
+  const mins = Math.floor((timeLeft % 3600) / 60);
+  const secs = timeLeft % 60;
+  const timeClass = round?.settled ? '' : roundOverdue ? 'danger' : timeLeft < 3600 ? 'danger' : timeLeft < 86400 ? 'warn' : 'ok';
+  const railwayOk = Date.now() < new Date('2026-04-27T00:00:00Z').getTime();
+
+  const health = [
+    { label: 'Round', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active' },
+    { label: 'Railway Bot', ok: railwayOk, warn: false, text: railwayOk ? 'Trial expires Apr 27' : 'EXPIRED — offline' },
+    { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting` },
+    { label: 'Content Queue', ok: pendingContent === 0, warn: pendingContent > 0, text: pendingContent === 0 ? 'All approved' : `${pendingContent} to approve` },
+  ];
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Command Center</div>
+        <div className="gold-rule" />
+        <div className="page-sub" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span><span className="dot-live" />Live · auto-refreshes every 60s</span>
+          <button onClick={load} style={{ background: 'none', border: '1px solid rgba(212,175,55,.3)', color: 'var(--gold-dim)', padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem' }}>
+            {loading ? '⟳ Refreshing…' : '⟳ Refresh'}
+          </button>
+        </div>
+      </div>
+
+      <div className="cmd-countdown">
+        <div>
+          <div className="cmd-metric-label">Round {round?.roundId || '—'} — Time Remaining</div>
+          {round?.settled ? (
+            <div className="cmd-time ok">Settled ✓</div>
+          ) : roundOverdue ? (
+            <div className="cmd-time danger">OVERDUE</div>
+          ) : (
+            <div className={`cmd-time ${timeClass}`}>
+              {days > 0 && `${days}d `}{String(hrs).padStart(2, '0')}:{String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+            </div>
+          )}
+          <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginTop: 4 }}>
+            {round && !round.error ? `Ends ${new Date(round.endTime * 1000).toLocaleString()}` : 'Loading round…'}
+          </div>
+        </div>
+        <div className="cmd-divider">
+          {[
+            { label: 'Pool', value: pool > 0 ? `${Math.round(pool).toLocaleString()} TTS` : '—', color: 'var(--gold-light)' },
+            { label: 'Profiles', value: round?.profileCount ?? '—', color: 'var(--text)' },
+            { label: 'Pending Review', value: pendingSubs, color: pendingSubs > 0 ? 'var(--rose)' : 'var(--green)' },
+            { label: 'Pending Content', value: pendingContent, color: pendingContent > 0 ? 'var(--amber)' : 'var(--text)' },
+          ].map((m, i) => (
+            <div key={i}>
+              <div className="cmd-metric-label">{m.label}</div>
+              <div className="cmd-metric-value" style={{ color: m.color }}>{m.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="cmd-health-grid">
+        {health.map((h, i) => {
+          const color = h.ok ? 'var(--green)' : h.warn ? 'var(--amber)' : 'var(--rose)';
+          return (
+            <div key={i} className="cmd-health-card" style={{ borderLeftColor: color }}>
+              <div className="cmd-health-label">{h.label}</div>
+              <div className="cmd-health-val" style={{ color }}>● {h.text}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="cmd-actions">
+        <div className="cmd-action-title">Quick Links</div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="cmd-btn" onClick={() => setActive('review')}>📸 Review Submissions</button>
+          <button className="cmd-btn" onClick={() => setActive('content')}>📅 Content Calendar</button>
+          <button className="cmd-btn" onClick={() => setActive('system')}>🛡 System Health</button>
+          <a className="cmd-btn" href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer">⛓ Fund Chainlink</a>
+          <a className="cmd-btn" href={`https://basescan.org/address/${VOTING_ADDRESS}`} target="_blank" rel="noopener noreferrer">📊 BaseScan</a>
+          <a className="cmd-btn" href="https://railway.app" target="_blank" rel="noopener noreferrer">🚂 Railway</a>
+        </div>
+      </div>
+
+      {lastRefresh && <div style={{ fontSize: '.6rem', color: 'var(--muted)', textAlign: 'right' }}>Last updated: {lastRefresh}</div>}
+    </div>
+  );
+}
+
+// ─── DAILY PRIORITIES ─────────────────────────────────────────────────────────
+const PRIORITY_GROUPS = [
+  {
+    key: 'daily', title: "Today's Tasks", emoji: '☀️', reset: 'daily',
+    tasks: [
+      { id: 'd1', label: 'Check round health (System Health tab)', cat: 'Ops' },
+      { id: 'd2', label: 'Review pending photo submissions', cat: 'Ops' },
+      { id: 'd3', label: 'Check LINK balances at automation.chain.link/base', cat: 'Ops' },
+      { id: 'd4', label: 'Scan X + Telegram for community questions', cat: 'Growth' },
+    ]
+  },
+  {
+    key: 'weekly', title: 'This Week', emoji: '📅', reset: 'weekly',
+    tasks: [
+      { id: 'w1', label: 'Generate + approve content calendar posts', cat: 'Content' },
+      { id: 'w2', label: 'Review staking APR obligations', cat: 'Finance' },
+      { id: 'w3', label: 'Export vote data for weekly report', cat: 'Finance' },
+      { id: 'w4', label: 'Confirm round will settle Sunday 23:59 UTC', cat: 'Ops' },
+    ]
+  },
+  {
+    key: 'monthly', title: 'This Month', emoji: '📆', reset: 'monthly',
+    tasks: [
+      { id: 'm1', label: 'Upgrade Railway Trial → Hobby plan ($5/mo)', cat: 'Ops', due: 'Due Apr 27' },
+      { id: 'm2', label: 'CoinGecko resubmission', cat: 'Growth', due: 'Due Apr 17' },
+      { id: 'm3', label: 'Blockaid false-positive portal re-check', cat: 'Ops' },
+      { id: 'm4', label: 'Check Vercel usage and billing', cat: 'Ops' },
+      { id: 'm5', label: 'Supabase Pro renewal review', cat: 'Ops' },
+    ]
+  },
+];
+
+function PrioritiesScreen() {
+  const today = new Date().toDateString();
+  const thisWeek = (() => { const d = new Date(); d.setUTCHours(0,0,0,0); return `w${d.getUTCFullYear()}${Math.floor((d.getTime() - new Date('2026-01-05').getTime()) / 604800000)}`; })();
+  const thisMonth = `m${new Date().getUTCFullYear()}${new Date().getUTCMonth()}`;
+
+  const [checks, setChecks] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('tt_priorities_v2') || '{}');
+      const out = {};
+      PRIORITY_GROUPS.forEach(g => {
+        g.tasks.forEach(t => {
+          if (g.reset === 'daily') out[t.id] = saved._date === today ? (saved[t.id] || false) : false;
+          else if (g.reset === 'weekly') out[t.id] = saved._week === thisWeek ? (saved[t.id] || false) : false;
+          else out[t.id] = saved._month === thisMonth ? (saved[t.id] || false) : false;
+        });
+      });
+      out._date = today; out._week = thisWeek; out._month = thisMonth;
+      return out;
+    } catch { return { _date: today, _week: thisWeek, _month: thisMonth }; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tt_priorities_v2', JSON.stringify(checks));
+  }, [checks]);
+
+  const toggle = id => setChecks(c => ({ ...c, [id]: !c[id] }));
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Daily Priorities</div>
+        <div className="gold-rule" />
+        <div className="page-sub">Daily tasks reset each morning · weekly/monthly tasks persist · click to check off</div>
+      </div>
+      {PRIORITY_GROUPS.map(g => {
+        const done = g.tasks.filter(t => checks[t.id]).length;
+        return (
+          <div key={g.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>{g.emoji} {g.title}</span>
+              <span style={{ fontSize: '.6rem', color: done === g.tasks.length ? 'var(--green)' : 'var(--muted)' }}>{done}/{g.tasks.length} done</span>
+            </div>
+            {g.tasks.map(t => (
+              <div key={t.id} className={`pri-task-row${checks[t.id] ? ' done' : ''}`} onClick={() => toggle(t.id)}>
+                <div className={`pri-check${checks[t.id] ? ' checked' : ''}`}>
+                  {checks[t.id] && <span style={{ color: '#fff', fontSize: '.7rem', lineHeight: 1 }}>✓</span>}
+                </div>
+                <span className={`pri-task-text${checks[t.id] ? ' done' : ''}`}>{t.label}</span>
+                {t.due && <span style={{ fontSize: '.58rem', background: 'var(--red-dim)', color: 'var(--rose)', padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>{t.due}</span>}
+                <span style={{ fontSize: '.55rem', color: 'var(--muted)', background: 'var(--surface2)', padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>{t.cat}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── KPI DASHBOARD ────────────────────────────────────────────────────────────
+function KPIScreen() {
+  const [data, setData] = useState({
+    rounds: '—', totalVotes: '—', totalPool: '—', avgPool: '—',
+    totalUsers: '—', newThisWeek: '—', totalSubs: '—', approvedSubs: '—',
+    houseEarned: '—', charityDonated: '—', stakersCount: '—',
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    Promise.all([
+      sb.get('users', 'select=id,created_at'),
+      sb.get('submissions', 'select=id,created_at,status'),
+      sb.get('votes', 'select=tts_amount,created_at'),
+      sb.get('staking_positions', 'status=eq.active&select=id').catch(() => []),
+      getRoundInfo(),
+    ]).then(([users, subs, votes, stakers, round]) => {
+      const totalUsers = Array.isArray(users) ? users.length : 0;
+      const newThisWeek = Array.isArray(users) ? users.filter(u => u.created_at && new Date(u.created_at) > new Date(oneWeekAgo)).length : 0;
+      const totalSubs = Array.isArray(subs) ? subs.length : 0;
+      const approvedSubs = Array.isArray(subs) ? subs.filter(s => s.status === 'approved').length : 0;
+      const totalPool = Array.isArray(votes) ? votes.reduce((s, v) => s + (Number(v.tts_amount) || 0), 0) : 0;
+      const roundId = round?.roundId || 1;
+      const avgPool = roundId > 0 ? Math.round(totalPool / roundId) : 0;
+      const stakersCount = Array.isArray(stakers) ? stakers.length : '—';
+      setData({
+        rounds: roundId.toLocaleString(),
+        totalVotes: Array.isArray(votes) ? votes.length.toLocaleString() : '—',
+        totalPool: Math.round(totalPool).toLocaleString(),
+        avgPool: avgPool.toLocaleString(),
+        totalUsers: totalUsers.toLocaleString(),
+        newThisWeek: newThisWeek.toLocaleString(),
+        totalSubs: totalSubs.toLocaleString(),
+        approvedSubs: approvedSubs.toLocaleString(),
+        houseEarned: Math.round(totalPool * 0.1).toLocaleString(),
+        charityDonated: Math.round(totalPool * 0.1).toLocaleString(),
+        stakersCount: stakersCount.toString(),
+      });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const Section = ({ title, emoji, cells }) => (
+    <div className="kpi-section">
+      <div className="kpi-section-head">{emoji} {title}</div>
+      <div className="kpi-grid">
+        {cells.map(([label, value, sub], i) => (
+          <div key={i} className="kpi-cell">
+            <div className="kpi-cell-label">{label}</div>
+            <div className="kpi-cell-value">{loading ? '…' : value}</div>
+            {sub && <div className="kpi-cell-sub">{sub}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">KPI Dashboard</div>
+        <div className="gold-rule" />
+        <div className="page-sub">Game, user, and financial performance metrics · refreshes on load</div>
+      </div>
+      <Section title="Game Metrics" emoji="🎮" cells={[
+        ['Rounds Run', data.rounds, 'total rounds'],
+        ['Total Votes Cast', data.totalVotes, 'across all rounds'],
+        ['Cumulative Pool', data.totalPool, '$TTS voted all-time'],
+        ['Avg Pool / Round', data.avgPool, '$TTS per round'],
+      ]} />
+      <Section title="User Metrics" emoji="👥" cells={[
+        ['Total Users', data.totalUsers, 'registered wallets'],
+        ['New This Week', data.newThisWeek, 'last 7 days'],
+        ['Total Submissions', data.totalSubs, 'all time'],
+        ['Approved Profiles', data.approvedSubs, 'ever approved'],
+        ['Active Stakers', data.stakersCount, 'current positions'],
+      ]} />
+      <Section title="Financial (est.)" emoji="💰" cells={[
+        ['House Revenue', data.houseEarned, '$TTS (10% of all pools)'],
+        ['Charity Donated', data.charityDonated, '$TTS to Polaris Project'],
+      ]} />
+    </div>
+  );
+}
+
+// ─── OPERATIONS MANUAL ───────────────────────────────────────────────────────
+const OPS_MANUAL = [
+  {
+    title: 'Round Start Checklist', emoji: '🚀',
+    steps: [
+      'TTSKeeper2 fires automatically at Monday 00:00 UTC via Chainlink Automation — verify on BaseScan',
+      'If automation fails: BaseScan → TTSKeeper2 (0xB17b…C61A48) → Write → manualExecute(1)',
+      'Approve pending profiles: Photo Review tab → Approve (updates Supabase; on-chain approval requires batchApproveProfiles via BaseScan)',
+      'Generate + approve content calendar: Content Calendar tab → Generate This Week → approve posts',
+      'Verify LINK balances > 3 LINK at automation.chain.link/base',
+    ]
+  },
+  {
+    title: 'Round Settlement', emoji: '🏆',
+    steps: [
+      'Keeper fires automatically at round end (Sunday 23:59 UTC) — calls settleRound → requests VRF',
+      'Chainlink VRF V2.5 fulfills within ~30s (3 confirmations) — winner selected proportionally to tickets',
+      'Payout split: 40% winner profile · 40% top voter · 10% house · 10% charity (Polaris Project)',
+      'If keeper misses: BaseScan → TTSKeeper2 → Write → manualExecute(3)',
+      'Confirm settlement: BaseScan → TTSVotingV3 → Events tab → look for RoundSettled',
+    ]
+  },
+  {
+    title: 'Emergency Procedures', emoji: '🚨',
+    steps: [
+      'LINK depleted: fund upkeeps immediately at automation.chain.link/base (keep > 5 LINK each)',
+      'Railway bot offline: check railway.app → proud-unity project; upgrade Trial → Hobby if expired',
+      'VRF stuck > 5 min: check sub balance at vrf.chain.link — sub ID starts 58222014…',
+      'Exploit / wrong winner: pause via Gnosis Safe multisig (0xeFb59d88…DE6fB86) — needs 2/2 sigs',
+      'Vercel down: check vercel.com → cryptofitjims-projects → temptation-token',
+      'Supabase unreachable: check status.supabase.com; contact support@supabase.io',
+    ]
+  },
+  {
+    title: 'Infrastructure Reference', emoji: '🔧',
+    steps: [
+      'Vercel: cryptofitjims-projects · Project: temptation-token · Auto-deploys on git push to main',
+      'Railway: proud-unity · Bot: @TTSGameBot · Broadcaster: @TTSBroadcastBot · Trial exp Apr 27 2026',
+      'Supabase: gmlikdxykgviyprqtqwz (Pro plan) · Tables: users, submissions, votes, staking_positions, scheduled_posts',
+      'Chainlink Automation Registry: 0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743 · 4 upkeeps',
+      'VRF Sub ID: 58222014484560539249027457203866883376041731162442592604288474822166186263722',
+      'Gnosis Safe: 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86 · 2/2 multisig (deployer + partner)',
+    ]
+  },
+  {
+    title: 'Social Media Templates', emoji: '📢',
+    templates: [
+      { name: 'Round Start', text: '🔥 Round is LIVE on @TemptationToken!\n\nVote for your favourite profile and win $TTS!\n\n👉 app.temptationtoken.io\n\n#TTS #Base #Web3' },
+      { name: 'Round End Alert', text: '⏰ Final hours of voting!\n\nGet your votes in before the round closes.\n\n👉 app.temptationtoken.io\n\n#TTS #Base' },
+      { name: 'Winner Announcement', text: '🏆 Round settled! Congratulations to our winner!\n\nNew round starts Monday — get your $TTS ready.\n\n👉 app.temptationtoken.io\n\n#TTS #Base' },
+      { name: 'New Profile Alert', text: '👀 New profile just approved!\n\nHead to the app and cast your vote.\n\n👉 app.temptationtoken.io\n\n#TTS #Base #Web3' },
+    ]
+  },
+];
+
+function ManualScreen() {
+  const [open, setOpen] = useState({ 0: true });
+  const [copied, setCopied] = useState(null);
+
+  const copyText = (text, key) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key); setTimeout(() => setCopied(null), 2000);
+    }).catch(() => {});
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Operations Manual</div>
+        <div className="gold-rule" />
+        <div className="page-sub">Playbooks, emergency procedures, and copy-paste templates · click to expand</div>
+      </div>
+      {OPS_MANUAL.map((section, i) => (
+        <div key={i} className="manual-section">
+          <button className="manual-toggle" onClick={() => setOpen(o => ({ ...o, [i]: !o[i] }))}>
+            <span className="manual-toggle-title">{section.emoji} {section.title}</span>
+            <span className={`manual-arrow${open[i] ? ' open' : ''}`}>▾</span>
+          </button>
+          {open[i] && (
+            <div className="manual-body">
+              {section.steps && section.steps.map((step, j) => (
+                <div key={j} className="manual-step">
+                  <span className="manual-step-num">{j + 1}.</span>
+                  <span className="manual-step-text">{step}</span>
+                </div>
+              ))}
+              {section.templates && section.templates.map((tpl, j) => (
+                <div key={j} className="manual-tpl">
+                  <div className="manual-tpl-head">
+                    <span className="manual-tpl-name">{tpl.name}</span>
+                    <button className={`manual-copy-btn${copied === `${i}-${j}` ? ' copied' : ''}`}
+                      onClick={() => copyText(tpl.text, `${i}-${j}`)}>
+                      {copied === `${i}-${j}` ? '✓ Copied' : '📋 Copy'}
+                    </button>
+                  </div>
+                  <pre className="manual-tpl-text">{tpl.text}</pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── SIDEBAR NAV CONFIG ───────────────────────────────────────────────────────
 const NAV = [
-  { section: "Dashboard", items: [
-    { key: "overview",    icon: "📊", label: "Overview" },
-    { key: "review",      icon: "📸", label: "Photo Review", badge: 6 },
-    { key: "content",     icon: "📅", label: "Content Calendar" },
-    { key: "users",       icon: "👤", label: "Users" },
-    { key: "payouts",     icon: "💸", label: "Payouts" },
-    { key: "staking",     icon: "🔒", label: "Staking" },
-    { key: "wallets",     icon: "💼", label: "Wallets" },
-    { key: "referral",    icon: "🔗", label: "Referrals" },
-    { key: "settings",    icon: "⚙️", label: "Settings" },
-    { key: "system",     icon: "🛡️", label: "System Health" },
+  { section: "Command", items: [
+    { key: "command",    icon: "🎯", label: "Command Center" },
+    { key: "priorities", icon: "✅", label: "Daily Priorities" },
+    { key: "kpi",        icon: "📈", label: "KPI Dashboard" },
+    { key: "manual",     icon: "📖", label: "Operations Manual" },
+  ]},
+  { section: "Operations", items: [
+    { key: "overview",  icon: "📊", label: "Overview" },
+    { key: "review",    icon: "📸", label: "Photo Review" },
+    { key: "content",   icon: "📅", label: "Content Calendar" },
+    { key: "system",    icon: "🛡️", label: "System Health" },
+  ]},
+  { section: "Finance", items: [
+    { key: "payouts",   icon: "💸", label: "Payouts" },
+    { key: "staking",   icon: "🔒", label: "Staking" },
+    { key: "wallets",   icon: "💼", label: "Wallets" },
+    { key: "referral",  icon: "🔗", label: "Referrals" },
+  ]},
+  { section: "Settings", items: [
+    { key: "users",     icon: "👤", label: "Users" },
+    { key: "settings",  icon: "⚙️", label: "Settings" },
   ]},
 ];
 
@@ -1907,29 +2437,34 @@ const NAV = [
 export default function AdminApp() {
   useEffect(() => { injectStyles(); }, []);
   const [loggedIn, setLoggedIn] = useState(false);
-  const [active, setActive] = useState("overview");
+  const [active, setActive] = useState("command");
   const [toast, showToast] = useToast();
 
   if (!loggedIn) return <div className="adm-app"><LoginScreen onLogin={() => setLoggedIn(true)} /></div>;
 
   const screenProps = { showToast };
   const screens = {
-    overview: <OverviewScreen />,
-    review:   <ReviewScreen {...screenProps} />,
-    content:  <ContentCalendarScreen {...screenProps} />,
-    users:    <UsersScreen {...screenProps} />,
-    wallets:  <WalletsScreen />,
-    payouts:  <PayoutsScreen {...screenProps} />,
-    staking:  <StakingScreen />,
-    referral: <ReferralScreen showToast={showToast} />,
-    settings: <SettingsScreen />,
-    system:   <SystemScreen />,
+    command:    <CommandScreen setActive={setActive} />,
+    priorities: <PrioritiesScreen />,
+    kpi:        <KPIScreen />,
+    manual:     <ManualScreen />,
+    overview:   <OverviewScreen />,
+    review:     <ReviewScreen {...screenProps} />,
+    content:    <ContentCalendarScreen {...screenProps} />,
+    users:      <UsersScreen {...screenProps} />,
+    wallets:    <WalletsScreen />,
+    payouts:    <PayoutsScreen {...screenProps} />,
+    staking:    <StakingScreen />,
+    referral:   <ReferralScreen showToast={showToast} />,
+    settings:   <SettingsScreen />,
+    system:     <SystemScreen />,
   };
 
   const titles = {
+    command: "Command Center", priorities: "Daily Priorities", kpi: "KPI Dashboard", manual: "Operations Manual",
     overview: "Overview", review: "Photo Review", content: "Content Calendar",
     users: "User Management", wallets: "Wallets", payouts: "Payouts",
-    staking: "Staking", settings: "Settings", system: "System Health"
+    staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health"
   };
 
   return (
@@ -1975,6 +2510,7 @@ export default function AdminApp() {
               <span className="admin-pill">Admin · Blockchain Entertainment LLC</span>
             </div>
           </div>
+          <AlertsBanner />
           <div className="adm-page">
             {screens[active]}
           </div>
