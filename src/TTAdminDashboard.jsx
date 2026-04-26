@@ -688,6 +688,39 @@ const injectStyles = () => {
 
     .progress-bar-wrap { background: rgba(255,255,255,0.05); border-radius: 2px; height: 3px; margin-top: 5px; min-width: 80px; }
     .progress-bar { height: 3px; background: linear-gradient(90deg, var(--crimson), var(--rose)); border-radius: 2px; }
+
+    /* ── CONTENT CALENDAR ── */
+    .cal-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+    .cal-week-label { font-size:0.7rem; color:var(--muted); font-weight:600; letter-spacing:0.08em; text-transform:uppercase; }
+    .cal-gen-btn { background:linear-gradient(135deg,var(--crimson),var(--rose)); color:#fff; border:none; padding:9px 18px; border-radius:6px; font-size:0.65rem; font-weight:700; letter-spacing:0.08em; cursor:pointer; }
+    .cal-gen-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .cal-day-group { margin-bottom:18px; }
+    .cal-day-label { font-size:0.62rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); padding:6px 0; border-bottom:1px solid var(--border); margin-bottom:10px; }
+    .cal-post-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:8px; display:flex; gap:14px; align-items:flex-start; }
+    .cal-post-card.posted { opacity:0.55; }
+    .cal-platform-icon { font-size:1.4rem; flex-shrink:0; margin-top:2px; }
+    .cal-post-body { flex:1; min-width:0; }
+    .cal-post-meta { display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+    .cal-post-type { font-size:0.58rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); }
+    .cal-post-time { font-size:0.58rem; color:var(--muted); }
+    .cal-status-badge { font-size:0.55rem; font-weight:700; letter-spacing:0.08em; padding:2px 7px; border-radius:20px; text-transform:uppercase; }
+    .cal-status-pending  { background:rgba(243,156,18,0.15); color:var(--amber); }
+    .cal-status-approved { background:rgba(33,150,243,0.15); color:#2196f3; }
+    .cal-status-posted   { background:var(--green-dim); color:var(--green); }
+    .cal-status-failed   { background:var(--red-dim); color:var(--rose); }
+    .cal-post-content { font-size:0.72rem; color:var(--text); line-height:1.6; margin-bottom:10px; white-space:pre-wrap; word-break:break-word; }
+    .cal-image-hint { font-size:0.62rem; color:var(--muted); font-style:italic; margin-bottom:10px; padding:6px 10px; background:rgba(212,175,55,0.05); border-left:2px solid var(--gold-dim); }
+    .cal-captions { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+    .cal-caption-opt { display:flex; gap:8px; align-items:flex-start; cursor:pointer; }
+    .cal-caption-opt input[type=radio] { margin-top:3px; flex-shrink:0; accent-color:var(--crimson); }
+    .cal-caption-text { font-size:0.7rem; color:var(--text); line-height:1.5; }
+    .cal-caption-text.selected { color:var(--crimson); }
+    .cal-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .cal-approve-btn { background:var(--crimson); color:#fff; border:none; padding:7px 16px; border-radius:6px; font-size:0.63rem; font-weight:700; cursor:pointer; letter-spacing:0.06em; }
+    .cal-approve-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .cal-copy-btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:7px 14px; border-radius:6px; font-size:0.63rem; cursor:pointer; }
+    .cal-insta-note { font-size:0.6rem; color:var(--muted); font-style:italic; padding:6px 10px; background:var(--surface2); border-radius:6px; border:1px dashed var(--border); }
+    .cal-empty { text-align:center; padding:40px 20px; color:var(--muted); font-size:0.75rem; }
   `;
   document.head.appendChild(s);
 };
@@ -1634,11 +1667,232 @@ function SystemScreen() {
   );
 }
 
+// ─── CONTENT CALENDAR ─────────────────────────────────────────────────────────
+
+const PLATFORM_ICON = { x: '𝕏', telegram: '📨', instagram: '📸' }
+const PLATFORM_LABEL = { x: 'X / Twitter', telegram: 'Telegram', instagram: 'Instagram' }
+const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+const POST_TYPE_LABEL = {
+  round_start: 'Round Start', leaderboard: 'Leaderboard', midpoint: 'Midpoint',
+  spotlight: 'Spotlight', weekend_push: 'Weekend Push', community: 'Community', round_end: 'Round End'
+}
+
+function getWeekStartStr(from = new Date()) {
+  const d = new Date(from)
+  const day = d.getUTCDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setUTCDate(d.getUTCDate() + diff)
+  return d.toISOString().split('T')[0]
+}
+
+function ContentCalendarScreen({ showToast }) {
+  const [posts, setPosts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [approving, setApproving] = useState({})
+  const [firing, setFiring] = useState({})
+  const weekStart = getWeekStartStr()
+
+  const fetchPosts = () => {
+    setLoading(true)
+    sb.get('scheduled_posts', `week_start=eq.${weekStart}&order=scheduled_at.asc&select=*`)
+      .then(d => { if (Array.isArray(d)) setPosts(d) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchPosts() }, [])
+
+  const generate = async (force = false) => {
+    setGenerating(true)
+    try {
+      const r = await fetch('/api/content-generator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force })
+      })
+      const d = await r.json()
+      if (d.skipped) showToast('Already generated this week. Use "Regenerate" to overwrite.', 'i')
+      else if (d.ok) { showToast(`Generated ${d.generated} posts for week of ${weekStart}`, 's'); fetchPosts() }
+      else showToast(d.error || 'Generation failed', 'e')
+    } catch (e) {
+      showToast('Network error', 'e')
+    }
+    setGenerating(false)
+  }
+
+  const approve = async (post) => {
+    setApproving(a => ({ ...a, [post.id]: true }))
+    await sb.patch('scheduled_posts', `id=eq.${post.id}`, { status: 'approved' })
+    setPosts(p => p.map(x => x.id === post.id ? { ...x, status: 'approved' } : x))
+    showToast(`Approved: ${PLATFORM_LABEL[post.platform]} ${DAY_NAMES[post.day_of_week]}`, 's')
+    setApproving(a => ({ ...a, [post.id]: false }))
+  }
+
+  const unapprove = async (post) => {
+    await sb.patch('scheduled_posts', `id=eq.${post.id}`, { status: 'pending' })
+    setPosts(p => p.map(x => x.id === post.id ? { ...x, status: 'pending' } : x))
+  }
+
+  const selectCaption = async (post, idx) => {
+    const captions = post.instagram_captions || []
+    const newContent = captions[idx] || post.content
+    await sb.patch('scheduled_posts', `id=eq.${post.id}`, { selected_caption: idx, content: newContent })
+    setPosts(p => p.map(x => x.id === post.id ? { ...x, selected_caption: idx, content: newContent } : x))
+  }
+
+  const copyCaption = (text) => {
+    navigator.clipboard.writeText(text).then(() => showToast('Caption copied!', 's')).catch(() => {})
+  }
+
+  const postNow = async (post) => {
+    setFiring(f => ({ ...f, [post.id]: true }))
+    try {
+      const r = await fetch(`/api/scheduler?action=fire&id=${post.id}`, { method: 'POST' })
+      const d = await r.json()
+      if (d.ok) {
+        showToast(`Posted: ${PLATFORM_LABEL[post.platform]}`, 's')
+        setPosts(p => p.map(x => x.id === post.id ? { ...x, status: 'posted' } : x))
+      } else {
+        showToast(d.error || 'Post failed', 'e')
+        setPosts(p => p.map(x => x.id === post.id ? { ...x, status: 'failed', error: d.error } : x))
+      }
+    } catch (e) {
+      showToast('Network error', 'e')
+    }
+    setFiring(f => ({ ...f, [post.id]: false }))
+  }
+
+  // Group posts by day_of_week
+  const byDay = Array.from({ length: 7 }, (_, i) =>
+    posts.filter(p => p.day_of_week === i)
+  )
+
+  const weekLabel = (() => {
+    const d = new Date(weekStart + 'T00:00:00Z')
+    const end = new Date(d); end.setUTCDate(d.getUTCDate() + 6)
+    return `${d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})} – ${end.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})}, ${end.getUTCFullYear()}`
+  })()
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Content Calendar</div>
+        <div className="gold-rule" />
+        <div className="page-sub">Approve posts before their scheduled time · Auto-generated every Monday 8am UTC</div>
+      </div>
+
+      <div className="cal-toolbar">
+        <div className="cal-week-label">Week of {weekLabel}</div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className="cal-gen-btn" style={{ background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border)' }}
+            onClick={() => generate(true)} disabled={generating}>
+            {generating ? 'Regenerating…' : '↺ Regenerate'}
+          </button>
+          <button className="cal-gen-btn" onClick={() => generate(false)} disabled={generating || posts.length > 0}>
+            {generating ? 'Generating…' : posts.length > 0 ? '✓ Generated' : '✦ Generate This Week'}
+          </button>
+        </div>
+      </div>
+
+      {loading && <div className="cal-empty">Loading posts…</div>}
+
+      {!loading && posts.length === 0 && (
+        <div className="cal-empty">
+          <div style={{ fontSize:'2rem', marginBottom:10 }}>📅</div>
+          <div>No content generated yet for this week.</div>
+          <div style={{ marginTop:8 }}>Click <strong>Generate This Week</strong> to create 7 days of content.</div>
+        </div>
+      )}
+
+      {!loading && byDay.map((dayPosts, dayIdx) => {
+        if (dayPosts.length === 0) return null
+        return (
+          <div key={dayIdx} className="cal-day-group">
+            <div className="cal-day-label">{DAY_NAMES[dayIdx]}</div>
+            {dayPosts.map(post => {
+              const isPosted   = post.status === 'posted'
+              const isApproved = post.status === 'approved'
+              const isFailed   = post.status === 'failed'
+              const schedTime  = new Date(post.scheduled_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
+              const captions   = post.instagram_captions || []
+              const selIdx     = post.selected_caption ?? 0
+
+              return (
+                <div key={post.id} className={`cal-post-card${isPosted ? ' posted' : ''}`}>
+                  <div className="cal-platform-icon">{PLATFORM_ICON[post.platform]}</div>
+                  <div className="cal-post-body">
+                    <div className="cal-post-meta">
+                      <span className="cal-post-type">{PLATFORM_LABEL[post.platform]} · {POST_TYPE_LABEL[post.post_type] || post.post_type}</span>
+                      <span className="cal-post-time">{schedTime}</span>
+                      <span className={`cal-status-badge cal-status-${post.status}`}>{post.status}</span>
+                      {isFailed && post.error && <span style={{ fontSize:'0.55rem', color:'var(--rose)' }}>{post.error}</span>}
+                    </div>
+
+                    {/* Instagram: show caption picker */}
+                    {post.platform === 'instagram' && captions.length > 0 ? (
+                      <>
+                        {post.image_hint && <div className="cal-image-hint">📷 Use: {post.image_hint}</div>}
+                        <div className="cal-captions">
+                          {captions.map((cap, ci) => (
+                            <label key={ci} className="cal-caption-opt">
+                              <input type="radio" name={`cap-${post.id}`} checked={selIdx === ci}
+                                onChange={() => !isPosted && selectCaption(post, ci)} disabled={isPosted} />
+                              <span className={`cal-caption-text${selIdx === ci ? ' selected' : ''}`}>{cap}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="cal-post-content">{post.content}</div>
+                    )}
+
+                    <div className="cal-actions">
+                      {!isPosted && !isApproved && (
+                        <button className="cal-approve-btn"
+                          disabled={!!approving[post.id]}
+                          onClick={() => approve(post)}>
+                          {approving[post.id] ? '…' : '✓ Approve & Schedule'}
+                        </button>
+                      )}
+                      {isApproved && !isPosted && (
+                        <>
+                          <span style={{ fontSize:'0.62rem', color:'#2196f3', fontWeight:700 }}>✓ Scheduled</span>
+                          <button className="cal-approve-btn" style={{ background:'var(--green)' }}
+                            disabled={!!firing[post.id]} onClick={() => postNow(post)}>
+                            {firing[post.id] ? 'Posting…' : '▶ Post Now'}
+                          </button>
+                          <button className="cal-copy-btn" onClick={() => unapprove(post)}>Unschedule</button>
+                        </>
+                      )}
+                      {isPosted && <span style={{ fontSize:'0.62rem', color:'var(--green)', fontWeight:700 }}>✓ Posted</span>}
+                      {isFailed && (
+                        <button className="cal-approve-btn" onClick={() => approve(post)}>↺ Retry</button>
+                      )}
+                      {post.platform === 'instagram' && (
+                        <button className="cal-copy-btn" onClick={() => copyCaption(post.content)}>📋 Copy Caption</button>
+                      )}
+                      {post.platform === 'instagram' && isPosted && (
+                        <span className="cal-insta-note">📲 Post manually on Instagram</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── SIDEBAR NAV CONFIG ───────────────────────────────────────────────────────
 const NAV = [
   { section: "Dashboard", items: [
     { key: "overview",    icon: "📊", label: "Overview" },
     { key: "review",      icon: "📸", label: "Photo Review", badge: 6 },
+    { key: "content",     icon: "📅", label: "Content Calendar" },
     { key: "users",       icon: "👤", label: "Users" },
     { key: "payouts",     icon: "💸", label: "Payouts" },
     { key: "staking",     icon: "🔒", label: "Staking" },
@@ -1662,6 +1916,7 @@ export default function AdminApp() {
   const screens = {
     overview: <OverviewScreen />,
     review:   <ReviewScreen {...screenProps} />,
+    content:  <ContentCalendarScreen {...screenProps} />,
     users:    <UsersScreen {...screenProps} />,
     wallets:  <WalletsScreen />,
     payouts:  <PayoutsScreen {...screenProps} />,
@@ -1672,8 +1927,9 @@ export default function AdminApp() {
   };
 
   const titles = {
-    overview: "Overview", review: "Photo Review", users: "User Management",
-    wallets: "Wallets", payouts: "Payouts", staking: "Staking", settings: "Settings", system: "System Health"
+    overview: "Overview", review: "Photo Review", content: "Content Calendar",
+    users: "User Management", wallets: "Wallets", payouts: "Payouts",
+    staking: "Staking", settings: "Settings", system: "System Health"
   };
 
   return (

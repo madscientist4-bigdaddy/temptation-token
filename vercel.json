@@ -1,18 +1,10 @@
 {
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    {
-      "path": "/api/scheduler",
-      "schedule": "0 10 * * *"
-    }
+    { "path": "/api/scheduler",         "schedule": "0 10 * * *"  },
+    { "path": "/api/content-generator", "schedule": "0 8 * * 1"   }
   ]
 }
