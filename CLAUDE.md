@@ -21,18 +21,22 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
 
 1. **React SPA** (`/src`) — Vite + React 19, deployed to Vercel. All on-chain interaction (votes, staking, airdrop claims) happens directly from the frontend via Wagmi/Viem — there is no intermediary server for contract calls.
 
-2. **Vercel serverless** (`/api`) — Four routes:
+2. **Vercel serverless** (`/api`) — Routes:
    - `/api/chat.js` — Proxies to Claude Haiku with `web_search` tool for the support chatbot
    - `/api/rpc.js` — Caches RPC calls to Base to reduce provider load
-   - `/api/notify.js` — Sends Telegram admin notification on new submission (needs TELEGRAM_BOT_TOKEN + ADMIN_CHAT_ID in Vercel env)
-   - `/api/social-post.js` — Posts to X (Twitter) and mirrors to Telegram channels (needs X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET, BROADCAST_BOT_TOKEN, MAIN_CHANNEL_ID, COMMUNITY_CHAT_ID)
+   - `/api/notify.js` — Sends Telegram admin notification on new submission
+   - `/api/social-post.js` — Posts to X (Twitter) and/or Telegram; supports `{type,data}` template mode OR `{platform:'telegram',content,chatId}` direct mode
+   - `/api/scheduler.js` — Hourly cron: fires approved scheduled_posts + daily round status + auto-correction alerts (LINK < 2, round overdue, no posts 25h+)
+   - `/api/content-generator.js` — Monday 8am UTC cron: generates weekly content via Claude Haiku, saves to `scheduled_posts` table
+   - `/api/referral-credit.js` — Credits referrer wallet on new user signup
+   - `/api/community-stats.js` — Returns Telegram community member count via bot API
 
 3. **Python Telegram bot** (`tts_bot.py`) — Runs as a separate worker (Procfile). Uses SQLite locally and integrates with the same Supabase instance.
 
 ### Frontend structure
 
 - `src/App.jsx` — The entire main voting UI, including all contract ABIs and addresses as constants at the top of the file. This is intentionally monolithic.
-- `src/TTAdminDashboard.jsx` — Password-protected admin panel (photo approval, staking health, payouts)
+- `src/TTAdminDashboard.jsx` — Password-protected admin panel. Tabs: Command Center, Daily Priorities, KPI Dashboard, Operations Manual, Overview, Photo Review, Content Calendar, Social Media, System Health, Payouts, Staking, Wallets, Referrals, Users, Settings. Password: `TTS2026Admin!`
 - `src/TTSChatbot.jsx` — Claude-powered floating support chatbot, calls `/api/chat`
 - `src/config/Wallet.js` — Wagmi + ReownAppKit (WalletConnect) config, Base chain only
 
@@ -97,18 +101,50 @@ Always `git add` + commit + push after every change.
 - Community: `@TTSCommunityChat`
 - VIP Vault invite: `https://t.me/+F2lyVRf92n4xMDRh`
 
+## Completed (April 26, 2026)
+
+- ✅ **Admin dashboard full overhaul** — 15-item CENTCOM pass:
+  - Command Center with live round countdown + health traffic lights
+  - Daily Priorities checklist (localStorage, auto-resets daily)
+  - KPI Dashboard (Supabase + on-chain metrics)
+  - Operations Manual with platform-linked templates
+  - Alerts Banner (clickable, navigates to fix)
+  - Railway plan updated to HOBBY (paid April 24) — no expiry warning
+  - All hardcoded dates replaced with `getCurrentWeekLabel()` (auto-updates)
+  - Live clock in topbar (updates every second)
+  - Prize pool pulls live from TTSVotingV3.getRound() on-chain
+  - Settlement history uses correct RoundSettled topic hash + eth_getLogs
+  - Photo Review: shows pending+approved, status filter, "Register On-Chain" modal
+  - Social Media tab: stats, Post Now (Telegram direct), DM outreach tracker, content preview, templates with platform links
+  - System Health: Railway Hobby status, referral system status card
+  - Auto-correction alerts in scheduler: LINK < 2, round overdue, no posts 25h+
+  - Operations Manual templates with Open → links for each platform
+  - Admin password: `TTS2026Admin!`
+  - `api/community-stats.js` added (Telegram member count endpoint)
+  - `api/social-post.js` updated to support direct telegram posting mode
+
+- ✅ **Beta audit fixes** — XSS in photo link buttons, wallet auto-populate, form reset on error, referral link full address
+- ✅ **TTSVotingV3** deployed + all steps complete (Round 1 active)
+- ✅ **Content Calendar** — weekly auto-generation via Claude Haiku, X/Telegram/Instagram, one-tap approve
+- ✅ **10 AI test profiles** in Supabase (status=approved, round_id=1)
+
 ## Pending items (priority order)
 
-1. Test on-chain voting end to end (Round 2 starts tonight Monday 00:00 UTC)
-2. Add Telegram admin notification when new submission arrives
-3. Add post-vote confetti animation and position feedback
-4. X social media auto-poster on round events
-5. Deploy TTS v2 M1 fix upgrade through Gnosis Safe
-6. Wire dollar-value signup bonus from live Uniswap price
-7. CoinGecko resubmission (April 17)
-8. Blockaid resubmission with new audit report
+1. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat Telegram channels (required for Post Now and scheduler to work)
+2. **Verify TTSVotingV3 on BaseScan** via Remix (Foundry bytecode mismatch — must use Remix IDE)
+3. **Deploy TTS v2 M1 fix** upgrade through Gnosis Safe (2/2 multisig)
+4. **Wire dollar-value signup bonus** from live Uniswap price (POOL: 0x77Fe188...)
+5. **Post-vote confetti animation** and position feedback in App.jsx
+6. **CoinGecko resubmission** — check current status
+7. **Blockaid** — submitted false positive reports; check portal for resolution status
+8. **X social media credentials** — set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env to enable X posting
 
-**Railway reminder:** Upgrade from Trial to Hobby plan ($5/mo) on April 27, 2026.
+## Next session: start here
+
+1. Check if @TTSBroadcastBot is added to channels (test Post Now button in Social Media tab)
+2. Check if Round 1 has settled (round end ~April 28) — if not, verify TTSKeeper2 automation is working
+3. If settled: start Round 2 via keeper.manualExecute(1) if automation missed it
+4. Check Blockaid portal for false positive resolution
 
 ## TTSVotingV3 Deployment (✅ COMPLETE)
 
@@ -153,3 +189,5 @@ How values were confirmed:
 - Staking tier multiplier is a graceful no-op (staking contract doesn't expose `getStakingTier`)
 - `0x6593c7De001fC8542bB1703532EE1e5aA0D458fD` (keeper slot 2) is the Chainlink Automation Registry, NOT the VRF coordinator
 - V2 (`0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA`) becomes unused once keeper points to V3
+- **Railway**: upgraded to Hobby plan April 24, 2026. No further action needed.
+- **RoundSettled topic hash**: `0xabf0728119ba3c53309b0f987eda834ecf31e54dfaeec92465c1512c5eb9c2b9`
