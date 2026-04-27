@@ -9,10 +9,8 @@ pragma solidity ^0.8.20;
 //   5.  node scripts/deployV3.js   (prints batchApproveProfiles calldata)
 //   6.  V3.batchApproveProfiles(profileIds[], wallets[])
 //   7.  Add V3_ADDRESS as consumer at vrf.chain.link
-//   8.  V3.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")
-//   9.  TTSRoundNFT.setMinter(V3_ADDRESS)
-//  10.  Update VOTING_ADDRESS in src/App.jsx
-//  11.  npm run build && npx vercel --prod
+//   8.  Update VOTING_ADDRESS in src/App.jsx
+//   9.  npm run build && npx vercel --prod
 
 // -----------------------------------------------------------------------------
 // Interfaces
@@ -26,10 +24,6 @@ interface IERC20 {
 
 interface IStaking {
     function getStakingTier(address user) external view returns (uint256);
-}
-
-interface ITTSRoundNFT {
-    function mint(address to, uint256 roundId, string calldata winnerProfile, uint256 voteCount) external returns (uint256);
 }
 
 // Top-level struct so the coordinator interface can reference it without issues
@@ -148,7 +142,6 @@ contract TTSVotingV3 is Ownable, VRFConsumerBaseV2Plus {
     IStaking public stakingContract;
     address  public charityWallet;
     address  public houseWallet;
-    address  public nftContract;
 
     // VRF
     IVRFCoordinatorV2Plus private immutable _coordinator;
@@ -337,11 +330,6 @@ contract TTSVotingV3 is Ownable, VRFConsumerBaseV2Plus {
             ttsToken.transfer(0x000000000000000000000000000000000000dEaD, remaining);
         }
 
-        // Mint winner NFT — wrapped so a failed mint never blocks settlement
-        if (nftContract != address(0)) {
-            try ITTSRoundNFT(nftContract).mint(winner.wallet, roundId, winnerId, pool / 1e18) {} catch {}
-        }
-
         emit RoundSettled(roundId, winnerId, winner.wallet, pool);
     }
 
@@ -354,6 +342,10 @@ contract TTSVotingV3 is Ownable, VRFConsumerBaseV2Plus {
 
         Profile storage p = _profiles[currentRoundId][profileId];
         require(p.approved, "Profile not approved");
+
+        uint256 newProfileRaw = p.rawVotes + amount;
+        uint256 newRoundRaw   = r.totalRawVotes + amount;
+        require(newProfileRaw * 10000 <= newRoundRaw * MAX_VOTE_CAP_BPS, "Exceeds vote cap");
 
         require(ttsToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
@@ -421,10 +413,6 @@ contract TTSVotingV3 is Ownable, VRFConsumerBaseV2Plus {
 
     function setStakingContract(address _staking) external onlyAdmin {
         stakingContract = IStaking(_staking);
-    }
-
-    function setNFTContract(address _nft) external onlyAdmin {
-        nftContract = _nft;
     }
 
     // Internal

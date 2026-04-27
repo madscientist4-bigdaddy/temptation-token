@@ -71,7 +71,22 @@ const TEMPLATES = {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { type, data = {} } = req.body || {}
+  const body = req.body || {}
+
+  // Direct content mode: { platform, content, chatId }
+  if (body.platform === 'telegram' && body.content) {
+    const broadcastToken = process.env.BROADCAST_BOT_TOKEN
+    const chatId = body.chatId || process.env.MAIN_CHANNEL_ID || '-1002207667493'
+    if (!broadcastToken) return res.status(200).json({ ok: false, error: 'BROADCAST_BOT_TOKEN not set' })
+    try {
+      const r = await sendTelegram(chatId, body.content, broadcastToken)
+      return res.status(200).json({ ok: true, telegram: r })
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+
+  const { type, data = {} } = body
   if (!type || !TEMPLATES[type]) return res.status(400).json({ error: 'Unknown type' })
 
   const text = TEMPLATES[type](data)

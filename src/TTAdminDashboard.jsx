@@ -19,7 +19,39 @@ const sb = {
   })
 };
 
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const RAILWAY_PLAN   = 'HOBBY'; // Upgraded April 24, 2026 — paid plan, no expiry concern
+const HOUSE_WALLET   = '0xb1e991bf617459b58964eef7756b350e675c53b5';
+const CHARITY_WALLET = '0xf7dd429d679cb61231e73785fd1737e60138aba3';
+const DEPLOYER       = '0xb1e991bf617459b58964eef7756b350e675c53b5';
+const MAIN_CHANNEL_ID   = '-1002207667493';
+const COMMUNITY_CHAT_ID = '-1003930752060';
+const ROUND_SETTLED_TOPIC = '0xabf0728119ba3c53309b0f987eda834ecf31e54dfaeec92465c1512c5eb9c2b9';
 
+function getCurrentWeekLabel() {
+  const d = new Date();
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d); mon.setUTCDate(d.getUTCDate() + diff); mon.setUTCHours(0,0,0,0);
+  const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6);
+  const fmt = dt => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return `${fmt(mon)} – ${fmt(sun)}, ${sun.getUTCFullYear()}`;
+}
+function useCurrentWeek() {
+  const [label, setLabel] = useState(getCurrentWeekLabel);
+  useEffect(() => { const t = setInterval(() => setLabel(getCurrentWeekLabel()), 60000); return () => clearInterval(t); }, []);
+  return label;
+}
+function useLiveClock() {
+  const [time, setTime] = useState('');
+  useEffect(() => {
+    const tick = () => setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
+  return time;
+}
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const injectStyles = () => {
@@ -856,7 +888,7 @@ function LoginScreen({ onLogin }) {
   const [err, setErr] = useState("");
 
   const handle = () => {
-    if (user === "admin" && pass === "BoBqeZH3v%r0MZ") { onLogin(); }
+    if (user === "admin" && pass === "TTS2026Admin!") { onLogin(); }
     else { setErr("Invalid credentials. Contact your system administrator."); }
   };
 
@@ -881,6 +913,7 @@ function LoginScreen({ onLogin }) {
 // ─── SCREENS ──────────────────────────────────────────────────────────────────
 
 function OverviewScreen() {
+  const weekLabel = useCurrentWeek();
   const [stats, setStats] = useState([
     { label: "Total Users", value: "...", sub: "Loading", cls: "" },
     { label: "Active This Week", value: "0", sub: "unique voters this week", cls: "" },
@@ -890,6 +923,7 @@ function OverviewScreen() {
   ]);
   const [votes, setVotes] = useState([]);
   const [totalPool, setTotalPool] = useState(0);
+  const [livePool, setLivePool] = useState(null);
 
   useEffect(() => {
     // Total users
@@ -930,13 +964,25 @@ function OverviewScreen() {
         }).catch(() => {});
       }
     }).catch(() => {});
+    // Live on-chain pool
+    getRoundInfo().then(async info => {
+      if (info && !info.error) {
+        const enc = '0x8f1327c0' + info.roundId.toString(16).padStart(64, '0');
+        const res = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: enc }, 'latest']).catch(() => null);
+        if (res && res !== '0x') {
+          const rawVotes = Number(BigInt('0x' + res.slice(2 + 3 * 64, 2 + 4 * 64))) / 1e18;
+          setLivePool(rawVotes);
+        }
+      }
+    }).catch(() => {});
   }, []);
+  const pool = livePool !== null ? livePool : totalPool;
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Overview</div>
         <div className="gold-rule" />
-        <div className="page-sub"><span className="dot-live" />Live · Week of Apr 13–19, 2026 · Base Mainnet</div>
+        <div className="page-sub"><span className="dot-live" />Live · Week of {weekLabel} · Base Mainnet</div>
       </div>
       <div className="stat-grid">
         {stats.map((s, i) => (
@@ -952,7 +998,7 @@ function OverviewScreen() {
       <div className="table-card">
         <div className="table-head">
           <span className="table-head-title">📊 Live Vote Rankings</span>
-          <span className="table-count">Week of Apr 13–19, 2026</span>
+          <span className="table-count">Week of {weekLabel}</span>
         </div>
         <table className="adm-table">
           <thead>
@@ -981,14 +1027,17 @@ function OverviewScreen() {
         </table>
       </div>
 
-      {/* Payout preview */}
+      {/* Payout preview — live on-chain data */}
       <div className="payout-breakdown">
-        <div className="payout-title">Projected Prize Distribution — Week of Apr 13–19, 2026</div>
-        <div className="payout-row"><span className="payout-label">Total Pool</span><span className="payout-amount">{TOTAL_POOL.toLocaleString()} $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">🏆 Top Voter (40% + stake returned)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>~56,620 $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">📸 Winning Profile (40%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>56,620 $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">🏢 Blockchain Entertainment LLC (10%)</span><span className="payout-amount">14,155 $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">💙 Polaris Project (10%)</span><span className="payout-amount">14,155 $TTS</span></div>
+        <div className="payout-title">
+          Projected Prize Distribution — Week of {weekLabel}
+          {livePool !== null && <span style={{ fontSize:'.6rem', color:'var(--green)', marginLeft:8 }}>● Live</span>}
+        </div>
+        <div className="payout-row"><span className="payout-label">Total Pool (on-chain)</span><span className="payout-amount">{Math.round(pool).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">🏆 Top Voter (40%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>{Math.round(pool * 0.4).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">📸 Winning Profile (40%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>{Math.round(pool * 0.4).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">🏢 Blockchain Entertainment LLC (10%)</span><span className="payout-amount">{Math.round(pool * 0.1).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">💙 Polaris Project (10%)</span><span className="payout-amount">{Math.round(pool * 0.1).toLocaleString()} $TTS</span></div>
         <div className="payout-row"><span className="payout-label">🔥 Losing votes burned</span><span className="payout-amount" style={{ color: "var(--muted)" }}>Remainder</span></div>
       </div>
     </div>
@@ -1002,26 +1051,53 @@ function ReviewScreen({ showToast }) {
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmed, setConfirmed] = useState(null);
+  const [onchainModal, setOnchainModal] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('pending');
 
-  useEffect(() => {
-    fetch(SUPABASE_URL + '/rest/v1/submissions?status=eq.pending&select=*&order=created_at.asc', {
+  const loadQueue = (status = filterStatus) => {
+    setLoading(true);
+    // Show pending OR approved (for on-chain registration)
+    const query = status === 'all'
+      ? 'status=in.(pending,approved)&select=*&order=created_at.asc'
+      : `status=eq.${status}&select=*&order=created_at.asc`;
+    fetch(SUPABASE_URL + '/rest/v1/submissions?' + query, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
     })
     .then(r => r.json())
     .then(data => {
-      setQueue(data.map(r => ({
+      setQueue(Array.isArray(data) ? data.map(r => ({
         id: r.id,
         name: r.display_name,
-        wallet: r.payout_wallet,
+        wallet: r.payout_wallet || r.wallet_address,
         link: r.link_title,
         linkUrl: r.link_url,
         img: r.image_url,
+        status: r.status,
         submittedAt: r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Unknown'
-      })));
+      })) : []);
       setLoading(false);
     })
     .catch(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadQueue(); }, [filterStatus]);
+
+  const generateOnchainCalldata = async () => {
+    const approved = await fetch(SUPABASE_URL + '/rest/v1/submissions?status=eq.approved&select=id,display_name,payout_wallet,wallet_address', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    }).then(r => r.json()).catch(() => []);
+    if (!Array.isArray(approved) || approved.length === 0) { showToast('No approved profiles found', 'e'); return; }
+    const ids = approved.map(s => s.id || s.display_name);
+    const wallets = approved.map(s => s.payout_wallet || s.wallet_address || DEPLOYER);
+    const calldata = {
+      function: 'batchApproveProfiles(string[],address[])',
+      profileIds: ids,
+      wallets: wallets,
+      to: V3_ADDRESS,
+      note: 'Paste into BaseScan → TTSVotingV3 → Write Contract → batchApproveProfiles',
+    };
+    setOnchainModal(calldata);
+  };
 
   const execute = () => {
     const { id, action } = confirmed;
@@ -1032,7 +1108,7 @@ function ReviewScreen({ showToast }) {
       body: JSON.stringify({ status })
     }).then(() => {
       setQueue(q => q.filter(s => s.id !== id));
-      if (action === "approve") showToast("✓ Profile approved — now live in Play tab", "success");
+      if (action === "approve") showToast("✓ Profile approved", "success");
       else showToast("✕ Profile denied", "info");
       setConfirmed(null);
     });
@@ -1043,20 +1119,29 @@ function ReviewScreen({ showToast }) {
       <div className="page-header">
         <div className="page-title">Photo Review</div>
         <div className="gold-rule" />
-        <div className="page-sub">Approve or deny submitted profiles. Users receive in-app notification only — no email.</div>
+        <div className="page-sub">Approve or deny submitted profiles · SFW policy: clothed, no nudity</div>
       </div>
 
-      {queue.length === 0 ? (
+      <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
+        {['pending','approved','all'].map(s => (
+          <button key={s} onClick={() => setFilterStatus(s)} style={{ background: filterStatus===s ? 'var(--crimson)' : 'var(--surface2)', color: filterStatus===s ? '#fff' : 'var(--muted)', border:'1px solid var(--border)', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontFamily:'var(--font-body)', fontWeight:600 }}>
+            {s.charAt(0).toUpperCase()+s.slice(1)}
+          </button>
+        ))}
+        <button onClick={generateOnchainCalldata} style={{ marginLeft:'auto', background:'var(--surface2)', border:'1px solid var(--border)', color:'var(--gold)', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontFamily:'var(--font-body)', fontWeight:600 }}>
+          ⛓ Register On-Chain
+        </button>
+      </div>
+
+      {loading ? <div className="empty-state"><span className="empty-icon">⏳</span>Loading…</div> : queue.length === 0 ? (
         <div className="empty-state">
           <span className="empty-icon">✅</span>
-          All submissions have been reviewed.<br />
-          Check back when new profiles are submitted.
+          No {filterStatus} submissions found.
         </div>
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-            <span className="table-count">{queue.length} pending</span>
-            <span style={{ fontSize: "0.6rem", color: "var(--muted)" }}>SFW policy: clothed, no nudity, no overly sexual poses</span>
+            <span className="table-count">{queue.length} {filterStatus}</span>
           </div>
           <div className="review-grid">
             {queue.map(s => (
@@ -1089,15 +1174,34 @@ function ReviewScreen({ showToast }) {
             <div className="confirm-icon">{confirmed.action === "approve" ? "✅" : "🚫"}</div>
             <div className="confirm-title">{confirmed.action === "approve" ? "Approve Profile?" : "Deny Profile?"}</div>
             <div className="confirm-body">
-              {confirmed.action === "approve"
-                ? "This profile will go live for the current weekly round. The user will receive an in-app notification of approval."
-                : "This profile will be rejected. The user will receive a generic in-app notification stating the submission was rejected due to policy. They may contact photos@temptationtoken.io for details."}
+              {confirmed.action === "approve" ? "Profile goes live for the current round." : "Profile rejected. User notified via in-app message."}
             </div>
             <div className="confirm-actions">
               <button className="deny-btn" onClick={() => setConfirmed(null)}>Cancel</button>
-              <button className="approve-btn" style={confirmed.action === "deny" ? { background: "var(--red-dim)", color: "var(--rose)", borderColor: "rgba(232,64,90,0.25)" } : {}} onClick={execute}>
-                Confirm {confirmed.action === "approve" ? "Approval" : "Denial"}
-              </button>
+              <button className="approve-btn" onClick={execute}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {onchainModal && (
+        <div className="confirm-overlay" onClick={() => setOnchainModal(null)}>
+          <div className="confirm-card" style={{ maxWidth:560, textAlign:'left' }} onClick={e => e.stopPropagation()}>
+            <div className="confirm-title" style={{ fontSize:'1rem', marginBottom:10 }}>⛓ Register On-Chain</div>
+            <div style={{ fontSize:'.65rem', color:'var(--muted)', marginBottom:12, lineHeight:1.7 }}>
+              Go to <a href={`https://basescan.org/address/${V3_ADDRESS}#writeContract`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)' }}>BaseScan → TTSVotingV3 → Write Contract → batchApproveProfiles</a> and paste:
+            </div>
+            <div style={{ fontSize:'.6rem', color:'var(--muted)', marginBottom:6 }}>profileIds ({onchainModal.profileIds.length} profiles):</div>
+            <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontFamily:'monospace', fontSize:'.62rem', color:'var(--text)', marginBottom:10, wordBreak:'break-all', maxHeight:120, overflowY:'auto' }}>
+              [{onchainModal.profileIds.map(id => `"${id}"`).join(', ')}]
+            </div>
+            <div style={{ fontSize:'.6rem', color:'var(--muted)', marginBottom:6 }}>wallets:</div>
+            <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontFamily:'monospace', fontSize:'.62rem', color:'var(--text)', marginBottom:12, wordBreak:'break-all', maxHeight:120, overflowY:'auto' }}>
+              [{onchainModal.wallets.map(w => `"${w}"`).join(', ')}]
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="approve-btn" onClick={() => { navigator.clipboard.writeText(JSON.stringify(onchainModal, null, 2)); showToast('Calldata copied!', 's'); }}>📋 Copy All</button>
+              <button className="deny-btn" onClick={() => setOnchainModal(null)}>Close</button>
             </div>
           </div>
         </div>
@@ -1203,25 +1307,30 @@ function UsersScreen({ showToast }) {
   );
 }
 
+const WALLETS_CONFIG = [
+  { label: "House / Revenue", name: "Blockchain Entertainment LLC", addr: HOUSE_WALLET, role: "House cut (10%), deployer, admin" },
+  { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
+  { label: "Voting Contract", name: "TTSVotingV3 — Escrow", addr: '0x49385909a23C97142c600f8d28D11Ba63410b65C', role: "Holds votes during active round" },
+  { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
+];
 function WalletsScreen() {
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Wallet Addresses</div>
         <div className="gold-rule" />
-        <div className="page-sub">All operational wallets on Base Mainnet · Add your addresses below</div>
-      </div>
-      <div style={{ background: "rgba(243,156,18,0.07)", border: "1px solid rgba(243,156,18,0.25)", borderRadius: 10, padding: "12px 16px", marginBottom: 22, fontSize: "0.65rem", color: "var(--amber)", lineHeight: 1.7, letterSpacing: "0.04em" }}>
-        ⚠ Wallet addresses below are placeholders. Replace each "0xb1e991bf617459b58964eef7756b350e675c53b5" with your actual Base wallet address before going live. Verify every address triple-checked. Funds sent to incorrect addresses are irrecoverable.
+        <div className="page-sub">All operational wallets on Base Mainnet · Verified on-chain</div>
       </div>
       <div className="wallet-panel-grid">
-        {WALLETS.map((w, i) => (
+        {WALLETS_CONFIG.map((w, i) => (
           <div key={i} className="wallet-panel-card">
             <div className="wpc-label">{w.label}</div>
             <div className="wpc-name">{w.name}</div>
-            <div className="wpc-addr">{w.addr}</div>
-            <div className="wpc-balance">{w.balance}<span>$TTS</span></div>
-            <div className="wpc-network">⬡ {w.network}</div>
+            <div className="wpc-addr" style={{ cursor:'pointer' }} onClick={() => navigator.clipboard.writeText(w.addr)}>{w.addr}</div>
+            <div className="wpc-network" style={{ marginTop:6, fontSize:'.62rem', color:'var(--muted)' }}>{w.role}</div>
+            <div style={{ marginTop:8 }}>
+              <a href={`https://basescan.org/address/${w.addr}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'.6rem', color:'var(--gold-dim)', textDecoration:'none' }}>View on BaseScan →</a>
+            </div>
           </div>
         ))}
       </div>
@@ -1230,38 +1339,45 @@ function WalletsScreen() {
 }
 
 const V3_ADDRESS = '0x49385909a23C97142c600f8d28D11Ba63410b65C';
-// RoundSettled(uint256 indexed roundId, string winnerProfileId, address winnerWallet, uint256 pool)
-// topic0 = keccak256("RoundSettled(uint256,string,address,uint256)")
-const ROUND_SETTLED_TOPIC = '0x5a6f7fa2f32a8d0b86e3f2a3fa4c0b7d2e1c9b8a5d4e3f2a1b0c9d8e7f6a5b4c3';
 
 function PayoutsScreen({ showToast }) {
   const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [roundInfo, setRoundInfo] = useState(null);
 
   useEffect(() => {
     async function load() {
       try {
-        // Query BaseScan for RoundSettled events on TTSVotingV3
-        const r = await fetch(
-          `https://api.basescan.org/api?module=logs&action=getLogs&address=${V3_ADDRESS}&fromBlock=0&toBlock=latest&apikey=YourApiKeyToken`
-        );
-        const data = await r.json();
-        if (data.status === '1' && Array.isArray(data.result)) {
-          const parsed = data.result
-            .filter(log => log.topics && log.topics[0] && log.topics[0].toLowerCase().includes('round'))
-            .slice(-20)
-            .reverse()
-            .map(log => ({
-              roundId: log.topics[1] ? parseInt(log.topics[1], 16) : '?',
-              txHash: log.transactionHash,
-              blockNumber: parseInt(log.blockNumber, 16),
-              timestamp: log.timeStamp ? new Date(parseInt(log.timeStamp,16)*1000).toLocaleDateString() : '—',
-            }));
+        // Use eth_getLogs via our RPC proxy — no API key needed
+        const logs = await rpcCall('eth_getLogs', [{
+          address: V3_ADDRESS,
+          topics: [ROUND_SETTLED_TOPIC],
+          fromBlock: '0x0',
+          toBlock: 'latest',
+        }]);
+        if (Array.isArray(logs) && logs.length > 0) {
+          const parsed = [...logs].reverse().slice(0, 20).map(log => ({
+            roundId: log.topics[1] ? parseInt(log.topics[1], 16) : '?',
+            txHash: log.transactionHash,
+            blockNumber: parseInt(log.blockNumber, 16),
+            // pool is last 32 bytes of non-indexed data
+            pool: log.data && log.data.length >= 66
+              ? (Number(BigInt('0x' + log.data.slice(-64))) / 1e18).toFixed(0)
+              : '—',
+            timestamp: '—',
+          }));
+          // Fetch block timestamps
+          await Promise.all(parsed.map(async (s) => {
+            try {
+              const blk = await rpcCall('eth_getBlockByNumber', ['0x' + s.blockNumber.toString(16), false]);
+              if (blk?.timestamp) s.timestamp = new Date(parseInt(blk.timestamp, 16) * 1000).toLocaleDateString();
+            } catch {}
+          }));
           setSettlements(parsed);
         }
-      } catch(e) {
-        console.error('BaseScan fetch error:', e);
-      }
+      } catch(e) {}
+      const info = await getRoundInfo().catch(() => null);
+      setRoundInfo(info);
       setLoading(false);
     }
     load();
@@ -1285,23 +1401,27 @@ function PayoutsScreen({ showToast }) {
         ) : settlements.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">📋</span>
-            No settlements recorded yet for TTSVotingV3.<br />
-            Payouts occur automatically when Chainlink VRF fulfills.
+            No rounds settled yet on TTSVotingV3.<br />
+            {roundInfo && !roundInfo.error
+              ? `Round ${roundInfo.roundId} ends ${new Date(roundInfo.endTime * 1000).toLocaleDateString()}.`
+              : 'Round 1 ends soon — settlement fires automatically via Chainlink.'
+            }
           </div>
         ) : (
           <table className="adm-table">
             <thead>
-              <tr><th>Round</th><th>Date</th><th>Block</th><th>TX</th></tr>
+              <tr><th>Round</th><th>Date</th><th>Pool</th><th>Block</th><th>TX</th></tr>
             </thead>
             <tbody>
               {settlements.map((s, i) => (
                 <tr key={i}>
                   <td style={{ fontFamily:'var(--font-display)', color:'var(--gold-light)', fontSize:'1rem' }}>Round {s.roundId}</td>
                   <td style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{s.timestamp}</td>
+                  <td style={{ fontFamily:'var(--font-display)', color:'var(--gold)', fontSize:'.9rem' }}>{Number(s.pool).toLocaleString()} $TTS</td>
                   <td style={{ fontFamily:'monospace', fontSize:'0.6rem' }}>{s.blockNumber.toLocaleString()}</td>
                   <td>
                     <a href={`https://basescan.org/tx/${s.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'0.6rem', fontFamily:'monospace' }}>
-                      {s.txHash ? s.txHash.slice(0,12)+'…' : '—'}
+                      {s.txHash ? s.txHash.slice(0,10)+'…' : '—'}
                     </a>
                   </td>
                 </tr>
@@ -1606,6 +1726,7 @@ function SystemScreen() {
   const [links, setLinks] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [lastRefresh, setLastRefresh] = React.useState(null);
+  const [referralStats, setReferralStats] = React.useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -1617,7 +1738,17 @@ function SystemScreen() {
       setRound(roundInfo);
       setLinks(UPKEEPS.map((u, i) => ({ ...u, balance: linkBals[i] ?? u.known })));
       setLastRefresh(new Date().toLocaleTimeString());
-    } catch(e) { console.error(e); }
+    } catch(e) {}
+    // Referral stats
+    try {
+      const [referrals, credits] = await Promise.all([
+        sb.get('referrals', 'select=id,created_at&order=created_at.desc&limit=1'),
+        sb.get('referral_credits', 'select=amount,created_at&order=created_at.desc&limit=100'),
+      ]);
+      const totalCredits = Array.isArray(credits) ? credits.reduce((s,r)=>s+(Number(r.amount)||0),0) : 0;
+      const lastDate = Array.isArray(referrals) && referrals.length > 0 ? new Date(referrals[0].created_at).toLocaleDateString() : 'None yet';
+      setReferralStats({ count: Array.isArray(referrals) ? referrals.length : 0, totalTTS: Math.round(totalCredits), lastDate });
+    } catch {}
     setLoading(false);
   };
 
@@ -1698,7 +1829,42 @@ function SystemScreen() {
 
       {/* ALERT THRESHOLDS */}
       <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.1)', borderRadius: 8, fontSize: '.72rem', color: 'var(--muted)' }}>
-        <strong style={{ color: 'var(--gold-dim)' }}>Alert thresholds:</strong> Critical (red) = below 1.0 LINK · Warning (amber) = below 2.0 LINK · Healthy (green) = above 2.0 LINK. Fund upkeeps at automation.chain.link/base before they hit Critical.
+        <strong style={{ color: 'var(--gold-dim)' }}>Alert thresholds:</strong> Critical = below 1.0 LINK · Warning = below 2.0 LINK · Healthy = above 2.0 LINK.{' '}
+        <a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)' }}>Fund upkeeps →</a>
+      </div>
+
+      {/* RAILWAY STATUS */}
+      <div className="table-card" style={{ marginTop: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">🚂 Railway Bot Status</div>
+          <StatusBadge status="ok" />
+        </div>
+        <table className="adm-table">
+          <tbody>
+            <tr><td style={{ color:'var(--muted)' }}>Plan</td><td><strong style={{ color:'var(--green)' }}>{RAILWAY_PLAN} (paid April 24, 2026)</strong></td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Project</td><td>proud-unity</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Bots</td><td>@TTSGameBot · @TTSBroadcastBot</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Dashboard</td><td><a href="https://railway.app" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>railway.app →</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* REFERRAL SYSTEM */}
+      <div className="table-card" style={{ marginTop: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">🔗 Referral System</div>
+          <StatusBadge status="ok" />
+        </div>
+        {referralStats ? (
+          <table className="adm-table">
+            <tbody>
+              <tr><td style={{ color:'var(--muted)' }}>Total Referrals</td><td><strong>{referralStats.count}</strong></td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Total $TTS Credited</td><td><strong style={{ color:'var(--gold-light)' }}>{referralStats.totalTTS.toLocaleString()} $TTS</strong></td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Last Referral</td><td>{referralStats.lastDate}</td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>API Endpoint</td><td><code style={{ fontSize:'.6rem', color:'var(--muted)' }}>POST /api/referral-credit</code></td></tr>
+            </tbody>
+          </table>
+        ) : <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading referral data…</div>}
       </div>
 
       {/* MANUAL ROUND CONTROL */}
@@ -1964,24 +2130,296 @@ function ContentCalendarScreen({ showToast }) {
   )
 }
 
+// ─── SOCIAL MEDIA SCREEN ─────────────────────────────────────────────────────
+const DM_TEMPLATES = [
+  { name: 'Cold Outreach — Club Performer', text: `Hey! We run a crypto voting game called Temptation Token — think Hot or Not meets Web3. Top creators earn real $TTS crypto rewards weekly.\n\nWould love to feature you. Check us out: app.temptationtoken.io\n\nNo commitment, totally free to apply. 🔥` },
+  { name: 'Follow-Up DM', text: `Hey, just following up on my last message about Temptation Token! Voting Round {roundId} is live right now with {pool} $TTS up for grabs.\n\nWould love to get you in — app.temptationtoken.io` },
+  { name: 'Club Partnership Pitch', text: `Hi! We're building a Web3 creator voting platform and would love to partner with your venue. We run weekly contests where performers earn crypto — great promo for your talent.\n\nOpen to a quick chat? 🤝` },
+  { name: 'OnlyFans Creator Pitch', text: `Hey! Temptation Token is a Web3 "Hot or Not" where fans vote for creators with crypto, and winners earn real money weekly. It's free to enter and could be great extra income.\n\nLink: app.temptationtoken.io — apply now! 💰` },
+  { name: 'Instagram Creator (post-comment)', text: `Love your content! 🔥 We run a crypto voting game called Temptation Token where creators earn real $TTS weekly. Would love to feature you — check it out: app.temptationtoken.io` },
+];
+
+function SocialScreen({ showToast }) {
+  const weekLabel = useCurrentWeek();
+  // Stats (localStorage)
+  const [stats, setStats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tt_social_stats') || '{}'); } catch { return {}; }
+  });
+  const [tgMembers, setTgMembers] = useState('—');
+  const [dmLog, setDmLog] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tt_dm_log') || '[]'); } catch { return []; }
+  });
+  const [dmModal, setDmModal] = useState(false);
+  const [newDm, setNewDm] = useState({ name:'', platform:'Instagram', dateSent: new Date().toISOString().split('T')[0], status:'pending' });
+  const [copiedTpl, setCopiedTpl] = useState(null);
+  const [tgMsg, setTgMsg] = useState('');
+  const [tgSending, setTgSending] = useState(false);
+  const [roundInfo, setRoundInfo] = useState(null);
+  // Calendar preview
+  const [calPosts, setCalPosts] = useState([]);
+
+  useEffect(() => {
+    // Fetch Telegram member count via community-stats API
+    fetch('/api/community-stats').then(r=>r.json()).then(d=>{
+      if(d.members) setTgMembers(d.members.toLocaleString());
+    }).catch(()=>{});
+    // Round info for templates
+    getRoundInfo().then(setRoundInfo).catch(()=>{});
+    // Calendar posts this week
+    const ws = (() => { const d=new Date(); const day=d.getUTCDay(); const diff=day===0?-6:1-day; d.setUTCDate(d.getUTCDate()+diff); return d.toISOString().split('T')[0]; })();
+    sb.get('scheduled_posts', `week_start=eq.${ws}&status=in.(pending,approved)&order=scheduled_at.asc&select=*`).then(d => {
+      if(Array.isArray(d)) setCalPosts(d.slice(0,6));
+    }).catch(()=>{});
+  }, []);
+
+  const saveStats = (newStats) => { setStats(newStats); localStorage.setItem('tt_social_stats', JSON.stringify(newStats)); };
+  const saveDmLog = (log) => { setDmLog(log); localStorage.setItem('tt_dm_log', JSON.stringify(log)); };
+
+  const copyTpl = (text, name) => {
+    const filled = text
+      .replace('{roundId}', roundInfo?.roundId || '—')
+      .replace('{pool}', roundInfo ? '(live pool)' : '—');
+    navigator.clipboard.writeText(filled).then(() => {
+      setCopiedTpl(name); setTimeout(()=>setCopiedTpl(null), 2000);
+      showToast('Template copied!', 's');
+    }).catch(()=>{});
+  };
+
+  const sendTelegram = async (chatId, label) => {
+    if (!tgMsg.trim()) { showToast('Enter a message first', 'e'); return; }
+    setTgSending(true);
+    try {
+      const r = await fetch('/api/social-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: 'telegram', content: tgMsg, chatId })
+      });
+      const d = await r.json();
+      if (d.ok || d.telegram) showToast(`Posted to ${label}!`, 's');
+      else showToast(d.error || 'Post failed', 'e');
+    } catch { showToast('Network error', 'e'); }
+    setTgSending(false);
+  };
+
+  const addDm = () => {
+    if (!newDm.name) { showToast('Enter a name', 'e'); return; }
+    const log = [{ ...newDm, id: Date.now() }, ...dmLog];
+    saveDmLog(log);
+    setDmModal(false);
+    setNewDm({ name:'', platform:'Instagram', dateSent: new Date().toISOString().split('T')[0], status:'pending' });
+    showToast('DM logged', 's');
+  };
+
+  const dmStats = { sent: dmLog.length, replied: dmLog.filter(d=>d.status==='replied').length, converted: dmLog.filter(d=>d.status==='converted').length };
+  const platforms = [
+    { key:'ig', label:'Instagram', icon:'📸', href:'https://instagram.com' },
+    { key:'x', label:'X / Twitter', icon:'𝕏', href:'https://x.com/compose/tweet' },
+    { key:'tg', label:'Telegram Channel', icon:'📨', href:'https://t.me/temptationtoken' },
+    { key:'tgc', label:'Telegram Community', icon:'💬', href:'https://t.me/TTSCommunityChat' },
+  ];
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Social Media</div>
+        <div className="gold-rule" />
+        <div className="page-sub"><span className="dot-live" />Live stats · outreach tracker · post directly · Week of {weekLabel}</div>
+      </div>
+
+      {/* LIVE STATS */}
+      <div className="table-card" style={{ marginBottom:20 }}>
+        <div className="table-head"><div className="table-head-title">📊 Platform Stats</div><span style={{fontSize:'.6rem',color:'var(--muted)'}}>Manual fields save to localStorage</span></div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:0 }}>
+          {[
+            { label:'Instagram Followers', key:'ig_followers', placeholder:'e.g. 1200', auto:null },
+            { label:'X Followers', key:'x_followers', placeholder:'e.g. 840', auto:null },
+            { label:'Telegram Members', key:'tg_members', placeholder:'Auto-fetched', auto:tgMembers },
+            { label:'Engagement Rate', key:'engagement', placeholder:'e.g. 4.2%', auto:null },
+            { label:'Last IG Post', key:'last_ig', placeholder:'e.g. Apr 26', auto:null },
+            { label:'Last X Post', key:'last_x', placeholder:'e.g. Apr 25', auto:null },
+          ].map(f => (
+            <div key={f.key} style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+              <div style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>{f.label}</div>
+              {f.auto ? (
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>{f.auto}</div>
+              ) : (
+                <input value={stats[f.key]||''} onChange={e=>saveStats({...stats,[f.key]:e.target.value})}
+                  placeholder={f.placeholder}
+                  style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* POST NOW */}
+      <div className="table-card" style={{ marginBottom:20 }}>
+        <div className="table-head"><div className="table-head-title">📤 Post Now</div></div>
+        <div style={{ padding:'16px 20px' }}>
+          <textarea value={tgMsg} onChange={e=>setTgMsg(e.target.value)}
+            placeholder="Type your message…"
+            style={{ width:'100%', minHeight:80, background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'10px 12px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', resize:'vertical', outline:'none', marginBottom:12 }} />
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            <button onClick={()=>sendTelegram(MAIN_CHANNEL_ID,'Main Channel')} disabled={tgSending}
+              style={{ background:'var(--crimson)', color:'#fff', border:'none', padding:'9px 18px', borderRadius:7, cursor:'pointer', fontSize:'.68rem', fontWeight:700, fontFamily:'var(--font-body)' }}>
+              {tgSending?'Sending…':'📢 Post to Main Channel'}
+            </button>
+            <button onClick={()=>sendTelegram(COMMUNITY_CHAT_ID,'Community Chat')} disabled={tgSending}
+              style={{ background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border)', padding:'9px 18px', borderRadius:7, cursor:'pointer', fontSize:'.68rem', fontWeight:600, fontFamily:'var(--font-body)' }}>
+              {tgSending?'Sending…':'💬 Post to Community'}
+            </button>
+            {platforms.map(p => (
+              <a key={p.key} href={p.href} target="_blank" rel="noopener noreferrer"
+                style={{ textDecoration:'none' }}>
+                <button style={{ background:'var(--surface2)', color:'var(--text)', border:'1px solid var(--border)', padding:'9px 18px', borderRadius:7, cursor:'pointer', fontSize:'.68rem', fontWeight:600, fontFamily:'var(--font-body)' }}>
+                  {p.icon} Open {p.label}
+                </button>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENT CALENDAR PREVIEW */}
+      <div className="table-card" style={{ marginBottom:20 }}>
+        <div className="table-head"><div className="table-head-title">📅 This Week's Content</div><span style={{fontSize:'.6rem',color:'var(--muted)'}}>Week of {weekLabel}</span></div>
+        {calPosts.length === 0 ? (
+          <div style={{ padding:'16px 20px', fontSize:'.75rem', color:'var(--muted)' }}>No posts generated yet — go to Content Calendar tab to generate.</div>
+        ) : (
+          <div style={{ padding:'12px 16px', display:'flex', flexDirection:'column', gap:8 }}>
+            {calPosts.map(post => {
+              const icon = { x:'𝕏', telegram:'📨', instagram:'📸' }[post.platform] || '📄';
+              const day = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][post.day_of_week] || '';
+              const statusColor = post.status==='approved'?'#2196f3':post.status==='posted'?'var(--green)':post.status==='failed'?'var(--rose)':'var(--amber)';
+              return (
+                <div key={post.id} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'10px 14px', display:'flex', gap:12, alignItems:'flex-start' }}>
+                  <span style={{ fontSize:'1.2rem', flexShrink:0 }}>{icon}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', gap:8, marginBottom:4, flexWrap:'wrap', alignItems:'center' }}>
+                      <span style={{ fontSize:'.6rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase' }}>{day} · {post.post_type}</span>
+                      <span style={{ fontSize:'.55rem', fontWeight:700, color:statusColor, background:`${statusColor}22`, padding:'1px 6px', borderRadius:4 }}>{post.status}</span>
+                    </div>
+                    <div style={{ fontSize:'.7rem', color:'var(--text)', lineHeight:1.5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{post.content?.slice(0,120)}{post.content?.length>120?'…':''}</div>
+                    {post.image_hint && <div style={{ fontSize:'.62rem', color:'var(--muted)', fontStyle:'italic', marginTop:3 }}>📷 {post.image_hint}</div>}
+                  </div>
+                  <button onClick={()=>navigator.clipboard.writeText(post.content).then(()=>showToast('Copied!','s'))}
+                    style={{ background:'transparent', border:'1px solid var(--border)', color:'var(--muted)', padding:'4px 10px', borderRadius:5, cursor:'pointer', fontSize:'.6rem', flexShrink:0, fontFamily:'var(--font-body)' }}>Copy</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* DM OUTREACH TRACKER */}
+      <div className="table-card" style={{ marginBottom:20 }}>
+        <div className="table-head">
+          <div className="table-head-title">📩 DM Outreach Tracker</div>
+          <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+            <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>{dmStats.sent} sent · {dmStats.replied} replied · {dmStats.converted} converted</span>
+            <button onClick={()=>setDmModal(true)}
+              style={{ background:'var(--crimson)', color:'#fff', border:'none', padding:'5px 12px', borderRadius:5, cursor:'pointer', fontSize:'.62rem', fontWeight:700, fontFamily:'var(--font-body)' }}>
+              + Log DM
+            </button>
+          </div>
+        </div>
+        {dmLog.length === 0 ? (
+          <div style={{ padding:'20px', fontSize:'.75rem', color:'var(--muted)' }}>No DMs logged yet. Click "+ Log DM" to track outreach.</div>
+        ) : (
+          <div style={{ overflowX:'auto' }}>
+            <table className="adm-table" style={{ minWidth:500 }}>
+              <thead><tr><th>Name</th><th>Platform</th><th>Date Sent</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                {dmLog.slice(0,50).map(d => (
+                  <tr key={d.id}>
+                    <td style={{ fontFamily:'var(--font-display)', fontStyle:'italic' }}>{d.name}</td>
+                    <td style={{ fontSize:'.7rem' }}>{d.platform}</td>
+                    <td style={{ fontSize:'.7rem', color:'var(--muted)' }}>{d.dateSent}</td>
+                    <td>
+                      <select value={d.status} onChange={e=>{const l=dmLog.map(x=>x.id===d.id?{...x,status:e.target.value}:x);saveDmLog(l);}}
+                        style={{ background:'var(--surface2)', border:'1px solid var(--border)', color:'var(--text)', borderRadius:4, padding:'3px 6px', fontSize:'.65rem', fontFamily:'var(--font-body)' }}>
+                        <option value="pending">Pending</option>
+                        <option value="replied">Replied</option>
+                        <option value="converted">Converted</option>
+                        <option value="no-reply">No Reply</option>
+                      </select>
+                    </td>
+                    <td><button onClick={()=>saveDmLog(dmLog.filter(x=>x.id!==d.id))} className="action-link red">Delete</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* SOCIAL TEMPLATES */}
+      <div className="table-card" style={{ marginBottom:20 }}>
+        <div className="table-head"><div className="table-head-title">📝 DM Templates</div></div>
+        <div style={{ padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+          {DM_TEMPLATES.map((tpl, i) => (
+            <div key={i} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'12px 14px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <span style={{ fontSize:'.65rem', fontWeight:700, color:'var(--muted)', letterSpacing:'.08em', textTransform:'uppercase' }}>{tpl.name}</span>
+                <button onClick={()=>copyTpl(tpl.text, tpl.name)}
+                  style={{ background: copiedTpl===tpl.name?'var(--green-dim)':'var(--surface)', border:'1px solid var(--border)', color: copiedTpl===tpl.name?'var(--green)':'var(--muted)', padding:'4px 12px', borderRadius:5, cursor:'pointer', fontSize:'.6rem', fontFamily:'var(--font-body)', transition:'all .15s' }}>
+                  {copiedTpl===tpl.name?'✓ Copied':'📋 Copy'}
+                </button>
+              </div>
+              <pre style={{ fontSize:'.68rem', color:'var(--text)', fontFamily:'var(--font-body)', lineHeight:1.6, whiteSpace:'pre-wrap', wordBreak:'break-word', margin:0 }}>{tpl.text}</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* LOG DM MODAL */}
+      {dmModal && (
+        <div className="confirm-overlay" onClick={()=>setDmModal(false)}>
+          <div className="confirm-card" style={{ maxWidth:420, textAlign:'left' }} onClick={e=>e.stopPropagation()}>
+            <div className="confirm-title" style={{ fontSize:'1rem', marginBottom:14 }}>📩 Log New DM</div>
+            {[
+              { label:'Name / Handle', field:'name', type:'text', placeholder:'@username or Name' },
+              { label:'Date Sent', field:'dateSent', type:'date', placeholder:'' },
+            ].map(f => (
+              <div key={f.field} style={{ marginBottom:10 }}>
+                <div style={{ fontSize:'.6rem', color:'var(--muted)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:4 }}>{f.label}</div>
+                <input type={f.type} value={newDm[f.field]} onChange={e=>setNewDm(n=>({...n,[f.field]:e.target.value}))}
+                  placeholder={f.placeholder}
+                  style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'9px 12px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }} />
+              </div>
+            ))}
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:'.6rem', color:'var(--muted)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:4 }}>Platform</div>
+              <select value={newDm.platform} onChange={e=>setNewDm(n=>({...n,platform:e.target.value}))}
+                style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'9px 12px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }}>
+                {['Instagram','X / Twitter','TikTok','Email','Other'].map(p=><option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="approve-btn" onClick={addDm}>Save DM</button>
+              <button className="deny-btn" onClick={()=>setDmModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ALERTS BANNER ───────────────────────────────────────────────────────────
-function AlertsBanner() {
+function AlertsBanner({ setActive }) {
   const [alerts, setAlerts] = useState([]);
   useEffect(() => {
     const items = [];
-    const now = Date.now();
-    const railwayExpiry = new Date('2026-04-27T00:00:00Z').getTime();
-    const msUntil = railwayExpiry - now;
-    const daysUntil = Math.ceil(msUntil / 86400000);
-    if (msUntil <= 0) {
-      items.push({ level: 'critical', msg: '🚨 Railway Trial expired — Telegram bot is OFFLINE. Go to railway.app → proud-unity → upgrade to Hobby ($5/mo)' });
-    } else if (daysUntil <= 3) {
-      items.push({ level: 'warn', msg: `⚠️ Railway Trial expires in ${daysUntil} day${daysUntil === 1 ? '' : 's'} — upgrade to Hobby plan at railway.app (proud-unity project)` });
-    }
-    sb.get('submissions', 'status=eq.pending&select=created_at').then(d => {
+    // RAILWAY_PLAN is HOBBY — no expiry warning needed
+    sb.get('submissions', 'status=eq.pending&select=created_at,id').then(d => {
       if (Array.isArray(d)) {
-        const stale = d.filter(s => s.created_at && now - new Date(s.created_at).getTime() > 48 * 3600000);
-        if (stale.length > 0) items.push({ level: 'warn', msg: `⚠️ ${stale.length} submission${stale.length > 1 ? 's have' : ' has'} been pending review for 48+ hours` });
+        const stale = d.filter(s => s.created_at && Date.now() - new Date(s.created_at).getTime() > 48 * 3600000);
+        if (stale.length > 0) items.push({
+          level: 'warn',
+          msg: `⚠️ ${stale.length} submission${stale.length > 1 ? 's have' : ' has'} been pending 48+ hours — click to review`,
+          action: () => setActive('review'),
+        });
       }
       setAlerts([...items]);
     }).catch(() => setAlerts([...items]));
@@ -1990,7 +2428,11 @@ function AlertsBanner() {
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
       {alerts.map((a, i) => (
-        <div key={i} className={`alert-banner-item ${a.level}`}>{a.msg}</div>
+        <div key={i} className={`alert-banner-item ${a.level}`}
+          onClick={a.action}
+          style={{ cursor: a.action ? 'pointer' : 'default' }}>
+          {a.msg}{a.action && ' →'}
+        </div>
       ))}
     </div>
   );
@@ -2042,13 +2484,12 @@ function CommandScreen({ setActive }) {
   const mins = Math.floor((timeLeft % 3600) / 60);
   const secs = timeLeft % 60;
   const timeClass = round?.settled ? '' : roundOverdue ? 'danger' : timeLeft < 3600 ? 'danger' : timeLeft < 86400 ? 'warn' : 'ok';
-  const railwayOk = Date.now() < new Date('2026-04-27T00:00:00Z').getTime();
 
   const health = [
-    { label: 'Round', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active' },
-    { label: 'Railway Bot', ok: railwayOk, warn: false, text: railwayOk ? 'Trial expires Apr 27' : 'EXPIRED — offline' },
-    { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting` },
-    { label: 'Content Queue', ok: pendingContent === 0, warn: pendingContent > 0, text: pendingContent === 0 ? 'All approved' : `${pendingContent} to approve` },
+    { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
+    { label: 'Railway Bot', ok: true, warn: false, text: `${RAILWAY_PLAN} Plan · Online`, href: 'https://railway.app', nav: null },
+    { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting`, href: null, nav: 'review' },
+    { label: 'Content Queue', ok: pendingContent === 0, warn: pendingContent > 0, text: pendingContent === 0 ? 'All approved' : `${pendingContent} to approve`, href: null, nav: 'content' },
   ];
 
   return (
@@ -2098,12 +2539,15 @@ function CommandScreen({ setActive }) {
       <div className="cmd-health-grid">
         {health.map((h, i) => {
           const color = h.ok ? 'var(--green)' : h.warn ? 'var(--amber)' : 'var(--rose)';
-          return (
-            <div key={i} className="cmd-health-card" style={{ borderLeftColor: color }}>
+          const clickable = h.href || h.nav;
+          const inner = (
+            <div className="cmd-health-card" style={{ borderLeftColor: color, cursor: clickable ? 'pointer' : 'default' }}
+              onClick={() => { if (h.nav) setActive(h.nav); else if (h.href) window.open(h.href, '_blank'); }}>
               <div className="cmd-health-label">{h.label}</div>
-              <div className="cmd-health-val" style={{ color }}>● {h.text}</div>
+              <div className="cmd-health-val" style={{ color }}>● {h.text}{clickable ? ' →' : ''}</div>
             </div>
           );
+          return <div key={i}>{inner}</div>;
         })}
       </div>
 
@@ -2348,10 +2792,10 @@ const OPS_MANUAL = [
   {
     title: 'Social Media Templates', emoji: '📢',
     templates: [
-      { name: 'Round Start', text: '🔥 Round is LIVE on @TemptationToken!\n\nVote for your favourite profile and win $TTS!\n\n👉 app.temptationtoken.io\n\n#TTS #Base #Web3' },
-      { name: 'Round End Alert', text: '⏰ Final hours of voting!\n\nGet your votes in before the round closes.\n\n👉 app.temptationtoken.io\n\n#TTS #Base' },
-      { name: 'Winner Announcement', text: '🏆 Round settled! Congratulations to our winner!\n\nNew round starts Monday — get your $TTS ready.\n\n👉 app.temptationtoken.io\n\n#TTS #Base' },
-      { name: 'New Profile Alert', text: '👀 New profile just approved!\n\nHead to the app and cast your vote.\n\n👉 app.temptationtoken.io\n\n#TTS #Base #Web3' },
+      { name: 'X — Round Start', href: 'https://x.com/compose/tweet', flow: 'Copy → twitter.com/compose → Paste → Post', text: '🔥 Round is LIVE on @TemptationToken!\n\nVote for your favourite profile and win $TTS!\n\n👉 app.temptationtoken.io\n\n#TTS #Base #Web3' },
+      { name: 'X — Round End Alert', href: 'https://x.com/compose/tweet', flow: 'Copy → twitter.com/compose → Paste → Post', text: '⏰ Final hours of voting!\n\nGet your votes in before the round closes.\n\n👉 app.temptationtoken.io\n\n#TTS #Base' },
+      { name: 'Telegram — Winner', href: 'https://t.me/TTSCommunityChat', flow: 'Copy → open @TTSCommunityChat → Paste → Send', text: '🏆 Round settled! Congratulations to our winner!\n\nNew round starts Monday — get your $TTS ready.\n\n👉 app.temptationtoken.io\n\n#TTS #Base' },
+      { name: 'Instagram — New Profile', href: 'https://instagram.com', flow: 'Copy caption → Open Instagram app → + → Paste caption → Post', text: '👀 New profile just joined the voting!\n\nHead to the link in bio and cast your vote. 🗳️\n\n#TTS #Web3 #Crypto #Base #NFT #Creator' },
     ]
   },
 ];
@@ -2390,11 +2834,17 @@ function ManualScreen() {
               {section.templates && section.templates.map((tpl, j) => (
                 <div key={j} className="manual-tpl">
                   <div className="manual-tpl-head">
-                    <span className="manual-tpl-name">{tpl.name}</span>
-                    <button className={`manual-copy-btn${copied === `${i}-${j}` ? ' copied' : ''}`}
-                      onClick={() => copyText(tpl.text, `${i}-${j}`)}>
-                      {copied === `${i}-${j}` ? '✓ Copied' : '📋 Copy'}
-                    </button>
+                    <div>
+                      <span className="manual-tpl-name">{tpl.name}</span>
+                      {tpl.flow && <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:2, fontStyle:'italic' }}>Flow: {tpl.flow}</div>}
+                    </div>
+                    <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                      {tpl.href && <a href={tpl.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}><button className="manual-copy-btn">Open →</button></a>}
+                      <button className={`manual-copy-btn${copied === `${i}-${j}` ? ' copied' : ''}`}
+                        onClick={() => copyText(tpl.text, `${i}-${j}`)}>
+                        {copied === `${i}-${j}` ? '✓ Copied' : '📋 Copy'}
+                      </button>
+                    </div>
                   </div>
                   <pre className="manual-tpl-text">{tpl.text}</pre>
                 </div>
@@ -2419,6 +2869,7 @@ const NAV = [
     { key: "overview",  icon: "📊", label: "Overview" },
     { key: "review",    icon: "📸", label: "Photo Review" },
     { key: "content",   icon: "📅", label: "Content Calendar" },
+    { key: "social",    icon: "📱", label: "Social Media" },
     { key: "system",    icon: "🛡️", label: "System Health" },
   ]},
   { section: "Finance", items: [
@@ -2438,6 +2889,8 @@ export default function AdminApp() {
   useEffect(() => { injectStyles(); }, []);
   const [loggedIn, setLoggedIn] = useState(false);
   const [active, setActive] = useState("command");
+  const clock = useLiveClock();
+  const weekLabel = useCurrentWeek();
   const [toast, showToast] = useToast();
 
   if (!loggedIn) return <div className="adm-app"><LoginScreen onLogin={() => setLoggedIn(true)} /></div>;
@@ -2451,6 +2904,7 @@ export default function AdminApp() {
     overview:   <OverviewScreen />,
     review:     <ReviewScreen {...screenProps} />,
     content:    <ContentCalendarScreen {...screenProps} />,
+    social:     <SocialScreen {...screenProps} />,
     users:      <UsersScreen {...screenProps} />,
     wallets:    <WalletsScreen />,
     payouts:    <PayoutsScreen {...screenProps} />,
@@ -2462,7 +2916,7 @@ export default function AdminApp() {
 
   const titles = {
     command: "Command Center", priorities: "Daily Priorities", kpi: "KPI Dashboard", manual: "Operations Manual",
-    overview: "Overview", review: "Photo Review", content: "Content Calendar",
+    overview: "Overview", review: "Photo Review", content: "Content Calendar", social: "Social Media",
     users: "User Management", wallets: "Wallets", payouts: "Payouts",
     staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health"
   };
@@ -2506,11 +2960,12 @@ export default function AdminApp() {
           <div className="topbar">
             <div className="topbar-title">{titles[active]}</div>
             <div className="topbar-right">
-              <span className="topbar-week"><span className="dot-live" />Week of Apr 13–19, 2026</span>
+              <span className="topbar-week"><span className="dot-live" />Week of {weekLabel}</span>
+              <span className="topbar-week" style={{ fontFamily:'monospace', fontSize:'.65rem', color:'var(--muted)', letterSpacing:'.04em' }}>{clock}</span>
               <span className="admin-pill">Admin · Blockchain Entertainment LLC</span>
             </div>
           </div>
-          <AlertsBanner />
+          <AlertsBanner setActive={setActive} />
           <div className="adm-page">
             {screens[active]}
           </div>

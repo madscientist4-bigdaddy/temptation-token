@@ -243,5 +243,57 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── JOB 3: Auto-correction alerts ────────────────────────────────────────
+  const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+  const adminToken  = process.env.TELEGRAM_BOT_TOKEN
+
+  try {
+    // Check LINK balances vs known values (warn if < 2)
+    const UPKEEPS = [
+      { name: 'TTS Link Reserve Monitor', known: 7.11 },
+      { name: 'TTS Settle Or Rollover',   known: 6.2  },
+      { name: 'TTS Midpoint Snapshot',    known: 8.2  },
+      { name: 'TTS Start Round',          known: 5.9  },
+    ]
+    for (const u of UPKEEPS) {
+      if (u.known < 2) {
+        await sendTelegram(adminChatId, `⚠️ LOW LINK: ${u.name} has ${u.known.toFixed(2)} LINK — fund now at https://automation.chain.link/base`, adminToken)
+      }
+    }
+
+    // Check if round is overdue (ended but not settled)
+    const idHex = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: '0x9cbe5efd' }, 'latest'])
+    if (idHex && idHex !== '0x') {
+      const roundId = parseInt(idHex, 16)
+      const padded  = roundId.toString(16).padStart(64, '0')
+      const rData   = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: '0x8f1327c0' + padded }, 'latest'])
+      if (rData && rData !== '0x') {
+        const chunks = []
+        for (let i = 0; i < rData.slice(2).length; i += 64) chunks.push(rData.slice(2 + i, 2 + i + 64))
+        const endTime = parseInt(chunks[1], 16)
+        const settled = chunks[4] !== '0'.padStart(64, '0')
+        if (!settled && Math.floor(Date.now() / 1000) > endTime) {
+          const settleLink = `https://basescan.org/address/0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48#writeContract`
+          await sendTelegram(adminChatId,
+            `🚨 ROUND ${roundId} OVERDUE — ended ${new Date(endTime * 1000).toLocaleString()} but not settled!\n\nManual settle: ${settleLink}`,
+            adminToken)
+        }
+      }
+    }
+
+    // Check if bot hasn't posted in 25+ hours
+    const recent = await sbGet('scheduled_posts', `status=eq.posted&order=posted_at.desc&limit=1&select=posted_at`)
+    if (Array.isArray(recent) && recent.length > 0 && recent[0].posted_at) {
+      const lastPost = new Date(recent[0].posted_at).getTime()
+      if (Date.now() - lastPost > 25 * 3600 * 1000) {
+        await sendTelegram(adminChatId,
+          `⚠️ No posts in 25+ hours! Last post was ${new Date(lastPost).toLocaleString()}. Check Content Calendar.`,
+          adminToken)
+      }
+    }
+  } catch (e) {
+    results.alerts_error = e.message
+  }
+
   return res.status(200).json({ ok: true, time: nowISO, ...results })
 }
