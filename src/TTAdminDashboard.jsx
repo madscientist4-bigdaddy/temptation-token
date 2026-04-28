@@ -943,19 +943,13 @@ function OverviewScreen() {
     }).catch(() => {});
     // Active this week + vote rankings from on-chain
     const oneWeekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
-    sb.get('votes', `select=voter_wallet,profile_id,tts_amount&created_at=gte.${oneWeekAgo}`).then(d => {
+    sb.get('votes', `select=voter_wallet,tts_amount&created_at=gte.${oneWeekAgo}`).then(d => {
       if (Array.isArray(d) && d.length > 0) {
         const uniqueVoters = new Set(d.map(v => v.voter_wallet).filter(Boolean));
         setStats(s => s.map((st, i) => i === 1 ? { ...st, value: uniqueVoters.size.toString() } : st));
-        const totals = {};
         let pool = 0;
-        d.forEach(v => {
-          totals[v.profile_id] = (totals[v.profile_id] || 0) + (Number(v.tts_amount) || 0);
-          pool += Number(v.tts_amount) || 0;
-        });
+        d.forEach(v => { pool += Number(v.tts_amount) || 0; });
         setTotalPool(pool);
-        const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5);
-        setVotes(sorted.map(([id, amt]) => ({ name: id.slice(0,8)+'…', votes: Math.round(amt), pct: pool > 0 ? Math.round((amt / pool) * 100) : 0 })));
       }
     }).catch(() => {});
     // Live on-chain pool + rankings from on-chain getProfile
@@ -1254,18 +1248,17 @@ function UsersScreen({ showToast }) {
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    sb.get('users', 'select=*').then(d => {
+    sb.get('users', 'select=id,wallet_address,display_name,email,created_at,referred_by').then(d => {
       if (Array.isArray(d)) {
         setUsers(d.map(u => ({
           id: u.id,
-          handle: u.username || u.first_name || 'Anonymous',
+          handle: u.display_name || (u.wallet_address ? u.wallet_address.slice(0,6)+'…' : 'Anonymous'),
           wallet: u.wallet_address ? u.wallet_address.slice(0,6)+'...'+u.wallet_address.slice(-4) : '—',
-          email: '—',
-          joined: u.joined_at ? new Date(u.joined_at*1000).toLocaleDateString() : '—',
+          email: u.email || '—',
+          joined: u.created_at ? new Date(u.created_at).toLocaleDateString() : '—',
           balance: 0,
           status: 'active',
-          vip: u.vip_tier || 'none',
-          ref_code: u.ref_code || '—'
+          referred_by: u.referred_by || '—'
         })));
       }
       setLoading(false);
@@ -1500,20 +1493,20 @@ function StakingScreen() {
     }).catch(() => setContractInfo({ totalStaked: null }));
 
     // Load stakers from Supabase (stakes or staking_positions table)
-    const loadStakers = (table) => sb.get(table, 'select=*').then(d => {
+    const loadStakers = (table) => sb.get(table, 'select=id,wallet_address,tts_amount,tier,created_at').then(d => {
       if (Array.isArray(d) && d.length > 0) {
         setStakers(d.map(s => {
-          const amt = Math.round(Number(s.amount || s.staked_amount || 0));
+          const amt = Math.round(Number(s.tts_amount || 0));
           const tier = STAKING_TIERS.find(t => amt >= t.min && amt <= t.max) || STAKING_TIERS[0];
           return {
             handle: s.wallet_address ? s.wallet_address.slice(0,6)+'...'+s.wallet_address.slice(-4) : 'Unknown',
             wallet: s.wallet_address || '—',
             amount: amt.toLocaleString(),
             tier: s.tier || tier.name,
-            boost: s.vote_boost || tier.boost,
-            apr: s.apr || tier.apr,
-            locked: s.lock_period || '—',
-            unlocks: s.unlock_date ? new Date(s.unlock_date).toLocaleDateString() : '—'
+            boost: tier.boost,
+            apr: tier.apr,
+            locked: '—',
+            unlocks: '—'
           };
         }));
         setLoading(false);
@@ -1521,7 +1514,7 @@ function StakingScreen() {
         setLoading(false);
       }
     });
-    loadStakers('stakes').catch(() => loadStakers('staking_positions').catch(() => setLoading(false)));
+    loadStakers('stakes').catch(() => setLoading(false));
   }, []);
 
   const dbTotalStaked = stakers.reduce((a, s) => a + parseInt((s.amount||'0').replace(/,/g,'')), 0);
@@ -1942,9 +1935,11 @@ async function getRoundInfo() {
 
 async function getLinkBalance(upkeepId) {
   try {
-    // getUpkeep via getActiveUpkeepIDs workaround - return known funded amount
-    // Direct registry reads require ABI decoding - link to chainlink dashboard instead
-    return null; // signals to use external link
+    const idHex = BigInt(upkeepId).toString(16).padStart(64, '0');
+    const result = await rpcCall('eth_call', [{ to: CHAINLINK_REGISTRY, data: '0xc7c3a19a' + idHex }, 'latest']);
+    // balance (uint96) is slot 3 inside the returned tuple — at chars 258–321 of the hex result
+    if (!result || result.length < 322) return null;
+    return Number(BigInt('0x' + result.slice(258, 322))) / 1e18;
   } catch(e) { return null; }
 }
 
@@ -1972,15 +1967,15 @@ function SystemScreen() {
       setLinks(UPKEEPS.map((u, i) => ({ ...u, balance: linkBals[i] ?? u.known })));
       setLastRefresh(new Date().toLocaleTimeString());
     } catch(e) {}
-    // Referral stats
+    // Referral stats — count users with referred_by set
     try {
-      const [referrals, credits] = await Promise.all([
-        sb.get('referrals', 'select=id,created_at&order=created_at.desc&limit=1'),
-        sb.get('referral_credits', 'select=amount,created_at&order=created_at.desc&limit=100'),
+      const [referred, settings] = await Promise.all([
+        sb.get('users', 'select=referred_by&referred_by=not.is.null'),
+        sb.get('referral_settings', 'id=eq.1&select=referrer_bonus'),
       ]);
-      const totalCredits = Array.isArray(credits) ? credits.reduce((s,r)=>s+(Number(r.amount)||0),0) : 0;
-      const lastDate = Array.isArray(referrals) && referrals.length > 0 ? new Date(referrals[0].created_at).toLocaleDateString() : 'None yet';
-      setReferralStats({ count: Array.isArray(referrals) ? referrals.length : 0, totalTTS: Math.round(totalCredits), lastDate });
+      const count = Array.isArray(referred) ? referred.length : 0;
+      const bonus = Array.isArray(settings) && settings[0] ? (settings[0].referrer_bonus || 100) : 100;
+      setReferralStats({ count, totalTTS: count * bonus, lastDate: count > 0 ? 'Active' : 'None yet' });
     } catch {}
     setLoading(false);
   };
@@ -2091,9 +2086,9 @@ function SystemScreen() {
         {referralStats ? (
           <table className="adm-table">
             <tbody>
-              <tr><td style={{ color:'var(--muted)' }}>Total Referrals</td><td><strong>{referralStats.count}</strong></td></tr>
-              <tr><td style={{ color:'var(--muted)' }}>Total $TTS Credited</td><td><strong style={{ color:'var(--gold-light)' }}>{referralStats.totalTTS.toLocaleString()} $TTS</strong></td></tr>
-              <tr><td style={{ color:'var(--muted)' }}>Last Referral</td><td>{referralStats.lastDate}</td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Referred Users</td><td><strong>{referralStats.count}</strong></td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Est. $TTS Credited</td><td><strong style={{ color:'var(--gold-light)' }}>{referralStats.totalTTS.toLocaleString()} $TTS</strong></td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>Status</td><td>{referralStats.lastDate}</td></tr>
               <tr><td style={{ color:'var(--muted)' }}>API Endpoint</td><td><code style={{ fontSize:'.6rem', color:'var(--muted)' }}>POST /api/referral-credit</code></td></tr>
             </tbody>
           </table>
@@ -2865,7 +2860,7 @@ const PRIORITY_GROUPS = [
   {
     key: 'monthly', title: 'This Month', emoji: '📆', reset: 'monthly',
     tasks: [
-      { id: 'm1', label: 'Upgrade Railway Trial → Hobby plan ($5/mo)', cat: 'Ops', due: 'Due Apr 27' },
+      { id: 'm1', label: '✅ Railway upgraded to Hobby plan (paid Apr 24)', cat: 'Ops' },
       { id: 'm2', label: 'CoinGecko resubmission', cat: 'Growth', due: 'Due Apr 17' },
       { id: 'm3', label: 'Blockaid false-positive portal re-check', cat: 'Ops' },
       { id: 'm4', label: 'Check Vercel usage and billing', cat: 'Ops' },

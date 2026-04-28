@@ -697,7 +697,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       fetch(`${SUPABASE_URL}/rest/v1/votes`, {
         method: 'POST',
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ round_id: Number(roundId), profile_id: photo.profileId, voter_wallet: address, tts_amount: a, tx_hash: voteTx, created_at: new Date().toISOString() })
+        body: JSON.stringify({ round_id: Number(roundId), voter_wallet: address, tts_amount: a, tx_hash: voteTx, created_at: new Date().toISOString() })
       }).catch(() => {})
 
       // Update UI
