@@ -63,7 +63,8 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 | TTS Token (UUPS Proxy) | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` |
 | TTS v2 Implementation (M1 fix, pending upgrade) | `0xb995b63cdf848b7884cdc51da82e4a80ad02395a` |
 | TTSVotingV2 (deprecated) | `0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA` |
-| **TTSVotingV3 (ACTIVE)** | **`0x49385909a23C97142c600f8d28D11Ba63410b65C`** |
+| TTSVotingV3 (deprecated — keeper-incompatible) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
+| **TTSVotingV3b (ACTIVE)** | **`0xEC339baD1900447833C9fe905C4A768D1f0cA912`** |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
 | Gnosis Safe (2/2 multisig) | `0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86` |

@@ -1347,7 +1347,7 @@ function UsersScreen({ showToast }) {
 const WALLETS_CONFIG = [
   { label: "House / Revenue", name: "Blockchain Entertainment LLC", addr: HOUSE_WALLET, role: "House cut (10%), deployer, admin" },
   { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
-  { label: "Voting Contract", name: "TTSVotingV3 — Escrow", addr: '0x49385909a23C97142c600f8d28D11Ba63410b65C', role: "Holds votes during active round" },
+  { label: "Voting Contract", name: "TTSVotingV3 — Escrow", addr: '0xEC339baD1900447833C9fe905C4A768D1f0cA912', role: "Holds votes during active round" },
   { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
 ];
 function WalletsScreen() {
@@ -1375,7 +1375,7 @@ function WalletsScreen() {
   );
 }
 
-const V3_ADDRESS = '0x49385909a23C97142c600f8d28D11Ba63410b65C';
+const V3_ADDRESS = '0xEC339baD1900447833C9fe905C4A768D1f0cA912';
 
 function PayoutsScreen({ showToast }) {
   const [settlements, setSettlements] = useState([]);
@@ -1886,7 +1886,7 @@ function SettingsScreen() {
 
 
 // ─── SYSTEM HEALTH SCREEN ─────────────────────────────────────────────────────
-const VOTING_ADDRESS = '0x49385909a23C97142c600f8d28D11Ba63410b65C'; // TTSVotingV3
+const VOTING_ADDRESS = '0xEC339baD1900447833C9fe905C4A768D1f0cA912'; // TTSVotingV3
 const CHAINLINK_REGISTRY = '0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743';
 const UPKEEPS = [
   { name: 'TTS Link Reserve Monitor', known: 7.11, id: '43621180820595228289765408559964550834819164637810952818427682374779443797241' },

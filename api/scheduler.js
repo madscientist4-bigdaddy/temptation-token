@@ -7,7 +7,7 @@ import crypto from 'crypto'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
-const VOTING_ADDRESS  = '0x49385909a23C97142c600f8d28D11Ba63410b65C'
+const VOTING_ADDRESS  = '0xEC339baD1900447833C9fe905C4A768D1f0cA912'
 const MAIN_CHANNEL_ID   = process.env.MAIN_CHANNEL_ID   || '-1002207667493'
 const COMMUNITY_CHAT_ID = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
 
