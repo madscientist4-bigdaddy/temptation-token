@@ -1099,19 +1099,36 @@ function ReviewScreen({ showToast }) {
     setOnchainModal(calldata);
   };
 
-  const execute = () => {
-    const { id, action } = confirmed;
-    const status = action === "approve" ? "approved" : "rejected";
-    fetch(SUPABASE_URL + '/rest/v1/submissions?id=eq.' + id, {
-      method: 'PATCH',
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ status })
-    }).then(() => {
+  const execute = async () => {
+    const { id, action, wallet } = confirmed;
+    if (action === "approve") {
+      showToast("Approving on-chain...", "info");
+      try {
+        const r = await fetch('/api/approve-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ submissionId: id, walletAddress: wallet }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          setQueue(q => q.filter(s => s.id !== id));
+          showToast(`✓ Approved on-chain · ${d.txHash ? d.txHash.slice(0, 10) + '…' : ''}`, "success");
+        } else {
+          showToast(`Error: ${d.error}`, "error");
+        }
+      } catch (e) {
+        showToast(`Error: ${e.message}`, "error");
+      }
+    } else {
+      await fetch(SUPABASE_URL + '/rest/v1/submissions?id=eq.' + id, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ status: 'rejected' })
+      });
       setQueue(q => q.filter(s => s.id !== id));
-      if (action === "approve") showToast("✓ Profile approved", "success");
-      else showToast("✕ Profile denied", "info");
-      setConfirmed(null);
-    });
+      showToast("✕ Profile denied", "info");
+    }
+    setConfirmed(null);
   };
 
   return (
@@ -1158,7 +1175,7 @@ function ReviewScreen({ showToast }) {
                   <div className="review-wallet">{s.wallet}</div>
                   <a className="review-link" href={/^https?:\/\//.test(s.linkUrl || '') ? s.linkUrl : '#'} target="_blank" rel="noopener noreferrer">🔗 {s.link}</a>
                   <div className="review-actions">
-                    <button className="approve-btn" onClick={() => setConfirmed({ id: s.id, action: "approve" })}>✓ Approve</button>
+                    <button className="approve-btn" onClick={() => setConfirmed({ id: s.id, action: "approve", wallet: s.wallet })}>✓ Approve</button>
                     <button className="deny-btn" onClick={() => setConfirmed({ id: s.id, action: "deny" })}>✕ Deny</button>
                   </div>
                 </div>
