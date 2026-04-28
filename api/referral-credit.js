@@ -16,13 +16,26 @@ import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const TTS_ADDRESS   = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
-const CREDIT_AMOUNT = 100n * 10n ** 18n // 100 TTS
+const TTS_ADDRESS = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 
 const TTS_ABI = parseAbi([
   'function transfer(address to, uint256 amount) returns (bool)',
   'function balanceOf(address) view returns (uint256)',
 ])
+
+async function getReferralSettings() {
+  try {
+    const url = (process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co') + '/rest/v1/referral_settings?id=eq.1&select=*&limit=1'
+    const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
+    const r = await fetch(url, { headers: { apikey: key, Authorization: 'Bearer ' + key } })
+    const d = await r.json()
+    if (Array.isArray(d) && d.length > 0 && d[0].referral_enabled !== false) {
+      return { creditAmount: BigInt(Math.floor((d[0].referrer_bonus || 100) * 1e18)), enabled: d[0].referral_enabled !== false }
+    }
+  } catch(_) {}
+  return { creditAmount: 100n * 10n ** 18n, enabled: true }
+}
 
 function supaFetch(path, opts = {}) {
   const url = process.env.SUPABASE_URL + '/rest/v1' + path
@@ -45,6 +58,10 @@ export default async function handler(req, res) {
   if (!newUserWallet || !/^0x[0-9a-fA-F]{40}$/.test(newUserWallet)) {
     return res.status(400).json({ error: 'Invalid wallet' })
   }
+
+  // Load live settings from Supabase
+  const { creditAmount, enabled } = await getReferralSettings()
+  if (!enabled) return res.status(200).json({ ok: true, skipped: 'referral program disabled' })
 
   const pk = process.env.DEPLOYER_PRIVATE_KEY
   if (!pk) return res.status(500).json({ error: 'DEPLOYER_PRIVATE_KEY not set' })
@@ -85,7 +102,7 @@ export default async function handler(req, res) {
       address: TTS_ADDRESS,
       abi: TTS_ABI,
       functionName: 'transfer',
-      args: [referrerWallet, CREDIT_AMOUNT],
+      args: [referrerWallet, creditAmount],
     })
     // wait for confirmation
     await publicClient.waitForTransactionReceipt({ hash: txHash })
@@ -101,7 +118,7 @@ export default async function handler(req, res) {
       new_user_wallet: newUserWallet,
       referrer_wallet: referrerWallet,
       referral_code: referralCode,
-      amount_tts: 100,
+      amount_tts: Number(creditAmount) / 1e18,
       tx_hash: txHash,
       created_at: new Date().toISOString(),
     }),

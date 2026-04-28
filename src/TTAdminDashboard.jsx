@@ -926,9 +926,12 @@ function OverviewScreen() {
   const [livePool, setLivePool] = useState(null);
 
   useEffect(() => {
-    // Total users
-    sb.get('users', 'select=id').then(d => {
-      if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 0 ? { ...st, value: d.length.toLocaleString(), sub: "registered wallets" } : st));
+    // Total users — count distinct voter_wallet from votes table
+    sb.get('votes', 'select=voter_wallet').then(d => {
+      if (Array.isArray(d)) {
+        const distinct = new Set(d.map(v => v.voter_wallet).filter(Boolean));
+        setStats(s => s.map((st, i) => i === 0 ? { ...st, value: distinct.size.toLocaleString(), sub: "unique voters" } : st));
+      }
     }).catch(() => {});
     // Pending submissions
     sb.get('submissions', 'status=eq.pending&select=id').then(d => {
@@ -938,42 +941,59 @@ function OverviewScreen() {
     sb.get('submissions', 'status=eq.approved&select=id').then(d => {
       if (Array.isArray(d)) setStats(s => s.map((st, i) => i === 4 ? { ...st, value: d.length.toString() } : st));
     }).catch(() => {});
-    // Active this week — count unique voter wallets from votes table (fallback: unique submission wallets)
+    // Active this week + vote rankings from on-chain
     const oneWeekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
-    sb.get('votes', `select=voter_wallet,submission_id,tts_amount&created_at=gte.${oneWeekAgo}`).then(d => {
+    sb.get('votes', `select=voter_wallet,profile_id,tts_amount&created_at=gte.${oneWeekAgo}`).then(d => {
       if (Array.isArray(d) && d.length > 0) {
         const uniqueVoters = new Set(d.map(v => v.voter_wallet).filter(Boolean));
         setStats(s => s.map((st, i) => i === 1 ? { ...st, value: uniqueVoters.size.toString() } : st));
         const totals = {};
         let pool = 0;
         d.forEach(v => {
-          totals[v.submission_id] = (totals[v.submission_id] || 0) + (Number(v.tts_amount) || 0);
+          totals[v.profile_id] = (totals[v.profile_id] || 0) + (Number(v.tts_amount) || 0);
           pool += Number(v.tts_amount) || 0;
         });
         setTotalPool(pool);
-        setStats(s => s.map((st, i) => i === 2 ? { ...st, value: Math.round(pool).toLocaleString() } : st));
         const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5);
-        setVotes(sorted.map(([id, amt]) => ({ name: id, votes: Math.round(amt), pct: pool > 0 ? Math.round((amt / pool) * 100) : 0 })));
-      } else {
-        // fallback: unique wallets that submitted this week
-        sb.get('submissions', `select=wallet_address&created_at=gte.${oneWeekAgo}`).then(d2 => {
-          if (Array.isArray(d2)) {
-            const unique = new Set(d2.map(s => s.wallet_address).filter(Boolean));
-            setStats(s => s.map((st, i) => i === 1 ? { ...st, value: unique.size.toString() } : st));
-          }
-        }).catch(() => {});
+        setVotes(sorted.map(([id, amt]) => ({ name: id.slice(0,8)+'…', votes: Math.round(amt), pct: pool > 0 ? Math.round((amt / pool) * 100) : 0 })));
       }
     }).catch(() => {});
-    // Live on-chain pool
+    // Live on-chain pool + rankings from on-chain getProfile
     getRoundInfo().then(async info => {
-      if (info && !info.error) {
-        const enc = '0x8f1327c0' + info.roundId.toString(16).padStart(64, '0');
-        const res = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: enc }, 'latest']).catch(() => null);
-        if (res && res !== '0x') {
-          const rawVotes = Number(BigInt('0x' + res.slice(2 + 3 * 64, 2 + 4 * 64))) / 1e18;
-          setLivePool(rawVotes);
-        }
+      if (!info || info.error) return;
+      const enc = '0x8f1327c0' + info.roundId.toString(16).padStart(64, '0');
+      const res = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: enc }, 'latest']).catch(() => null);
+      if (res && res !== '0x') {
+        const rawVotes = Number(BigInt('0x' + res.slice(2 + 3 * 64, 2 + 4 * 64))) / 1e18;
+        setLivePool(rawVotes);
+        setStats(s => s.map((st, i) => i === 2 ? { ...st, value: Math.round(rawVotes).toLocaleString() } : st));
       }
+      // Fetch on-chain vote counts per profile
+      try {
+        const approved = await sb.get('submissions', `status=eq.approved&round_id=eq.${info.roundId}&select=id,display_name`);
+        if (Array.isArray(approved) && approved.length > 0) {
+          const profileVotes = await Promise.all(approved.map(async p => {
+            const padRound = info.roundId.toString(16).padStart(64,'0');
+            const padId = [...new TextEncoder().encode(p.id)].map(b=>b.toString(16).padStart(2,'0')).join('');
+            const offset = '40'.padStart(64,'0');
+            const len = p.id.length.toString(16).padStart(64,'0');
+            const padded = padId.padEnd(64,'0');
+            const data = '0x76c2c389' + padRound + offset + len + padded;
+            const r = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data }, 'latest']).catch(() => null);
+            let votes = 0;
+            if (r && r !== '0x' && r.length >= 2 + 5*64) {
+              votes = Number(BigInt('0x' + r.slice(2 + 2*64, 2 + 3*64))) / 1e18;
+            }
+            return { name: p.display_name || p.id.slice(0,8)+'…', votes };
+          }));
+          const sorted = profileVotes.sort((a,b) => b.votes - a.votes);
+          const total = sorted.reduce((s,p) => s+p.votes, 0);
+          if (total > 0) {
+            setVotes(sorted.map(p => ({ name: p.name, votes: Math.round(p.votes), pct: total > 0 ? Math.round((p.votes/total)*100) : 0 })));
+            setTotalPool(total);
+          }
+        }
+      } catch(_) {}
     }).catch(() => {});
   }, []);
   const pool = livePool !== null ? livePool : totalPool;
@@ -1455,66 +1475,122 @@ function PayoutsScreen({ showToast }) {
   );
 }
 
+const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc';
+const STAKING_TIERS = [
+  { name: 'Bronze', min: 0,       max: 9999,    apr: '8%',  boost: '1.1x' },
+  { name: 'Silver', min: 10000,   max: 49999,   apr: '12%', boost: '1.25x' },
+  { name: 'Gold',   min: 50000,   max: 199999,  apr: '18%', boost: '1.5x' },
+  { name: 'Platinum', min: 200000, max: Infinity, apr: '25%', boost: '2.0x' },
+];
+
 function StakingScreen() {
   const [stakers, setStakers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [contractInfo, setContractInfo] = useState(null); // {totalStaked, abiAvailable}
 
   useEffect(() => {
-    sb.get('stakes', 'select=*').then(d => {
-      if (Array.isArray(d)) setStakers(d.map(s => ({
-        handle: s.wallet_address ? s.wallet_address.slice(0,6)+'...'+s.wallet_address.slice(-4) : 'Unknown',
-        wallet: s.wallet_address || '—',
-        amount: s.amount ? Math.round(Number(s.amount)).toLocaleString() : '0',
-        tier: s.tier || 'Bronze',
-        boost: s.vote_boost || '1.1x',
-        apr: s.apr || '8%',
-        locked: s.lock_period || '—',
-        unlocks: s.unlock_date ? new Date(s.unlock_date).toLocaleDateString() : '—'
-      })));
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    // Try to get on-chain totalStaked via direct RPC call (selector 0x817b1cd2)
+    rpcCall('eth_call', [{ to: STAKING_ADDRESS, data: '0x817b1cd2' }, 'latest']).then(r => {
+      if (r && r !== '0x') {
+        const totalStaked = Number(BigInt('0x' + r.slice(2))) / 1e18;
+        setContractInfo({ totalStaked: Math.round(totalStaked) });
+      } else {
+        setContractInfo({ totalStaked: null });
+      }
+    }).catch(() => setContractInfo({ totalStaked: null }));
+
+    // Load stakers from Supabase (stakes or staking_positions table)
+    const loadStakers = (table) => sb.get(table, 'select=*').then(d => {
+      if (Array.isArray(d) && d.length > 0) {
+        setStakers(d.map(s => {
+          const amt = Math.round(Number(s.amount || s.staked_amount || 0));
+          const tier = STAKING_TIERS.find(t => amt >= t.min && amt <= t.max) || STAKING_TIERS[0];
+          return {
+            handle: s.wallet_address ? s.wallet_address.slice(0,6)+'...'+s.wallet_address.slice(-4) : 'Unknown',
+            wallet: s.wallet_address || '—',
+            amount: amt.toLocaleString(),
+            tier: s.tier || tier.name,
+            boost: s.vote_boost || tier.boost,
+            apr: s.apr || tier.apr,
+            locked: s.lock_period || '—',
+            unlocks: s.unlock_date ? new Date(s.unlock_date).toLocaleDateString() : '—'
+          };
+        }));
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
+    });
+    loadStakers('stakes').catch(() => loadStakers('staking_positions').catch(() => setLoading(false)));
   }, []);
 
-  const totalStaked = stakers.reduce((a, s) => a + parseInt((s.amount||'0').replace(/,/g,'')), 0);
+  const dbTotalStaked = stakers.reduce((a, s) => a + parseInt((s.amount||'0').replace(/,/g,'')), 0);
+  const displayTotal = contractInfo?.totalStaked ?? dbTotalStaked;
 
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Staking</div>
         <div className="gold-rule" />
-        <div className="page-sub">Monitor active stakes · APR reward obligations · Locked vault balance</div>
+        <div className="page-sub">Monitor active stakes · APR reward obligations · Staking contract: <code style={{fontSize:'.6rem',fontFamily:'monospace',color:'var(--gold-dim)'}}>{STAKING_ADDRESS.slice(0,10)}…</code></div>
       </div>
       <div className="stat-grid" style={{ marginBottom: 24 }}>
-        <div className="stat-card"><div className="stat-label">Total Staked</div><div className="stat-value gold">{totalStaked.toLocaleString()}</div><div className="stat-sub">$TTS locked on Base</div></div>
-        <div className="stat-card"><div className="stat-label">Active Stakers</div><div className="stat-value">{stakers.length}</div><div className="stat-sub">Across all tiers</div></div>
-        <div className="stat-card"><div className="stat-label">Est. APR Obligations</div><div className="stat-value rose">0</div><div className="stat-sub">$TTS owed this period</div></div>
+        <div className="stat-card"><div className="stat-label">Total Staked (On-Chain)</div><div className="stat-value gold">{contractInfo === null ? '…' : displayTotal.toLocaleString()}</div><div className="stat-sub">$TTS locked in contract</div></div>
+        <div className="stat-card"><div className="stat-label">Active Stakers (DB)</div><div className="stat-value">{stakers.length}</div><div className="stat-sub">Across all tiers</div></div>
+        <div className="stat-card"><div className="stat-label">Contract</div><div className="stat-value" style={{fontSize:'1rem',paddingTop:4}}>
+          <a href={`https://basescan.org/address/${STAKING_ADDRESS}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)',fontSize:'.65rem'}}>View on BaseScan →</a>
+        </div><div className="stat-sub">TTSStaking @ Base</div></div>
       </div>
+
+      {/* Tier Benefits */}
+      <div className="table-card" style={{marginBottom:20}}>
+        <div className="table-head"><span className="table-head-title">⭐ Tier Benefits</span></div>
+        <table className="adm-table">
+          <thead><tr><th>Tier</th><th>Min Stake</th><th>APR</th><th>Vote Boost</th></tr></thead>
+          <tbody>
+            {STAKING_TIERS.map(t => (
+              <tr key={t.name}>
+                <td><span className="badge" style={{background:'rgba(212,175,55,0.1)',color:'var(--gold)',border:'1px solid rgba(212,175,55,0.25)'}}>{t.name}</span></td>
+                <td style={{fontFamily:'var(--font-display)',color:'var(--gold-light)'}}>{t.min.toLocaleString()} $TTS</td>
+                <td style={{color:'var(--green)',fontWeight:700}}>{t.apr}</td>
+                <td style={{color:'var(--rose)',fontWeight:700}}>{t.boost}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <div className="table-card">
         <div className="table-head">
-          <span className="table-head-title">Active Stakes</span>
+          <span className="table-head-title">Active Stakes (Supabase)</span>
           <span className="table-count">{stakers.length} stakers</span>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table className="adm-table" style={{ minWidth: 700 }}>
-            <thead>
-              <tr><th>Handle</th><th>Wallet</th><th>Staked</th><th>Tier</th><th>Vote Boost</th><th>APR</th><th>Lock</th><th>Unlocks</th></tr>
-            </thead>
-            <tbody>
-              {stakers.map((s, i) => (
-                <tr key={i}>
-                  <td style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}>{s.handle}</td>
-                  <td style={{ fontFamily: "monospace", fontSize: "0.6rem", color: "var(--gold-dim)" }}>{s.wallet}</td>
-                  <td style={{ fontFamily: "var(--font-display)", color: "var(--gold-light)" }}>{s.amount} $TTS</td>
-                  <td><span className="badge" style={{ background: "rgba(212,175,55,0.1)", color: "var(--gold)", border: "1px solid rgba(212,175,55,0.25)" }}>{s.tier}</span></td>
-                  <td style={{ color: "var(--rose)", fontWeight: 600, fontSize: "0.7rem" }}>{s.boost}</td>
-                  <td style={{ color: "var(--green)", fontSize: "0.7rem" }}>{s.apr}</td>
-                  <td style={{ color: "var(--muted)", fontSize: "0.65rem" }}>{s.locked}</td>
-                  <td style={{ fontSize: "0.65rem" }}>{s.unlocks}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {loading ? (
+          <div style={{padding:20,color:'var(--muted)',fontSize:'.8rem'}}>Loading…</div>
+        ) : stakers.length === 0 ? (
+          <div className="empty-state"><span className="empty-icon">🔒</span>No stakers in database yet.<br/><span style={{fontSize:'.65rem'}}>Stakes will appear here after users stake via the app.</span></div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="adm-table" style={{ minWidth: 700 }}>
+              <thead>
+                <tr><th>Handle</th><th>Wallet</th><th>Staked</th><th>Tier</th><th>Vote Boost</th><th>APR</th><th>Unlocks</th></tr>
+              </thead>
+              <tbody>
+                {stakers.map((s, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}>{s.handle}</td>
+                    <td style={{ fontFamily: "monospace", fontSize: "0.6rem", color: "var(--gold-dim)" }}>{s.wallet}</td>
+                    <td style={{ fontFamily: "var(--font-display)", color: "var(--gold-light)" }}>{s.amount} $TTS</td>
+                    <td><span className="badge" style={{ background: "rgba(212,175,55,0.1)", color: "var(--gold)", border: "1px solid rgba(212,175,55,0.25)" }}>{s.tier}</span></td>
+                    <td style={{ color: "var(--rose)", fontWeight: 600, fontSize: "0.7rem" }}>{s.boost}</td>
+                    <td style={{ color: "var(--green)", fontSize: "0.7rem" }}>{s.apr}</td>
+                    <td style={{ fontSize: "0.65rem" }}>{s.unlocks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1611,20 +1687,157 @@ function ReferralScreen({ showToast }) {
   )
 }
 
+const NFT_ADDRESS = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2';
+// Pre-computed 4-byte selectors
+const SEL = {
+  charityWallet:    '0x7b208769',
+  houseWallet:      '0x77818f02',
+  stakingContract:  '0xee99205c',
+  minter:           '0x07546172',
+  setCharityWallet: '0x30563bd7',
+  setHouseWallet:   '0x35d4de51',
+  setStaking:       '0x9dd373b9',
+  setMinter:        '0xfca3b5aa',
+};
+
+function encodeAddressCall(selector, addr) {
+  const clean = addr.toLowerCase().replace('0x','').padStart(64,'0');
+  return selector + clean;
+}
+
+function decodeAddress(hex) {
+  if (!hex || hex === '0x' || hex.length < 66) return null;
+  return '0x' + hex.slice(-40);
+}
+
+function ContractSettingsSection() {
+  const [connectedWallet, setConnectedWallet] = useState(null);
+  const [currentValues, setCurrentValues] = useState({ charityWallet: '…', houseWallet: '…', stakingContract: '…', minter: '…' });
+  const [inputs, setInputs] = useState({ charityWallet: '', houseWallet: '', stakingContract: '', minter: '' });
+  const [pending, setPending] = useState({});
+  const [, showToast] = useToast();
+
+  const loadCurrentValues = async () => {
+    const [cw, hw, sc, mn] = await Promise.all([
+      rpcCall('eth_call', [{ to: V3_ADDRESS, data: SEL.charityWallet }, 'latest']).catch(() => null),
+      rpcCall('eth_call', [{ to: V3_ADDRESS, data: SEL.houseWallet }, 'latest']).catch(() => null),
+      rpcCall('eth_call', [{ to: V3_ADDRESS, data: SEL.stakingContract }, 'latest']).catch(() => null),
+      rpcCall('eth_call', [{ to: NFT_ADDRESS, data: SEL.minter }, 'latest']).catch(() => null),
+    ]);
+    setCurrentValues({
+      charityWallet: decodeAddress(cw) || '(read failed)',
+      houseWallet: decodeAddress(hw) || '(read failed)',
+      stakingContract: decodeAddress(sc) || '(read failed)',
+      minter: decodeAddress(mn) || '(read failed)',
+    });
+  };
+
+  useEffect(() => { loadCurrentValues(); }, []);
+
+  const connectWallet = async () => {
+    if (!window.ethereum) { alert('MetaMask not found. Install MetaMask to use contract settings.'); return; }
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      setConnectedWallet(accounts[0]);
+      // Ensure Base network
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x2105' }] }).catch(() => {});
+    } catch(e) { alert('Connection failed: ' + e.message); }
+  };
+
+  const disconnect = () => setConnectedWallet(null);
+
+  const sendTx = async (to, data, label) => {
+    if (!connectedWallet) { alert('Connect wallet first'); return; }
+    setPending(p => ({ ...p, [label]: true }));
+    try {
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: connectedWallet, to, data, gas: '0x30D40' }]
+      });
+      alert(`✓ ${label} transaction sent!\n\nTx: ${txHash}\n\nWaiting for confirmation on BaseScan.`);
+      setTimeout(loadCurrentValues, 5000);
+    } catch(e) {
+      alert(`Transaction failed: ${e.message}`);
+    }
+    setPending(p => ({ ...p, [label]: false }));
+  };
+
+  const settings = [
+    { key: 'charityWallet', label: 'Charity Wallet', contract: V3_ADDRESS, sel: SEL.setCharityWallet, note: 'TTSVotingV3 · onlyAdmin (deployer)' },
+    { key: 'houseWallet',   label: 'House Wallet',   contract: V3_ADDRESS, sel: SEL.setHouseWallet,   note: 'TTSVotingV3 · onlyAdmin (deployer)' },
+    { key: 'stakingContract', label: 'Staking Contract', contract: V3_ADDRESS, sel: SEL.setStaking,  note: 'TTSVotingV3 · onlyAdmin (deployer)' },
+    { key: 'minter',        label: 'NFT Minter',     contract: NFT_ADDRESS, sel: SEL.setMinter,       note: 'TTSRoundNFT · owner only' },
+  ];
+
+  return (
+    <div className="table-card" style={{marginBottom:16}}>
+      <div className="table-head">
+        <span className="table-head-title">⚙️ Contract Settings</span>
+        {connectedWallet ? (
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <span style={{fontSize:'.6rem',color:'var(--green)',fontFamily:'monospace'}}>✓ {connectedWallet.slice(0,6)}…{connectedWallet.slice(-4)}</span>
+            <button onClick={disconnect} style={{background:'none',border:'1px solid var(--border)',color:'var(--muted)',padding:'3px 10px',borderRadius:5,cursor:'pointer',fontSize:'.6rem',fontFamily:'var(--font-body)'}}>Disconnect</button>
+          </div>
+        ) : (
+          <button onClick={connectWallet}
+            style={{background:'var(--crimson)',color:'#fff',border:'none',padding:'7px 16px',borderRadius:6,cursor:'pointer',fontSize:'.65rem',fontWeight:700,fontFamily:'var(--font-body)',letterSpacing:'.06em'}}>
+            🦊 Connect Admin Wallet
+          </button>
+        )}
+      </div>
+      {!connectedWallet && (
+        <div style={{padding:'12px 20px',fontSize:'.68rem',color:'var(--muted)',background:'rgba(243,156,18,0.06)',borderBottom:'1px solid var(--border)'}}>
+          ⚠️ Connect the deployer wallet (<code style={{fontFamily:'monospace',color:'var(--gold-dim)'}}>{DEPLOYER.slice(0,10)}…</code>) via MetaMask to update on-chain settings.
+        </div>
+      )}
+      <div style={{padding:'8px 0'}}>
+        {settings.map(s => (
+          <div key={s.key} style={{padding:'14px 20px',borderBottom:'1px solid var(--border2)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,flexWrap:'wrap',gap:8}}>
+              <div>
+                <div style={{fontSize:'.7rem',fontWeight:700,color:'var(--text)',marginBottom:2}}>{s.label}</div>
+                <div style={{fontSize:'.55rem',color:'var(--muted)',letterSpacing:'.06em'}}>{s.note}</div>
+              </div>
+              <div style={{fontFamily:'monospace',fontSize:'.6rem',color:'var(--gold-dim)',background:'var(--surface2)',padding:'4px 10px',borderRadius:5,border:'1px solid var(--border2)'}}>
+                Current: {currentValues[s.key]}
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <input
+                value={inputs[s.key]}
+                onChange={e=>setInputs(i=>({...i,[s.key]:e.target.value}))}
+                placeholder="New address (0x...)"
+                style={{flex:1,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'9px 12px',color:'var(--text)',fontFamily:'monospace',fontSize:'.72rem',outline:'none'}}
+              />
+              <button
+                disabled={!connectedWallet || pending[s.key] || !inputs[s.key] || !/^0x[0-9a-fA-F]{40}$/.test(inputs[s.key])}
+                onClick={() => sendTx(s.contract, encodeAddressCall(s.sel, inputs[s.key]), s.label)}
+                style={{background:'var(--crimson)',color:'#fff',border:'none',padding:'9px 18px',borderRadius:6,cursor:'pointer',fontSize:'.65rem',fontWeight:700,fontFamily:'var(--font-body)',opacity:(!connectedWallet||pending[s.key])?0.5:1,whiteSpace:'nowrap'}}>
+                {pending[s.key] ? 'Sending…' : 'Update On-Chain'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SettingsScreen() {
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Settings</div>
         <div className="gold-rule" />
-        <div className="page-sub">Platform configuration · Nonprofit · Round management</div>
+        <div className="page-sub">Platform configuration · Nonprofit · Round management · Contract settings</div>
       </div>
       {[
         {
           title: "Weekly Round",
           fields: [
-            { label: "Round Start (UTC)", value: "Monday 00:00 UTC" },
-            { label: "Round End (UTC)", value: "Sunday 23:59 UTC" },
+            { label: "Round Start (UTC)", value: "Monday 00:00 UTC (cron: 0 0 * * 1)" },
+            { label: "Round End (UTC)", value: "Sunday 23:59 UTC (cron: 59 23 * * 0)" },
+            { label: "Round Duration", value: "604800 seconds (7 days exactly)" },
             { label: "Max Profiles Per Week", value: "50" },
             { label: "Max Submissions Per Wallet", value: "3 per week" },
             { label: "Minimum Vote Amount", value: "5 $TTS" },
@@ -1661,8 +1874,11 @@ function SettingsScreen() {
           </div>
         </div>
       ))}
+
+      <ContractSettingsSection />
+
       <div style={{ background: "rgba(52,152,219,0.08)", border: "1px solid rgba(52,152,219,0.2)", borderRadius: 10, padding: "14px 18px", fontSize: "0.63rem", color: "var(--muted)", lineHeight: 1.8 }}>
-        ℹ Settings that affect smart contract behaviour (round timing, fee %s, wallet addresses) must be updated in the Base smart contract directly. This panel is for reference only. Work with your blockchain developer to make on-chain changes.
+        ℹ Contract Settings above require the admin wallet (deployer) connected via MetaMask. All other settings are for reference only.
       </div>
     </div>
   );
@@ -1882,6 +2098,47 @@ function SystemScreen() {
             </tbody>
           </table>
         ) : <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading referral data…</div>}
+      </div>
+
+      {/* ROUND SCHEDULE */}
+      <div className="table-card" style={{ marginTop: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">📅 Round Schedule (Chainlink Automation)</div>
+          <StatusBadge status="ok" />
+        </div>
+        <table className="adm-table">
+          <thead><tr><th>Upkeep</th><th>Cron</th><th>When</th><th>Duration</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style={{fontSize:'.75rem'}}>TTS Start Round</td>
+              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 0 * * 1</code></td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every Monday 00:00 UTC</td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>604800s (7 days)</td>
+            </tr>
+            <tr>
+              <td style={{fontSize:'.75rem'}}>TTS Settle Or Rollover</td>
+              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>59 23 * * 0</code></td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every Sunday 23:59 UTC</td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
+            </tr>
+            <tr>
+              <td style={{fontSize:'.75rem'}}>TTS Midpoint Snapshot</td>
+              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 12 * * 3</code></td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every Wednesday 12:00 UTC</td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
+            </tr>
+            <tr>
+              <td style={{fontSize:'.75rem'}}>TTS Link Reserve Monitor</td>
+              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 * * * *</code></td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every hour</td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style={{padding:'10px 16px',fontSize:'.62rem',color:'var(--muted)',lineHeight:1.7}}>
+          ⚠️ TTSVotingV3 does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper must fire on Monday. If it misses, use Manual Round Control below to start manually.
+          {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify schedules at automation.chain.link →</a>
+        </div>
       </div>
 
       {/* MANUAL ROUND CONTROL */}
@@ -2688,23 +2945,24 @@ function KPIScreen() {
   useEffect(() => {
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     Promise.all([
-      sb.get('users', 'select=id,created_at'),
+      sb.get('votes', 'select=voter_wallet,tts_amount,created_at'),
       sb.get('submissions', 'select=id,created_at,status'),
-      sb.get('votes', 'select=tts_amount,created_at'),
-      sb.get('staking_positions', 'status=eq.active&select=id').catch(() => []),
+      sb.get('staking_positions', 'status=eq.active&select=id').catch(() => sb.get('stakes', 'select=id').catch(() => [])),
       getRoundInfo(),
-    ]).then(([users, subs, votes, stakers, round]) => {
-      const totalUsers = Array.isArray(users) ? users.length : 0;
-      const newThisWeek = Array.isArray(users) ? users.filter(u => u.created_at && new Date(u.created_at) > new Date(oneWeekAgo)).length : 0;
+    ]).then(([votes, subs, stakers, round]) => {
+      // Distinct voters = "total users"
+      const distinctVoters = new Set(Array.isArray(votes) ? votes.map(v => v.voter_wallet).filter(Boolean) : []);
+      const totalUsers = distinctVoters.size;
+      const newThisWeek = Array.isArray(votes) ? new Set(votes.filter(v => v.created_at && new Date(v.created_at) > new Date(oneWeekAgo)).map(v => v.voter_wallet).filter(Boolean)).size : 0;
       const totalSubs = Array.isArray(subs) ? subs.length : 0;
       const approvedSubs = Array.isArray(subs) ? subs.filter(s => s.status === 'approved').length : 0;
       const totalPool = Array.isArray(votes) ? votes.reduce((s, v) => s + (Number(v.tts_amount) || 0), 0) : 0;
       const roundId = round?.roundId || 1;
       const avgPool = roundId > 0 ? Math.round(totalPool / roundId) : 0;
-      const stakersCount = Array.isArray(stakers) ? stakers.length : '—';
+      const stakersCount = Array.isArray(stakers) ? stakers.length : 0;
       setData({
         rounds: roundId.toLocaleString(),
-        totalVotes: Array.isArray(votes) ? votes.length.toLocaleString() : '—',
+        totalVotes: Array.isArray(votes) ? votes.length.toLocaleString() : '0',
         totalPool: Math.round(totalPool).toLocaleString(),
         avgPool: avgPool.toLocaleString(),
         totalUsers: totalUsers.toLocaleString(),

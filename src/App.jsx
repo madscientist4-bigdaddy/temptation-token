@@ -693,6 +693,13 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       const voteTx = await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
       await waitForReceipt(voteTx)
 
+      // Write vote to Supabase (non-blocking — enables dashboard metrics)
+      fetch(`${SUPABASE_URL}/rest/v1/votes`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ round_id: Number(roundId), profile_id: photo.profileId, voter_wallet: address, tts_amount: a, tx_hash: voteTx, created_at: new Date().toISOString() })
+      }).catch(() => {})
+
       // Update UI
       setBalance(b => b - a)
       setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, votes: p.votes + a, myVotes: p.myVotes + a } : p))
