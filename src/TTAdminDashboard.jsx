@@ -2934,6 +2934,8 @@ function KPIScreen() {
     rounds: '—', totalVotes: '—', totalPool: '—', avgPool: '—',
     totalUsers: '—', newThisWeek: '—', totalSubs: '—', approvedSubs: '—',
     houseEarned: '—', charityDonated: '—', stakersCount: '—',
+    signupBonusCount: '—', signupBonusTTS: '—',
+    voteMatchCount: '—', voteMatchTTS: '—',
   });
   const [loading, setLoading] = useState(true);
 
@@ -2944,7 +2946,9 @@ function KPIScreen() {
       sb.get('submissions', 'select=id,created_at,status'),
       sb.get('staking_positions', 'status=eq.active&select=id').catch(() => sb.get('stakes', 'select=id').catch(() => [])),
       getRoundInfo(),
-    ]).then(([votes, subs, stakers, round]) => {
+      sb.get('bonus_claims', 'bonus_type=eq.signup&select=tts_amount').catch(() => []),
+      sb.get('bonus_claims', 'bonus_type=eq.vote_match&select=tts_amount').catch(() => []),
+    ]).then(([votes, subs, stakers, round, signupBonuses, voteMatches]) => {
       // Distinct voters = "total users"
       const distinctVoters = new Set(Array.isArray(votes) ? votes.map(v => v.voter_wallet).filter(Boolean) : []);
       const totalUsers = distinctVoters.size;
@@ -2955,6 +2959,8 @@ function KPIScreen() {
       const roundId = round?.roundId || 1;
       const avgPool = roundId > 0 ? Math.round(totalPool / roundId) : 0;
       const stakersCount = Array.isArray(stakers) ? stakers.length : 0;
+      const signupBonusTTS = Array.isArray(signupBonuses) ? Math.round(signupBonuses.reduce((s, b) => s + (Number(b.tts_amount) || 0), 0)) : 0;
+      const voteMatchTTS  = Array.isArray(voteMatches)  ? Math.round(voteMatches.reduce((s, b)  => s + (Number(b.tts_amount) || 0), 0)) : 0;
       setData({
         rounds: roundId.toLocaleString(),
         totalVotes: Array.isArray(votes) ? votes.length.toLocaleString() : '0',
@@ -2967,6 +2973,10 @@ function KPIScreen() {
         houseEarned: Math.round(totalPool * 0.1).toLocaleString(),
         charityDonated: Math.round(totalPool * 0.1).toLocaleString(),
         stakersCount: stakersCount.toString(),
+        signupBonusCount: Array.isArray(signupBonuses) ? signupBonuses.length.toLocaleString() : '0',
+        signupBonusTTS: signupBonusTTS.toLocaleString(),
+        voteMatchCount: Array.isArray(voteMatches) ? voteMatches.length.toLocaleString() : '0',
+        voteMatchTTS: voteMatchTTS.toLocaleString(),
       });
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -3010,6 +3020,12 @@ function KPIScreen() {
       <Section title="Financial (est.)" emoji="💰" cells={[
         ['House Revenue', data.houseEarned, '$TTS (10% of all pools)'],
         ['Charity Donated', data.charityDonated, '$TTS to Polaris Project'],
+      ]} />
+      <Section title="Bonus System" emoji="🎁" cells={[
+        ['Signup Bonuses Sent', data.signupBonusCount, 'new user welcome bonuses'],
+        ['Signup Bonus TTS', data.signupBonusTTS, '$TTS distributed'],
+        ['Vote Matches Sent', data.voteMatchCount, 'first-vote matches'],
+        ['Vote Match TTS', data.voteMatchTTS, '$TTS matched'],
       ]} />
     </div>
   );

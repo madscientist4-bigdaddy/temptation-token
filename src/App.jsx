@@ -700,6 +700,18 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         body: JSON.stringify({ round_id: Number(roundId), voter_wallet: address, tts_amount: a, tx_hash: voteTx, created_at: new Date().toISOString() })
       }).catch(() => {})
 
+      // First-vote match bonus (fire-and-forget — no UI impact if it fails)
+      fetch('/api/vote-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: address, voteAmount: a, txHash: voteTx }),
+      }).then(r => r.json()).then(d => {
+        if (d.success && d.matchAmount > 0) {
+          showToast(`🎁 First-vote match: +${d.matchAmount.toLocaleString()} $TTS sent!`, 's')
+          setBalance(b => b + d.matchAmount)
+        }
+      }).catch(() => {})
+
       // Update UI
       setBalance(b => b - a)
       setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, votes: p.votes + a, myVotes: p.myVotes + a } : p))
@@ -940,16 +952,80 @@ function LeaderboardScreen() {
 }
 
 // ── NFT SCREEN ────────────────────────────────────────────────────────────────
-function NFTScreen() {
+const NFT_ABI_READ = parseAbi([
+  'function balanceOf(address owner) view returns (uint256)',
+  'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
+  'function tokenURI(uint256 tokenId) view returns (string)',
+])
+
+function NFTScreen({ address, connected }) {
+  const [nfts, setNfts] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!connected || !address) return
+    setLoading(true)
+    ;(async () => {
+      try {
+        const bal = await readContract(NFT_ADDRESS, NFT_ABI_READ, 'balanceOf', [address])
+        const count = Number(bal)
+        if (!count) { setNfts([]); return }
+        const ids = await Promise.all(
+          Array.from({ length: count }, (_, i) =>
+            readContract(NFT_ADDRESS, NFT_ABI_READ, 'tokenOfOwnerByIndex', [address, i])
+          )
+        )
+        const metas = await Promise.all(ids.map(async id => {
+          try {
+            const uri = await readContract(NFT_ADDRESS, NFT_ABI_READ, 'tokenURI', [id])
+            let meta = {}
+            if (uri && uri.startsWith('data:application/json;base64,')) {
+              meta = JSON.parse(atob(uri.slice(29)))
+            } else if (uri && uri.startsWith('{')) {
+              meta = JSON.parse(uri)
+            }
+            return { id: Number(id), name: meta.name || `Round #${id}`, image: meta.image || null, description: meta.description || '' }
+          } catch { return { id: Number(id), name: `Trophy #${id}`, image: null, description: '' } }
+        }))
+        setNfts(metas)
+      } catch (e) {
+        console.error('NFT fetch error:', e)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [address, connected])
+
   return (
     <div>
       <div className="shead"><h2>NFT Trophies</h2><div className="grule" /><p>Weekly round winners earn exclusive on-chain NFTs</p></div>
-      <div className="nft-empty">
-        <span className="nft-ei">💎</span>
-        <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>No NFTs yet</div>
-        Win a weekly round to receive your exclusive NFT trophy.<br />
-        NFTs are minted on Base and held permanently in your wallet.
-      </div>
+      {!connected ? (
+        <div className="nft-empty"><span className="nft-ei">💎</span><div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>Connect wallet to view trophies</div></div>
+      ) : loading ? (
+        <div className="nft-empty"><span className="nft-ei">⏳</span><div style={{ color:'var(--muted)' }}>Loading your trophies...</div></div>
+      ) : nfts.length === 0 ? (
+        <div className="nft-empty">
+          <span className="nft-ei">💎</span>
+          <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>No NFTs yet</div>
+          Win a weekly round to receive your exclusive NFT trophy.<br />
+          NFTs are minted on Base and held permanently in your wallet.
+        </div>
+      ) : (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:16, margin:'0 16px 24px' }}>
+          {nfts.map(nft => (
+            <div key={nft.id} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', textAlign:'center' }}>
+              {nft.image
+                ? <img src={nft.image} alt={nft.name} style={{ width:'100%', aspectRatio:'1', objectFit:'cover' }} />
+                : <div style={{ width:'100%', aspectRatio:'1', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'3rem', background:'var(--bg)' }}>🏆</div>
+              }
+              <div style={{ padding:'10px 8px' }}>
+                <div style={{ fontSize:'.8rem', fontWeight:700, color:'var(--text)', marginBottom:4 }}>{nft.name}</div>
+                {nft.description && <div style={{ fontSize:'.7rem', color:'var(--muted)', lineHeight:1.4 }}>{nft.description}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ margin:'0 16px 24px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, padding:20 }}>
         <div style={{ fontSize:'.72rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--gold)', fontWeight:700, marginBottom:12 }}>How NFT Trophies Work</div>
         {[
@@ -1498,6 +1574,18 @@ export default function App() {
     readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address])
       .then(raw => { if (raw != null) setBalance(Math.floor(Number(raw) / 1e18)) })
       .finally(() => setBalanceLoading(false))
+
+    // Signup bonus — fire once per wallet, silently fails if already claimed or not funded
+    fetch('/api/signup-bonus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletAddress: address }),
+    }).then(r => r.json()).then(d => {
+      if (d.success && d.amount > 0) {
+        showToast(`🎉 Welcome bonus: +${Math.floor(d.amount).toLocaleString()} $TTS sent!`, 's')
+        setBalance(b => b + Math.floor(d.amount))
+      }
+    }).catch(() => {})
   }, [isConnected, address])
 
   useEffect(() => {
@@ -1541,7 +1629,7 @@ export default function App() {
       <div className="main">
         {tab==='play'        && <PlayScreen {...sp} />}
         {tab==='leaderboard' && <LeaderboardScreen />}
-        {tab==='nfts'        && <NFTScreen />}
+        {tab==='nfts'        && <NFTScreen address={address} connected={isConnected} />}
         {tab==='buysell'     && <BuySellScreen {...sp} />}
         {tab==='submit'      && <SubmitScreen {...sp} />}
         {tab==='refer'       && <ReferScreen {...sp} />}

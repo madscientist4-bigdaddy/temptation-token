@@ -46,6 +46,10 @@ interface IVRFCoordinatorV2Plus {
         external returns (uint256 requestId);
 }
 
+interface ITTSRoundNFT {
+    function mint(address to, uint256 roundId, string calldata winnerProfile, uint256 voteCount) external;
+}
+
 // -----------------------------------------------------------------------------
 // Ownable (single-step — TTSKeeper2 uses single-step transferOwnership)
 // -----------------------------------------------------------------------------
@@ -143,6 +147,7 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
     IStaking public stakingContract;
     address  public charityWallet;
     address  public houseWallet;
+    address  public nftContract;
 
     // VRF
     IVRFCoordinatorV2Plus private immutable _coordinator;
@@ -374,6 +379,10 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
         ttsToken.transfer(charityWallet, charityShare);
         ttsToken.transfer(houseWallet, houseShare);
 
+        if (nftContract != address(0)) {
+            try ITTSRoundNFT(nftContract).mint(winner.wallet, roundId, winnerId, pool / 1e18) {} catch {}
+        }
+
         uint256 remaining = ttsToken.balanceOf(address(this));
         if (remaining > 0) {
             ttsToken.transfer(0x000000000000000000000000000000000000dEaD, remaining);
@@ -471,6 +480,10 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
 
     function setStakingContract(address _staking) external onlyAdmin {
         stakingContract = IStaking(_staking);
+    }
+
+    function setNFTContract(address _nft) external onlyAdmin {
+        nftContract = _nft;
     }
 
     // -------------------------------------------------------------------------
