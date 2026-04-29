@@ -30,6 +30,8 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
    - `/api/content-generator.js` — Monday 8am UTC cron: generates weekly content via Claude Haiku, saves to `scheduled_posts` table
    - `/api/referral-credit.js` — Credits referrer wallet on new user signup
    - `/api/community-stats.js` — Returns Telegram community member count via bot API
+   - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends $5 USD of TTS (min 500, max 50,000) from Marketing wallet on first connect. Live Uniswap price. 20/day rate limit. Records in `bonus_claims` table.
+   - `/api/vote-match.js` — POST `{ walletAddress, voteAmount, txHash }`: matches first-ever vote up to 1,000 TTS from Marketing wallet. Records in `bonus_claims` table.
 
 3. **Python Telegram bot** (`tts_bot.py`) — Runs as a separate worker (Procfile). Uses SQLite locally and integrates with the same Supabase instance.
 
@@ -70,6 +72,8 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 | Gnosis Safe (2/2 multisig) | `0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86` |
 | Deployer wallet | `0xb1e991bf617459b58964eef7756b350e675c53b5` |
 | Uniswap V2 Pool | `0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68` |
+| TTSRoundNFT | `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` |
+| Marketing Wallet | `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` |
 
 The v2 implementation is deployed but not yet active — the UUPS upgrade must go through the Gnosis Safe multisig.
 
@@ -102,7 +106,17 @@ Always `git add` + commit + push after every change.
 - Community: `@TTSCommunityChat`
 - VIP Vault invite: `https://t.me/+F2lyVRf92n4xMDRh`
 
-## Completed (April 26, 2026)
+## Completed (April 28, 2026)
+
+- ✅ **TTSVotingV3b** deployed at `0xEC339baD1900447833C9fe905C4A768D1f0cA912` — keeper-compatible (adds `minProfilesPerRound()`, `getProfiles()`, `performUpkeep()`, `checkUpkeep()`, `getProfileCount()` wrappers). NFT minting hook via `setNFTContract(address)` (onlyAdmin). Round 1 started April 28.
+
+- ✅ **Bonus system** — `api/signup-bonus.js` + `api/vote-match.js`. Welcome bonus fires on wallet connect; first-vote match fires after vote confirms. Both record to `bonus_claims` table. Both require `MARKETING_WALLET_PRIVATE_KEY` in Vercel env (gracefully disabled if missing).
+
+- ✅ **Live NFT display** — NFTScreen in App.jsx now fetches `balanceOf → tokenOfOwnerByIndex → tokenURI → base64 decode` for connected wallet. Grid display with image + name + description.
+
+- ✅ **KPI Bonus Section** — Admin dashboard KPI tab now shows signup bonus count/TTS and vote-match count/TTS from `bonus_claims` table.
+
+- ✅ **Admin dashboard audit** — 7 bugs fixed (votes.profile_id, users columns, staking tts_amount, referrals table, LINK balance on-chain fetch, dashboard zeros).
 
 - ✅ **Admin dashboard full overhaul** — 15-item CENTCOM pass:
   - Command Center with live round countdown + health traffic lights
@@ -132,20 +146,22 @@ Always `git add` + commit + push after every change.
 ## Pending items (priority order)
 
 1. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat Telegram channels (required for Post Now and scheduler to work)
-2. **Verify TTSVotingV3 on BaseScan** via Remix (Foundry bytecode mismatch — must use Remix IDE)
-3. **Deploy TTS v2 M1 fix** upgrade through Gnosis Safe (2/2 multisig)
-4. **Wire dollar-value signup bonus** from live Uniswap price (POOL: 0x77Fe188...)
-5. **Post-vote confetti animation** and position feedback in App.jsx
-6. **CoinGecko resubmission** — check current status
-7. **Blockaid** — submitted false positive reports; check portal for resolution status
-8. **X social media credentials** — set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env to enable X posting
+2. **Run `bonus_claims` SQL** in Supabase (see `system_test.md` for exact SQL — creates table + unique index)
+3. **Add MARKETING_WALLET_PRIVATE_KEY** to Vercel env — enables signup bonus + vote-match APIs
+4. **Run `setNFTContract`** on TTSVotingV3b: `cast send 0xEC339baD1900447833C9fe905C4A768D1f0cA912 "setNFTContract(address)" "0x0768e862D3AB14d85213BfeF8f1D012E77721da2" --rpc-url https://mainnet.base.org --interactive`
+5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — must use Remix IDE with same compiler settings)
+6. **Deploy TTS v2 M1 fix** upgrade through Gnosis Safe (2/2 multisig)
+7. **CoinGecko resubmission** — check current status
+8. **Blockaid** — submitted false positive reports; check portal for resolution status
+9. **X social media credentials** — set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env to enable X posting
 
 ## Next session: start here
 
-1. Check if @TTSBroadcastBot is added to channels (test Post Now button in Social Media tab)
-2. Check if Round 1 has settled (round end ~April 28) — if not, verify TTSKeeper2 automation is working
-3. If settled: start Round 2 via keeper.manualExecute(1) if automation missed it
-4. Check Blockaid portal for false positive resolution
+1. Run `bonus_claims` SQL in Supabase (exact SQL in `system_test.md`)
+2. Add `MARKETING_WALLET_PRIVATE_KEY` to Vercel env
+3. Run `setNFTContract` cast send command (see item 4 above)
+4. Add @TTSBroadcastBot as channel admin → test Post Now
+5. Check if V3b Round 1 has settled (~April 28 end) — if not, verify TTSKeeper2 automation via Chainlink dashboard
 
 ## TTSVotingV3 Deployment (✅ COMPLETE)
 
