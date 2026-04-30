@@ -77,6 +77,17 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 The v2 implementation is deployed but not yet active — the UUPS upgrade must go through the Gnosis Safe multisig.
 
+## Prize Distribution (canonical — hardcoded in fulfillRandomWords)
+
+| Recipient | Share | Who |
+|-----------|-------|-----|
+| Top Voter | 40% | Wallet that voted the most on the winning profile |
+| Winning Profile | 40% | The profile wallet that received the most votes |
+| Polaris Project | 10% | Charity wallet (anti-trafficking nonprofit) |
+| Blockchain Entertainment LLC | 10% | House wallet |
+
+**This is the only correct split.** Any website copy, social media templates, admin dashboard text, chatbot prompts, or generated content must use these exact percentages. The previously circulated 60/20/10 split was incorrect and has been removed.
+
 ## Infrastructure
 
 | Service | Project/ID |
