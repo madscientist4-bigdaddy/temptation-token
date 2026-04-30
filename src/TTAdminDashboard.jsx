@@ -2840,6 +2840,18 @@ function CommandScreen({ setActive }) {
 // ─── DAILY PRIORITIES ─────────────────────────────────────────────────────────
 const PRIORITY_GROUPS = [
   {
+    key: 'action', title: 'Action Required', emoji: '🚨', reset: 'never',
+    tasks: [
+      {
+        id: 'a1',
+        label: '🚀 Deploy NFT-enabled voting contract — run forge create in terminal, paste Deployed to: address into Claude Code',
+        cat: 'Deploy',
+        priority: 'high',
+        showFrom: '2026-05-04',
+      },
+    ]
+  },
+  {
     key: 'daily', title: "Today's Tasks", emoji: '☀️', reset: 'daily',
     tasks: [
       { id: 'd1', label: 'Check round health (System Health tab)', cat: 'Ops' },
@@ -2882,6 +2894,7 @@ function PrioritiesScreen() {
         g.tasks.forEach(t => {
           if (g.reset === 'daily') out[t.id] = saved._date === today ? (saved[t.id] || false) : false;
           else if (g.reset === 'weekly') out[t.id] = saved._week === thisWeek ? (saved[t.id] || false) : false;
+          else if (g.reset === 'never') out[t.id] = saved[t.id] || false; // persists until manually checked
           else out[t.id] = saved._month === thisMonth ? (saved[t.id] || false) : false;
         });
       });
@@ -2904,20 +2917,28 @@ function PrioritiesScreen() {
         <div className="page-sub">Daily tasks reset each morning · weekly/monthly tasks persist · click to check off</div>
       </div>
       {PRIORITY_GROUPS.map(g => {
-        const done = g.tasks.filter(t => checks[t.id]).length;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const visibleTasks = g.tasks.filter(t => !t.showFrom || todayStr >= t.showFrom);
+        if (visibleTasks.length === 0) return null;
+        const done = visibleTasks.filter(t => checks[t.id]).length;
+        const hasHighPriority = visibleTasks.some(t => t.priority === 'high' && !checks[t.id]);
         return (
-          <div key={g.key} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase' }}>{g.emoji} {g.title}</span>
-              <span style={{ fontSize: '.6rem', color: done === g.tasks.length ? 'var(--green)' : 'var(--muted)' }}>{done}/{g.tasks.length} done</span>
+          <div key={g.key} style={{ background: 'var(--surface)', border: `1px solid ${hasHighPriority ? 'var(--rose)' : 'var(--border)'}`, borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${hasHighPriority ? 'var(--rose)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: hasHighPriority ? 'var(--red-dim)' : 'transparent' }}>
+              <span style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: hasHighPriority ? 'var(--rose)' : 'inherit' }}>{g.emoji} {g.title}</span>
+              <span style={{ fontSize: '.6rem', color: done === visibleTasks.length ? 'var(--green)' : hasHighPriority ? 'var(--rose)' : 'var(--muted)' }}>{done}/{visibleTasks.length} done</span>
             </div>
-            {g.tasks.map(t => (
-              <div key={t.id} className={`pri-task-row${checks[t.id] ? ' done' : ''}`} onClick={() => toggle(t.id)}>
-                <div className={`pri-check${checks[t.id] ? ' checked' : ''}`}>
+            {visibleTasks.map(t => (
+              <div key={t.id} className={`pri-task-row${checks[t.id] ? ' done' : ''}`} onClick={() => toggle(t.id)}
+                   style={t.priority === 'high' && !checks[t.id] ? { background: 'rgba(239,68,68,0.05)' } : {}}>
+                <div className={`pri-check${checks[t.id] ? ' checked' : ''}`}
+                     style={t.priority === 'high' && !checks[t.id] ? { borderColor: 'var(--rose)' } : {}}>
                   {checks[t.id] && <span style={{ color: '#fff', fontSize: '.7rem', lineHeight: 1 }}>✓</span>}
                 </div>
-                <span className={`pri-task-text${checks[t.id] ? ' done' : ''}`}>{t.label}</span>
+                <span className={`pri-task-text${checks[t.id] ? ' done' : ''}`}
+                      style={t.priority === 'high' && !checks[t.id] ? { color: 'var(--rose)', fontWeight: 600 } : {}}>{t.label}</span>
                 {t.due && <span style={{ fontSize: '.58rem', background: 'var(--red-dim)', color: 'var(--rose)', padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>{t.due}</span>}
+                {t.priority === 'high' && !checks[t.id] && <span style={{ fontSize: '.58rem', background: 'var(--rose)', color: '#fff', padding: '2px 8px', borderRadius: 4, flexShrink: 0, fontWeight: 700 }}>HIGH PRIORITY</span>}
                 <span style={{ fontSize: '.55rem', color: 'var(--muted)', background: 'var(--surface2)', padding: '2px 7px', borderRadius: 4, flexShrink: 0 }}>{t.cat}</span>
               </div>
             ))}

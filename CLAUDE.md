@@ -156,10 +156,10 @@ Always `git add` + commit + push after every change.
 
 ## Pending items (priority order)
 
-1. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat Telegram channels (required for Post Now and scheduler to work)
-2. **Run `bonus_claims` SQL** in Supabase (see `system_test.md` for exact SQL — creates table + unique index)
-3. **Add MARKETING_WALLET_PRIVATE_KEY** to Vercel env — enables signup bonus + vote-match APIs
-4. **Run `setNFTContract`** on TTSVotingV3b: `cast send 0xEC339baD1900447833C9fe905C4A768D1f0cA912 "setNFTContract(address)" "0x0768e862D3AB14d85213BfeF8f1D012E77721da2" --rpc-url https://mainnet.base.org --interactive`
+1. **🚀 Deploy NFT-enabled V3b** — `setNFTContract` reverts because the DEPLOYED contract at `0xEC339...` predates the NFT minting code. Must redeploy after Round 1 settles (May 5 2026 21:10 UTC). Run `forge create TTSVotingV3b` with same constructor args, then run the 6-step keeper handoff (see TTSVotingV3b Deployment section below). Confirm Round 1 settled first: check `0xEC339baD1900447833C9fe905C4A768D1f0cA912#events` on BaseScan.
+2. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat Telegram channels (required for Post Now and scheduler to work)
+3. **Run `bonus_claims` SQL** in Supabase (see `system_test.md` for exact SQL — creates table + unique index)
+4. **Add MARKETING_WALLET_PRIVATE_KEY** to Vercel env — enables signup bonus + vote-match APIs
 5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — must use Remix IDE with same compiler settings)
 6. **Deploy TTS v2 M1 fix** upgrade through Gnosis Safe (2/2 multisig)
 7. **CoinGecko resubmission** — check current status
