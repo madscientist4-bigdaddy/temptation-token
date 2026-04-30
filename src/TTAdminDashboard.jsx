@@ -1828,8 +1828,9 @@ function SettingsScreen() {
         {
           title: "Weekly Round",
           fields: [
-            { label: "Round Start (UTC)", value: "Monday 00:00 UTC (cron: 0 0 * * 1)" },
-            { label: "Round End (UTC)", value: "Sunday 23:59 UTC (cron: 59 23 * * 0)" },
+            { label: "Round Schedule", value: "Monday 12:00am UTC → Sunday 11:59pm UTC" },
+            { label: "Round Start Keeper", value: "Monday 00:00 UTC (cron: 0 0 * * 1)" },
+            { label: "Round End Keeper", value: "Sunday 23:59 UTC (cron: 59 23 * * 0)" },
             { label: "Round Duration", value: "604800 seconds (7 days exactly)" },
             { label: "Max Profiles Per Week", value: "50" },
             { label: "Max Submissions Per Wallet", value: "3 per week" },
@@ -2107,13 +2108,13 @@ function SystemScreen() {
             <tr>
               <td style={{fontSize:'.75rem'}}>TTS Start Round</td>
               <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 0 * * 1</code></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every Monday 00:00 UTC</td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Monday 12:00am UTC (start of round)</td>
               <td style={{fontSize:'.72rem',color:'var(--muted)'}}>604800s (7 days)</td>
             </tr>
             <tr>
               <td style={{fontSize:'.75rem'}}>TTS Settle Or Rollover</td>
               <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>59 23 * * 0</code></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every Sunday 23:59 UTC</td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Sunday 11:59pm UTC (end of round)</td>
               <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
             </tr>
             <tr>
@@ -2131,7 +2132,7 @@ function SystemScreen() {
           </tbody>
         </table>
         <div style={{padding:'10px 16px',fontSize:'.62rem',color:'var(--muted)',lineHeight:1.7}}>
-          ⚠️ TTSVotingV3 does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper must fire on Monday. If it misses, use Manual Round Control below to start manually.
+          ⚠️ TTSVotingV3b does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper fires Monday 12:00am UTC. If it misses, use Manual Round Control below to start manually.
           {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify schedules at automation.chain.link →</a>
         </div>
       </div>
@@ -2291,7 +2292,7 @@ function ContentCalendarScreen({ showToast }) {
       <div className="page-header">
         <div className="page-title">Content Calendar</div>
         <div className="gold-rule" />
-        <div className="page-sub">Approve posts before their scheduled time · Auto-generated every Monday 8am UTC</div>
+        <div className="page-sub">Approve posts before their scheduled time · Posts fire at 2pm EST (19:00 UTC) daily · Auto-generated every Monday</div>
       </div>
 
       <div className="cal-toolbar">
@@ -2866,7 +2867,7 @@ const PRIORITY_GROUPS = [
       { id: 'w1', label: 'Generate + approve content calendar posts', cat: 'Content' },
       { id: 'w2', label: 'Review staking APR obligations', cat: 'Finance' },
       { id: 'w3', label: 'Export vote data for weekly report', cat: 'Finance' },
-      { id: 'w4', label: 'Confirm round will settle Sunday 23:59 UTC', cat: 'Ops' },
+      { id: 'w4', label: 'Confirm round settled Monday 00:05 UTC and new round started', cat: 'Ops' },
     ]
   },
   {
@@ -3057,7 +3058,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Start Checklist', emoji: '🚀',
     steps: [
-      'TTSKeeper2 fires automatically at Monday 00:00 UTC via Chainlink Automation — verify on BaseScan',
+      'TTSKeeper2 fires automatically at Monday 12:00am UTC (00:00 UTC) via Chainlink Automation — verify on BaseScan',
       'If automation fails: BaseScan → TTSKeeper2 (0xB17b…C61A48) → Write → manualExecute(1)',
       'Approve pending profiles: Photo Review tab → Approve (updates Supabase; on-chain approval requires batchApproveProfiles via BaseScan)',
       'Generate + approve content calendar: Content Calendar tab → Generate This Week → approve posts',
@@ -3067,7 +3068,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Settlement', emoji: '🏆',
     steps: [
-      'Keeper fires automatically at round end (Sunday 23:59 UTC) — calls settleRound → requests VRF',
+      'Keeper fires automatically at round end (Sunday 11:59pm UTC / 23:59 UTC) — calls settleRound → requests VRF',
       'Chainlink VRF V2.5 fulfills within ~30s (3 confirmations) — winner selected proportionally to tickets',
       'Payout split: 40% winner profile · 40% top voter · 10% house · 10% charity (Polaris Project)',
       'If keeper misses: BaseScan → TTSKeeper2 → Write → manualExecute(3)',

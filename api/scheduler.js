@@ -211,9 +211,9 @@ export default async function handler(req, res) {
     results.fired_error = e.message
   }
 
-  // ── JOB 2: Daily 10am round status update to Telegram ────────────────────
+  // ── JOB 2: Daily 2pm EST (19:00 UTC) round status update to Telegram ────────
 
-  if (nowHour === 10) {
+  if (nowHour === 19) {
     const broadcastToken = process.env.BROADCAST_BOT_TOKEN
     if (broadcastToken) {
       try {

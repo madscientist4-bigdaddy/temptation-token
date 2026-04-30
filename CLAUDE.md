@@ -77,6 +77,19 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 The v2 implementation is deployed but not yet active — the UUPS upgrade must go through the Gnosis Safe multisig.
 
+## Round Schedule (canonical)
+
+| Event | Time |
+|-------|------|
+| Round starts | Monday 12:00am UTC (00:00 UTC) — TTS Start Round keeper fires |
+| Round ends | Sunday 11:59pm UTC (23:59 UTC) — TTS Settle Or Rollover keeper fires |
+| VRF settlement | Within minutes of round end — winner paid automatically on-chain |
+| New round confirmed | Check Monday 00:05 UTC that settlement + new round both occurred |
+| Social posts fire | 2pm EST daily (19:00 UTC) — Vercel scheduler cron `0 19 * * *` |
+| Content generated | Monday 8am UTC — content-generator cron `0 8 * * 1` |
+
+**Any UI, dashboard, or documentation showing round timing must use these exact values.**
+
 ## Prize Distribution (canonical — hardcoded in fulfillRandomWords)
 
 | Recipient | Share | Who |

@@ -189,7 +189,7 @@ Generate a full week of social media content. Return ONLY a raw JSON object (no 
   // --- Build rows ---
   const DAYS        = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
   const POST_TYPES  = ['round_start','leaderboard','midpoint','spotlight','weekend_push','community','round_end']
-  const HOURS       = [10, 14, 12, 14, 16, 12, 18]
+  const HOURS       = [19, 19, 19, 19, 19, 19, 19] // 2pm EST (19:00 UTC) daily
   const IG_DAYS     = new Set(['monday','wednesday','sunday'])
 
   const rows = []
@@ -216,7 +216,7 @@ Generate a full week of social media content. Return ONLY a raw JSON object (no 
       const captions = [ig.caption_1, ig.caption_2, ig.caption_3].filter(Boolean)
       rows.push({
         platform: 'instagram', post_type: POST_TYPES[i], day_of_week: i,
-        scheduled_at: toISO(weekStart, i, 12),
+        scheduled_at: toISO(weekStart, i, 19),
         content: captions[0] || '',
         instagram_captions: captions,
         selected_caption: 0,
