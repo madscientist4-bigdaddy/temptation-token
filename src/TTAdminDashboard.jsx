@@ -1470,10 +1470,11 @@ function PayoutsScreen({ showToast }) {
 
 const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc';
 const STAKING_TIERS = [
-  { name: 'Bronze', min: 0,       max: 9999,    apr: '8%',  boost: '1.1x' },
-  { name: 'Silver', min: 10000,   max: 49999,   apr: '12%', boost: '1.25x' },
-  { name: 'Gold',   min: 50000,   max: 199999,  apr: '18%', boost: '1.5x' },
-  { name: 'Platinum', min: 200000, max: Infinity, apr: '25%', boost: '2.0x' },
+  { name: 'Bronze',  minUSD: 50,   apr: '8%',  boost: '1.1x' },
+  { name: 'Silver',  minUSD: 100,  apr: '12%', boost: '1.25x' },
+  { name: 'Gold',    minUSD: 250,  apr: '18%', boost: '1.5x' },
+  { name: 'Diamond', minUSD: 1000, apr: '32%', boost: '2x' },
+  { name: 'VIP',     minUSD: 5000, apr: '45%', boost: '3x' },
 ];
 
 function StakingScreen() {
@@ -1497,7 +1498,7 @@ function StakingScreen() {
       if (Array.isArray(d) && d.length > 0) {
         setStakers(d.map(s => {
           const amt = Math.round(Number(s.tts_amount || 0));
-          const tier = STAKING_TIERS.find(t => amt >= t.min && amt <= t.max) || STAKING_TIERS[0];
+          const tier = STAKING_TIERS.find(t => t.name === s.tier) || STAKING_TIERS[0];
           return {
             handle: s.wallet_address ? s.wallet_address.slice(0,6)+'...'+s.wallet_address.slice(-4) : 'Unknown',
             wallet: s.wallet_address || '—',
@@ -1539,12 +1540,12 @@ function StakingScreen() {
       <div className="table-card" style={{marginBottom:20}}>
         <div className="table-head"><span className="table-head-title">⭐ Tier Benefits</span></div>
         <table className="adm-table">
-          <thead><tr><th>Tier</th><th>Min Stake</th><th>APR</th><th>Vote Boost</th></tr></thead>
+          <thead><tr><th>Tier</th><th>Min Stake (USD)</th><th>APR</th><th>Vote Boost</th></tr></thead>
           <tbody>
             {STAKING_TIERS.map(t => (
               <tr key={t.name}>
                 <td><span className="badge" style={{background:'rgba(212,175,55,0.1)',color:'var(--gold)',border:'1px solid rgba(212,175,55,0.25)'}}>{t.name}</span></td>
-                <td style={{fontFamily:'var(--font-display)',color:'var(--gold-light)'}}>{t.min.toLocaleString()} $TTS</td>
+                <td style={{fontFamily:'var(--font-display)',color:'var(--gold-light)'}}>${t.minUSD.toLocaleString()}+</td>
                 <td style={{color:'var(--green)',fontWeight:700}}>{t.apr}</td>
                 <td style={{color:'var(--rose)',fontWeight:700}}>{t.boost}</td>
               </tr>
@@ -3095,6 +3096,17 @@ const OPS_MANUAL = [
       'Chainlink Automation Registry: 0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743 · 4 upkeeps',
       'VRF Sub ID: 58222014484560539249027457203866883376041731162442592604288474822166186263722',
       'Gnosis Safe: 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86 · 2/2 multisig (deployer + partner)',
+    ]
+  },
+  {
+    title: 'Staking Reference', emoji: '💎',
+    steps: [
+      'Canonical tiers (locked April 29 2026): Bronze $50+ 8% APR 1.1x | Silver $100+ 12% 1.25x | Gold $250+ 18% 1.5x | Diamond $1000+ 32% 2x | VIP $5000+ 45% 3x',
+      'TTS equivalent = USD threshold ÷ current Uniswap price — shown live in app',
+      'Tier multipliers are hardcoded in staking contract — changing tiers requires redeployment',
+      'Staking contract: 0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc (BaseScan)',
+      'APR is paid from protocol revenue; obligations scale with total staked — monitor in KPI dashboard',
+      'To update tiers: redeploy staking contract → update STAKING_ADDRESS in App.jsx + TTAdminDashboard.jsx → update CLAUDE.md',
     ]
   },
   {

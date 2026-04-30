@@ -90,6 +90,18 @@ The v2 implementation is deployed but not yet active — the UUPS upgrade must g
 
 **Any UI, dashboard, or documentation showing round timing must use these exact values.**
 
+## Staking Tiers (canonical — locked April 29 2026)
+
+| Tier | Min Stake (USD) | APR | Vote Boost |
+|------|----------------|-----|-----------|
+| Bronze | $50+ | 8% | 1.1x |
+| Silver | $100+ | 12% | 1.25x |
+| Gold | $250+ | 18% | 1.5x |
+| Diamond | $1,000+ | 32% | 2x |
+| VIP | $5,000+ | 45% | 3x |
+
+**Display both USD threshold and live TTS equivalent in all UI.** TTS equivalent = USD threshold ÷ current Uniswap price (fetch live from pool). Tier multipliers are hardcoded in the staking contract — changing tiers requires redeployment. Do not drift from this table. Any surface showing different values is wrong and must be corrected. "Platinum" tier no longer exists — remove it wherever found.
+
 ## Prize Distribution (canonical — hardcoded in fulfillRandomWords)
 
 | Recipient | Share | Who |

@@ -19,7 +19,7 @@ CONTRACT ADDRESSES (Base Mainnet):
 - NFT: 0x8b1EFa595a9c6b670078701069EADC5ae857091f
 
 SUBMISSION TIERS: Standard 1 TTS, Featured 50 TTS (gold border, first 5 slots), Spotlight 200 TTS (pinned #1, one per week)
-STAKING: Bronze $50 1.1x 8% APR → VIP $5000+ 3x votes 45% APR
+STAKING TIERS: Bronze $50+ 8% APR 1.1x boost | Silver $100+ 12% APR 1.25x | Gold $250+ 18% APR 1.5x | Diamond $1000+ 32% APR 2x | VIP $5000+ 45% APR 3x. TTS equivalent shown live in app based on current price.
 REFERRALS: 10 TTS per referral. Friend gets 10 TTS bonus on top of 100 TTS signup.
 BUY TTS: Uniswap on Base — app.uniswap.org — contract 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
 
