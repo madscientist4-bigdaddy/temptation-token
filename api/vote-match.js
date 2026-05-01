@@ -82,7 +82,8 @@ export default async function handler(req, res) {
   }
 
   // Send TTS from Marketing wallet
-  const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
+  const pkClean = pk.trim().replace(/^["']|["']$/g, '').trim()
+  const pkHex = pkClean.startsWith('0x') ? pkClean : `0x${pkClean}`
   let matchTxHash
   try {
     const account      = privateKeyToAccount(pkHex)

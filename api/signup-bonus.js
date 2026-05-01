@@ -100,7 +100,15 @@ export default async function handler(req, res) {
   }
 
   // Send TTS from Marketing wallet
-  const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
+  const pkClean = pk.trim().replace(/^["'`]|["'`]$/g, '').replace(/\s/g, '').trim()
+  const pkHex = pkClean.startsWith('0x') ? pkClean : `0x${pkClean}`
+  const hexBody = pkHex.slice(2)
+  if (!/^[0-9a-fA-F]{64}$/.test(hexBody)) {
+    return res.status(500).json({
+      success: false,
+      reason: 'MARKETING_WALLET_PRIVATE_KEY is invalid — must be 64 hex chars (32 bytes). It was set to the wallet address instead of the private key. Export the private key from MetaMask and update in Vercel env vars.'
+    })
+  }
   let txHash
   try {
     const account = privateKeyToAccount(pkHex)
@@ -123,7 +131,6 @@ export default async function handler(req, res) {
       wallet_address: walletAddress,
       bonus_type: 'signup',
       tts_amount: Number(ttsAmount) / 1e18,
-      usd_value: usdValue,
       tx_hash: txHash,
       created_at: new Date().toISOString(),
     }),
