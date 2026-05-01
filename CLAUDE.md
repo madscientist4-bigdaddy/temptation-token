@@ -44,7 +44,7 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
 
 ### Data layer
 
-- **Supabase** (`gmlikdxykgviyprqtqwz`) — Primary app database. Tables: `users`, `submissions`, `votes`, `rounds`, `stakes`, `scheduled_posts`, `bonus_claims`, `referral_settings`, `referral_credits` (run SQL from `outputs/supabase_missing_tables.sql` if missing).
+- **Supabase** (`gmlikdxykgviyprqtqwz`) — Primary app database. Tables: `users`, `submissions`, `votes`, `rounds`, `stakes`, `scheduled_posts`, `bonus_claims`, `referral_settings`, `referral_credits`, `referrals`, `outreach_queue` (all created as of May 1 2026).
 - **SQLite** — Used only by the Telegram bot worker.
 - **Smart contracts on Base mainnet** — Token, Voting, Staking, Airdrop, NFT. Addresses are hardcoded constants in `App.jsx`.
 
@@ -180,16 +180,23 @@ Always `git add` + commit + push after every change.
 
 ## Pending Actions (priority order)
 
-1. **🚨 Update Chainlink crons** — automation.chain.link/base → change Start Round to `0 4 * * 1`, Settle to `59 3 * * 1` (requires MetaMask confirmation with deployer wallet)
+1. **🚨 Fund Marketing wallet with TTS** — `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` has 0 TTS. Send TTS from deployer/house wallet to enable signup bonus + vote-match payouts. Marketing wallet has ETH for gas ✅ but needs TTS tokens.
 2. **🚀 Deploy NFT-enabled V3b after May 5** — Current V3b at 0xEC339... predates NFT code. After Round 1 settles (May 5 21:10 UTC), redeploy with current TTSVotingV3b.sol, run 6-step keeper handoff, call `setNFTContract(0x0768...)`. Confirm settlement on BaseScan first.
-3. **Run missing Supabase SQL** — `outputs/supabase_missing_tables.sql` in Supabase SQL Editor (creates referral_credits, outreach_queue, referrals tables)
-4. **Add MARKETING_WALLET_PRIVATE_KEY** to Vercel env — enables signup bonus + vote-match APIs
-5. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat channels
-6. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings)
-7. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env
-8. **CoinGecko resubmission** — use `outputs/exchange_submissions/coingecko_update.md`
-9. **Solidproof audit delivery** — expected 5-10 business days from April 29. When received: publish at temptationtoken.io/audit, resubmit to Blockaid, submit to CoinGecko/CMC.
-10. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig
+3. **Add DEPLOYER_PRIVATE_KEY** to Vercel env — enables approve-profile API (one-click approve in Photo Review tab) and referral-credit API. This is the deployer/house wallet private key.
+4. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env → enables auto X posting
+5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings)
+6. **CoinGecko resubmission** — use `outputs/exchange_submissions/coingecko_update.md`
+7. **Solidproof audit delivery** — expected 5-10 business days from April 29. When received: publish at temptationtoken.io/audit, resubmit to Blockaid, submit to CoinGecko/CMC.
+8. **Publish website content** — deploy outputs/trust_page.html to temptationtoken.io/trust, publish blog posts from outputs/blog/ to temptationtoken.io/blog
+9. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig
+
+### ✅ Completed (May 1 2026)
+- MARKETING_WALLET_PRIVATE_KEY corrected in Vercel (was wallet address, now actual private key)
+- All 11 Supabase tables exist (referral_credits, referrals, outreach_queue added May 1)
+- Chainlink crons updated: Start `0 4 * * 1`, Settle `59 3 * * 1`
+- Marketing wallet ETH funded (0.005 ETH for gas)
+- index.html SEO: OG tags, Twitter cards, JSON-LD schema added
+- Admin Wallets tab expanded: 8 wallets (added Marketing, Staking, NFT, Keeper)
 
 ---
 
@@ -203,21 +210,26 @@ Check memory files for any session-specific context.
 
 ## Completed History
 
-### April 28–30, 2026
+### April 28 – May 1, 2026
 
 - ✅ TTSVotingV3b deployed at `0xEC339baD1900447833C9fe905C4A768D1f0cA912`
 - ✅ Round 1 started April 28 21:10 UTC — ends May 5 21:10 UTC — 14 profiles
-- ✅ api/signup-bonus.js + api/vote-match.js (bonus system)
+- ✅ api/signup-bonus.js + api/vote-match.js (bonus system, private key corrected May 1)
+- ✅ Marketing wallet ETH funded (May 1); TTS balance still 0 — needs TTS transfer
 - ✅ Live NFT display in App.jsx (balanceOf → tokenOfOwnerByIndex → tokenURI → OpenSea links)
-- ✅ Admin dashboard full overhaul (15-item CENTCOM pass)
+- ✅ Admin dashboard full overhaul — 15-tab CENTCOM; Wallets tab expanded to 8 wallets
 - ✅ Content Calendar — weekly auto-generation, approve, post
 - ✅ Staking tiers canonical update — removed Platinum, locked 5-tier structure
 - ✅ Prize distribution fixed everywhere — 40/40/10/10
 - ✅ Round schedule fixed everywhere — EDT-based
-- ✅ Social post timing fixed — 2pm EDT (19:00 UTC)
+- ✅ Chainlink crons updated to EDT: `0 4 * * 1` (start), `59 3 * * 1` (settle)
+- ✅ Social post timing fixed — 19:00 UTC (2pm EST / 3pm EDT)
 - ✅ content-generator.js Supabase insert fixed (normalized row keys)
+- ✅ All 11 Supabase tables present (referral_credits, referrals, outreach_queue added May 1)
+- ✅ index.html SEO: meta description, OG tags, Twitter cards, JSON-LD schema
+- ✅ @TTSBroadcastBot confirmed admin on both channels
 - ✅ Operations Manual staking reference added
-- ✅ Outputs folder created: daily_operations.md, blog posts (5), social SVGs (7), trust_page.html, enticement paper, investor one-pager, exchange submissions, income streams doc
+- ✅ Outputs folder: daily_operations.md, blog posts (5), social SVGs (7), trust_page.html, enticement paper, investor one-pager, exchange submissions, income streams doc
 
 ### Technical Notes
 

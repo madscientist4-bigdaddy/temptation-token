@@ -1339,8 +1339,12 @@ function UsersScreen({ showToast }) {
 
 const WALLETS_CONFIG = [
   { label: "House / Revenue", name: "Blockchain Entertainment LLC", addr: HOUSE_WALLET, role: "House cut (10%), deployer, admin" },
+  { label: "Marketing / Bonus", name: "Marketing & Bonus Wallet", addr: '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB', role: "Signup bonus + vote-match TTS payouts" },
   { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
-  { label: "Voting Contract", name: "TTSVotingV3 — Escrow", addr: '0xEC339baD1900447833C9fe905C4A768D1f0cA912', role: "Holds votes during active round" },
+  { label: "Voting Contract", name: "TTSVotingV3b — Escrow", addr: '0xEC339baD1900447833C9fe905C4A768D1f0cA912', role: "Holds votes during active round" },
+  { label: "Staking Contract", name: "TTSStaking", addr: '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc', role: "Staked TTS lockup + APR distribution" },
+  { label: "NFT Contract", name: "TTSRoundNFT", addr: '0x0768e862D3AB14d85213BfeF8f1D012E77721da2', role: "Round winner NFT trophies (minting Round 2+)" },
+  { label: "Keeper / Automation", name: "TTSKeeper2", addr: '0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48', role: "Chainlink automation: start, snapshot, settle, rollover" },
   { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
 ];
 function WalletsScreen() {
