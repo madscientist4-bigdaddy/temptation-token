@@ -12,7 +12,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.s
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 
-const V3_ADDRESS = '0xEC339baD1900447833C9fe905C4A768D1f0cA912'
+const V3_ADDRESS = '0x1c1446F4d984983d56954e8829ceA4b7576D9EdA'
 
 const ABI = parseAbi(['function batchApproveProfiles(string[] profileIds, address[] wallets) external'])
 
