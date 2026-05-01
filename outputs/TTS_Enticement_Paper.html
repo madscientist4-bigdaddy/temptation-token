@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Temptation Token — Enticement Paper</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg:#0d0d0d; --surface:#141414; --gold:#c9a84c; --gold-light:#f0d060; --text:#f5f5f5; --muted:#999; --green:#2ecc71; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:'Montserrat',sans-serif; max-width:860px; margin:0 auto; padding:60px 40px; line-height:1.7; }
+    @media print { body { background:#fff; color:#000; padding:20px; } .gold { color:#8b6914 !important; } }
+
+    /* COVER */
+    .cover { text-align:center; padding:80px 0 60px; border-bottom:1px solid rgba(201,168,76,0.3); margin-bottom:60px; }
+    .cover-tag { font-size:.65rem; letter-spacing:.3em; text-transform:uppercase; color:var(--gold); margin-bottom:20px; }
+    .cover h1 { font-family:'Cormorant Garamond',serif; font-size:3rem; font-weight:700; line-height:1.2; margin-bottom:16px; }
+    .cover h1 em { color:var(--gold); font-style:normal; }
+    .cover-sub { font-size:1rem; color:var(--muted); max-width:500px; margin:0 auto 32px; }
+    .cover-badges { display:flex; justify-content:center; gap:12px; flex-wrap:wrap; }
+    .cbadge { background:#1a1a1a; border:1px solid rgba(201,168,76,0.3); border-radius:50px; padding:8px 20px; font-size:.75rem; color:var(--gold); font-weight:600; }
+
+    /* SECTIONS */
+    .section { margin-bottom:50px; }
+    .section-num { font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+    h2 { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:700; margin-bottom:16px; }
+    h3 { font-size:1rem; font-weight:700; color:var(--gold); margin:20px 0 10px; }
+    p { font-size:.9rem; color:var(--muted); margin-bottom:12px; }
+    strong { color:var(--text); }
+
+    /* TABLE */
+    table { width:100%; border-collapse:collapse; margin:16px 0; font-size:.85rem; }
+    th { text-align:left; color:var(--gold); font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; padding:10px 12px; border-bottom:1px solid rgba(201,168,76,0.2); }
+    td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--muted); }
+    td:first-child { color:var(--text); }
+
+    /* HIGHLIGHT BOX */
+    .highlight { background:#1a1a1a; border-left:3px solid var(--gold); padding:16px 20px; border-radius:0 8px 8px 0; margin:16px 0; }
+    .highlight p { margin:0; }
+
+    /* STAT GRID */
+    .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin:20px 0; }
+    .stat { background:#1a1a1a; border:1px solid rgba(201,168,76,0.2); border-radius:12px; padding:20px 16px; text-align:center; }
+    .stat-val { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:700; color:var(--gold); }
+    .stat-label { font-size:.7rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; margin-top:4px; }
+
+    /* FOOTER */
+    .doc-footer { border-top:1px solid rgba(201,168,76,0.2); padding-top:30px; margin-top:60px; text-align:center; font-size:.75rem; color:#555; }
+  </style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-tag">Enticement Paper · April 2026</div>
+  <h1>Temptation Token (<em>$TTS</em>)<br/>The First Vote-to-Earn Game<br/>on Base Blockchain</h1>
+  <div class="cover-sub">A provably fair weekly voting game where real cryptocurrency changes hands every Sunday night.</div>
+  <div class="cover-badges">
+    <div class="cbadge">Base Blockchain</div>
+    <div class="cbadge">Audited · Solidproof</div>
+    <div class="cbadge">Chainlink VRF</div>
+    <div class="cbadge">LP Locked 12mo</div>
+    <div class="cbadge">app.temptationtoken.io</div>
+  </div>
+</div>
+
+<!-- 1. EXECUTIVE SUMMARY -->
+<div class="section">
+  <div class="section-num">Section 1</div>
+  <h2>Executive Summary</h2>
+  <p>Temptation Token ($TTS) is a weekly on-chain voting game deployed on Base blockchain. Each week, a new round opens with a curated set of approved profiles. Participants purchase $TTS tokens and vote on the profile they believe will win. The top voter on the winning profile earns 40% of the entire prize pool, paid automatically by the smart contract within minutes of round close. The winning profile earns an additional 40%. 10% goes to the Polaris Project (an anti-trafficking nonprofit) and 10% to Blockchain Entertainment LLC.</p>
+  <p>The game combines the engagement mechanics of social voting with the financial incentives of prediction markets. It is the first application of this model on Base blockchain — and the first to integrate Chainlink VRF for provably fair outcome selection, a Gnosis Safe treasury, and a full staking system with up to 45% APR and 3x vote multipliers. Every piece of infrastructure is verifiable on-chain. This document explains what we've built, why it works, and how to participate.</p>
+</div>
+
+<!-- 2. THE PROBLEM -->
+<div class="section">
+  <div class="section-num">Section 2</div>
+  <h2>The Problem</h2>
+  <p>Adult entertainment and crypto have coexisted for years but never properly converged. Content creators generate billions in revenue for platforms — and receive a fraction. Fans pay subscription fees that disappear into platform revenue with no upside. Both parties are stuck in a transaction with no alignment.</p>
+  <p>On the crypto side, "play-to-earn" games promised a solution but consistently failed: either the token economics were unsustainable, the gameplay was shallow, or the "earning" required more capital than most users had. What the market needed was a game where the stakes were real, the outcomes were fair, and the participation curve started low enough to be accessible.</p>
+  <p>Temptation Token solves both. Creators compete for real weekly prizes. Voters have genuine financial skin in the game. And the mechanism — a weekly voting round with Chainlink VRF settlement — is elegant enough to sustain indefinitely.</p>
+</div>
+
+<!-- 3. THE SOLUTION -->
+<div class="section">
+  <div class="section-num">Section 3</div>
+  <h2>The Solution</h2>
+  <p>Weekly on-chain voting rounds. Real crypto prizes. NFT trophies. Provably fair via Chainlink VRF.</p>
+  <div class="highlight"><p>Every Monday 12:00 AM EDT, a new round begins. Approved profiles compete for votes. When Sunday 11:59 PM EDT arrives, the round closes. Chainlink VRF selects the winner. The smart contract distributes the prize pool automatically. No waiting. No claiming. No trust required.</p></div>
+  <p>The result is a game with genuine stakes on all sides: profiles compete for the winning vote count, voters compete to be the top voter on the right profile, and stakers earn passive yield while multiplying their voting edge. Every interaction is on-chain. Every outcome is verifiable. Every payout is automatic.</p>
+</div>
+
+<!-- 4. GAME MECHANICS -->
+<div class="section">
+  <div class="section-num">Section 4</div>
+  <h2>Game Mechanics</h2>
+  <h3>Round Schedule</h3>
+  <table>
+    <tr><td>Round Start</td><td>Monday 12:00 AM EDT (04:00 UTC)</td></tr>
+    <tr><td>Round End</td><td>Sunday 11:59 PM EDT (Monday 03:59 UTC)</td></tr>
+    <tr><td>Settlement</td><td>Automatic via Chainlink VRF within minutes of close</td></tr>
+    <tr><td>Minimum Vote</td><td>5 TTS per vote</td></tr>
+    <tr><td>Profile Fee</td><td>5 TTS per submission</td></tr>
+    <tr><td>Max Vote Cap</td><td>40% of pool per profile per round</td></tr>
+  </table>
+  <h3>Prize Distribution</h3>
+  <table>
+    <tr><th>Recipient</th><th>Share</th><th>Who</th></tr>
+    <tr><td>Top Voter</td><td style="color:var(--gold);font-weight:700">40%</td><td>Wallet that voted the most on the winning profile</td></tr>
+    <tr><td>Winning Profile</td><td style="color:var(--gold);font-weight:700">40%</td><td>Profile wallet that received the most weighted votes</td></tr>
+    <tr><td>Polaris Project</td><td>10%</td><td>Anti-trafficking charity (501c3)</td></tr>
+    <tr><td>Blockchain Entertainment LLC</td><td>10%</td><td>House wallet (platform revenue)</td></tr>
+  </table>
+</div>
+
+<!-- 5. TOKEN ECONOMICS -->
+<div class="section">
+  <div class="section-num">Section 5</div>
+  <h2>Token Economics</h2>
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-val">69B</div><div class="stat-label">Total Supply</div></div>
+    <div class="stat"><div class="stat-val">18</div><div class="stat-label">Decimals</div></div>
+    <div class="stat"><div class="stat-val">1%</div><div class="stat-label">Transfer Tax</div></div>
+    <div class="stat"><div class="stat-val">12mo</div><div class="stat-label">LP Locked</div></div>
+  </div>
+  <p>Contract: <code style="font-size:.8rem;color:var(--gold)">0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</code> · Base mainnet</p>
+  <table>
+    <tr><th>Allocation</th><th>Amount</th><th>Purpose</th></tr>
+    <tr><td>Founder</td><td>10,000,000,000</td><td>Long-term protocol development</td></tr>
+    <tr><td>Investor Reserve</td><td>10,000,000,000</td><td>Strategic investment rounds</td></tr>
+    <tr><td>Marketing</td><td>5,000,000,000</td><td>Signup bonuses, vote-match, promotions</td></tr>
+    <tr><td>Development</td><td>5,000,000,000</td><td>Platform build and maintenance</td></tr>
+    <tr><td>Ecosystem</td><td>5,000,000,000</td><td>Partnerships and integrations</td></tr>
+    <tr><td>Charitable</td><td>2,000,000,000</td><td>Polaris Project and charity events</td></tr>
+    <tr><td>Team</td><td>2,000,000,000</td><td>Core team compensation</td></tr>
+    <tr><td>Public/Liquidity</td><td>Remainder</td><td>Uniswap V2 pool (locked)</td></tr>
+  </table>
+  <p style="margin-top:12px">Uniswap V2 Pool: <code style="font-size:.75rem;color:var(--gold)">0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68</code> · Locked 12 months on Team.Finance</p>
+</div>
+
+<!-- 6. STAKING -->
+<div class="section">
+  <div class="section-num">Section 6</div>
+  <h2>Staking System</h2>
+  <p>Lock $TTS to earn passive APR and multiply your voting power. Tiers are locked and cannot be changed without contract redeployment.</p>
+  <table>
+    <tr><th>Tier</th><th>Min Stake (USD)</th><th>APR</th><th>Vote Multiplier</th></tr>
+    <tr><td>Bronze</td><td>$50+</td><td style="color:var(--green)">8%</td><td>1.1x</td></tr>
+    <tr><td>Silver</td><td>$100+</td><td style="color:var(--green)">12%</td><td>1.25x</td></tr>
+    <tr><td>Gold</td><td>$250+</td><td style="color:var(--green)">18%</td><td>1.5x</td></tr>
+    <tr><td>Diamond</td><td>$1,000+</td><td style="color:var(--green)">32%</td><td>2x</td></tr>
+    <tr><td>VIP</td><td>$5,000+</td><td style="color:var(--gold)">45%</td><td>3x</td></tr>
+  </table>
+</div>
+
+<!-- 7. SECURITY -->
+<div class="section">
+  <div class="section-num">Section 7</div>
+  <h2>Security</h2>
+  <table>
+    <tr><th>Feature</th><th>Status</th><th>Verifiable At</th></tr>
+    <tr><td>Solidproof Audit</td><td style="color:var(--green)">✓ Complete — zero critical</td><td>temptationtoken.io/audit</td></tr>
+    <tr><td>Chainlink VRF V2.5</td><td style="color:var(--green)">✓ Active</td><td>vrf.chain.link/base</td></tr>
+    <tr><td>LP Lock (12 months)</td><td style="color:var(--green)">✓ Locked</td><td>team.finance</td></tr>
+    <tr><td>Gnosis Safe 2/2</td><td style="color:var(--green)">✓ Active</td><td>app.safe.global</td></tr>
+    <tr><td>BaseScan Verified</td><td style="color:var(--green)">✓ All contracts</td><td>basescan.org</td></tr>
+  </table>
+</div>
+
+<!-- 8. INVESTOR SECTION -->
+<div class="section">
+  <div class="section-num">Section 8</div>
+  <h2>For Investors</h2>
+  <h3>Revenue Model</h3>
+  <p>Platform earns 10% of every prize pool (house cut), hardcoded in the settlement contract. Additionally: 5 TTS submission fee per profile, 1% transfer tax on all token transactions.</p>
+  <h3>Growth Projections</h3>
+  <table>
+    <tr><th>Users</th><th>Weekly Pool (TTS)</th><th>House Cut (10%)</th><th>Monthly Revenue</th></tr>
+    <tr><td>1,000</td><td>500,000</td><td>50,000 TTS</td><td>~$200</td></tr>
+    <tr><td>10,000</td><td>5,000,000</td><td>500,000 TTS</td><td>~$2,000</td></tr>
+    <tr><td>100,000</td><td>50,000,000</td><td>5,000,000 TTS</td><td>~$20,000+</td></tr>
+  </table>
+  <p style="margin-top:8px;font-size:.75rem">*USD value depends on TTS price at time of settlement. Projections at current market price.</p>
+  <h3>Investor Reserve</h3>
+  <p>10 billion TTS allocated for strategic investors. Suggested presale pricing: $0.001/TTS ($10M implied valuation at full allocation). Contact: support@temptationtoken.io</p>
+</div>
+
+<!-- 9. FOR CREATORS -->
+<div class="section">
+  <div class="section-num">Section 9</div>
+  <h2>For Creators</h2>
+  <p>Submit your photo at <a href="https://app.temptationtoken.io">app.temptationtoken.io</a>. If your profile wins the weekly round, 40% of all votes cast this week go directly to your wallet. No exclusivity. No fees. You keep everything.</p>
+  <p>Winners also receive an exclusive NFT trophy minted on Base — a permanent on-chain record of your win, viewable on OpenSea.</p>
+</div>
+
+<!-- 10. ROADMAP -->
+<div class="section">
+  <div class="section-num">Section 10</div>
+  <h2>Roadmap</h2>
+  <table>
+    <tr><th>Period</th><th>Milestone</th></tr>
+    <tr><td>Q2 2026</td><td>Beta launch · Round 1 complete · 10+ real profiles · Solidproof audit published</td></tr>
+    <tr><td>Q3 2026</td><td>Mobile app (iOS + Android) · Club partnership program · 1,000+ active voters</td></tr>
+    <tr><td>Q4 2026</td><td>CEX listings (MEXC, Gate.io) · 10 club partners · CoinGecko/CMC full listings</td></tr>
+    <tr><td>Q1 2027</td><td>Tournament rounds · Premium profile features · White-label platform</td></tr>
+    <tr><td>2027+</td><td>Club franchise model · International expansion · Series A</td></tr>
+  </table>
+</div>
+
+<!-- 11. TEAM -->
+<div class="section">
+  <div class="section-num">Section 11</div>
+  <h2>Team</h2>
+  <p><strong>Blockchain Entertainment LLC</strong> — founded and operated by Jim Goetz, former MLB Strength &amp; Conditioning coach and human performance expert. Jim brings the same data-driven, outcome-focused approach to Web3 that he applied to professional athletics — building systems where performance is measurable, outcomes are transparent, and incentives align.</p>
+</div>
+
+<!-- 12. CONTACT -->
+<div class="section">
+  <div class="section-num">Section 12</div>
+  <h2>Contact &amp; Links</h2>
+  <table>
+    <tr><td>App</td><td><a href="https://app.temptationtoken.io">app.temptationtoken.io</a></td></tr>
+    <tr><td>Website</td><td><a href="https://temptationtoken.io">temptationtoken.io</a></td></tr>
+    <tr><td>Twitter / X</td><td><a href="https://twitter.com/TemptationToken">twitter.com/TemptationToken</a></td></tr>
+    <tr><td>Telegram Community</td><td><a href="https://t.me/TTSCommunityChat">t.me/TTSCommunityChat</a></td></tr>
+    <tr><td>Instagram</td><td><a href="https://instagram.com/temptationtoken">instagram.com/temptationtoken</a></td></tr>
+    <tr><td>Email</td><td><a href="mailto:support@temptationtoken.io">support@temptationtoken.io</a></td></tr>
+    <tr><td>Token Contract</td><td><code style="font-size:.8rem">0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</code></td></tr>
+    <tr><td>Voting Contract</td><td><code style="font-size:.8rem">0xEC339baD1900447833C9fe905C4A768D1f0cA912</code></td></tr>
+  </table>
+</div>
+
+<div class="doc-footer">
+  <p>© 2026 Blockchain Entertainment LLC · Temptation Token ($TTS) · Base Blockchain · Not financial advice</p>
+  <p style="margin-top:8px">app.temptationtoken.io · support@temptationtoken.io</p>
+</div>
+
+</body>
+</html>

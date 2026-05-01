@@ -1005,9 +1005,11 @@ function NFTScreen({ address, connected }) {
       ) : nfts.length === 0 ? (
         <div className="nft-empty">
           <span className="nft-ei">💎</span>
-          <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>No NFTs yet</div>
-          Win a weekly round to receive your exclusive NFT trophy.<br />
-          NFTs are minted on Base and held permanently in your wallet.
+            <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>NFT trophies are awarded to Round winners 🏆</div>
+          <div style={{ fontSize:'.85rem', color:'var(--muted)', lineHeight:1.6 }}>
+            Win a round to earn yours. Minting begins Round 2 (after May 5).<br /><br />
+            <strong style={{ color:'var(--gold)' }}>How to win:</strong> Vote on the winning profile and be the top voter — you earn 40% of the prize pool + an exclusive NFT trophy minted to your wallet on Base.
+          </div>
         </div>
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:16, margin:'0 16px 24px' }}>
@@ -1019,7 +1021,8 @@ function NFTScreen({ address, connected }) {
               }
               <div style={{ padding:'10px 8px' }}>
                 <div style={{ fontSize:'.8rem', fontWeight:700, color:'var(--text)', marginBottom:4 }}>{nft.name}</div>
-                {nft.description && <div style={{ fontSize:'.7rem', color:'var(--muted)', lineHeight:1.4 }}>{nft.description}</div>}
+                {nft.description && <div style={{ fontSize:'.7rem', color:'var(--muted)', lineHeight:1.4, marginBottom:6 }}>{nft.description}</div>}
+                <a href={`https://opensea.io/assets/base/0x0768e862D3AB14d85213BfeF8f1D012E77721da2/${nft.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'.65rem', color:'var(--gold)', textDecoration:'none' }}>View on OpenSea →</a>
               </div>
             </div>
           ))}
@@ -1491,7 +1494,7 @@ function HowToWinScreen() {
 
 function RulesScreen() {
   const rules = [
-    { t:'Weekly Voting Cycle', b:'Each week begins Monday 00:00 UTC and ends Sunday 23:59 UTC. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
+    { t:'Weekly Voting Cycle', b:'Each week begins Monday 12:00 AM EDT and ends Sunday 11:59 PM EDT. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
     { t:'Prize Distribution', b:'Top Voter: 40% of winning pool.\nWinning Profile: 40% of pool.\nBlockchain Entertainment LLC: 10%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },

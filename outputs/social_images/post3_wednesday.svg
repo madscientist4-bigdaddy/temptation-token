@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <rect width="1080" height="1080" fill="#0d0d0d"/>
+  <rect x="24" y="24" width="1032" height="1032" rx="20" fill="none" stroke="#c9a84c" stroke-width="2" opacity="0.4"/>
+  <text x="54" y="88" font-family="Georgia, serif" font-size="28" font-weight="700" fill="#c9a84c" letter-spacing="3">TEMPTATION TOKEN</text>
+  <text x="54" y="112" font-family="Arial, sans-serif" font-size="16" fill="#888" letter-spacing="2">$TTS · BASE BLOCKCHAIN</text>
+  <text x="540" y="240" font-size="80" text-anchor="middle">📊</text>
+  <text x="540" y="330" font-family="Georgia, serif" font-size="70" font-weight="700" fill="#f5f5f5" text-anchor="middle">MIDWEEK</text>
+  <text x="540" y="410" font-family="Georgia, serif" font-size="70" font-weight="700" fill="#c9a84c" text-anchor="middle">LEADERBOARD</text>
+  <!-- Leaderboard rows -->
+  <rect x="120" y="460" width="840" height="70" rx="10" fill="#1a1a1a" stroke="#c9a84c" stroke-width="1"/>
+  <text x="160" y="503" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#c9a84c">#1</text>
+  <text x="220" y="503" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#f5f5f5">🔥 Leading Profile</text>
+  <text x="900" y="503" font-family="Georgia, serif" font-size="24" font-weight="700" fill="#c9a84c" text-anchor="end">LEADING</text>
+  <rect x="120" y="545" width="840" height="70" rx="10" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+  <text x="160" y="588" font-family="Arial, sans-serif" font-size="24" fill="#aaa">#2</text>
+  <text x="220" y="588" font-family="Arial, sans-serif" font-size="24" fill="#f5f5f5">Profile 2</text>
+  <text x="900" y="588" font-family="Georgia, serif" font-size="24" fill="#888" text-anchor="end">CLOSE RACE</text>
+  <rect x="120" y="628" width="840" height="70" rx="10" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
+  <text x="160" y="671" font-family="Arial, sans-serif" font-size="24" fill="#aaa">#3</text>
+  <text x="220" y="671" font-family="Arial, sans-serif" font-size="24" fill="#f5f5f5">Profile 3</text>
+  <text x="900" y="671" font-family="Georgia, serif" font-size="24" fill="#888" text-anchor="end">TRAILING</text>
+  <text x="540" y="770" font-family="Arial, sans-serif" font-size="30" fill="#aaa" text-anchor="middle">4 days left · Ends Sunday 11:59 PM EDT</text>
+  <text x="540" y="815" font-family="Arial, sans-serif" font-size="26" fill="#888" text-anchor="middle">Vote now to change the standings</text>
+  <rect x="290" y="860" width="500" height="72" rx="36" fill="#c9a84c"/>
+  <text x="540" y="904" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#0d0d0d" text-anchor="middle">CHECK STANDINGS →</text>
+  <text x="540" y="1010" font-family="Arial, sans-serif" font-size="24" fill="#c9a84c" text-anchor="middle" letter-spacing="2">app.temptationtoken.io</text>
+</svg>

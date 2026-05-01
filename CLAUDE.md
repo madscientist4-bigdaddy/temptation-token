@@ -26,12 +26,12 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
    - `/api/rpc.js` — Caches RPC calls to Base to reduce provider load
    - `/api/notify.js` — Sends Telegram admin notification on new submission
    - `/api/social-post.js` — Posts to X (Twitter) and/or Telegram; supports `{type,data}` template mode OR `{platform:'telegram',content,chatId}` direct mode
-   - `/api/scheduler.js` — Hourly cron: fires approved scheduled_posts + daily round status + auto-correction alerts (LINK < 2, round overdue, no posts 25h+)
+   - `/api/scheduler.js` — Cron at 19:00 UTC daily: fires approved scheduled_posts + daily round status + auto-correction alerts (LINK < 2, round overdue, no posts 25h+)
    - `/api/content-generator.js` — Monday 8am UTC cron: generates weekly content via Claude Haiku, saves to `scheduled_posts` table
-   - `/api/referral-credit.js` — Credits referrer wallet on new user signup
+   - `/api/referral-credit.js` — Credits referrer wallet on new user signup. Uses `referral_credits` table.
    - `/api/community-stats.js` — Returns Telegram community member count via bot API
-   - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends $5 USD of TTS (min 500, max 50,000) from Marketing wallet on first connect. Live Uniswap price. 20/day rate limit. Records in `bonus_claims` table.
-   - `/api/vote-match.js` — POST `{ walletAddress, voteAmount, txHash }`: matches first-ever vote up to 1,000 TTS from Marketing wallet. Records in `bonus_claims` table.
+   - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends $5 USD of TTS (min 500, max 50,000) from Marketing wallet on first connect. Live Uniswap price. 20/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY` in Vercel env.
+   - `/api/vote-match.js` — POST `{ walletAddress, voteAmount, txHash }`: matches first-ever vote up to 1,000 TTS from Marketing wallet. 50/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY`.
 
 3. **Python Telegram bot** (`tts_bot.py`) — Runs as a separate worker (Procfile). Uses SQLite locally and integrates with the same Supabase instance.
 
@@ -44,7 +44,7 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
 
 ### Data layer
 
-- **Supabase** — Primary app database: user profiles, photo submissions, votes, staking records. Client is initialized inline in `App.jsx`.
+- **Supabase** (`gmlikdxykgviyprqtqwz`) — Primary app database. Tables: `users`, `submissions`, `votes`, `rounds`, `stakes`, `scheduled_posts`, `bonus_claims`, `referral_settings`, `referral_credits` (run SQL from `outputs/supabase_missing_tables.sql` if missing).
 - **SQLite** — Used only by the Telegram bot worker.
 - **Smart contracts on Base mainnet** — Token, Voting, Staking, Airdrop, NFT. Addresses are hardcoded constants in `App.jsx`.
 
@@ -58,39 +58,67 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
 
 The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming disabled. The model has access to a `web_search` tool. The system prompt is defined inline in the API route.
 
-## Contracts (Base Mainnet)
+---
+
+## Active Contracts (Base Mainnet)
 
 | Contract | Address |
 |---|---|
-| TTS Token (UUPS Proxy) | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` |
+| **TTS Token (UUPS Proxy)** | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` |
 | TTS v2 Implementation (M1 fix, pending upgrade) | `0xb995b63cdf848b7884cdc51da82e4a80ad02395a` |
 | TTSVotingV2 (deprecated) | `0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA` |
-| TTSVotingV3 (deprecated — keeper-incompatible) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
+| TTSVotingV3 (deprecated) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
 | **TTSVotingV3b (ACTIVE)** | **`0xEC339baD1900447833C9fe905C4A768D1f0cA912`** |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
+| **TTSRoundNFT** | **`0x0768e862D3AB14d85213BfeF8f1D012E77721da2`** |
+| TTSStaking | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` |
 | Gnosis Safe (2/2 multisig) | `0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86` |
-| Deployer wallet | `0xb1e991bf617459b58964eef7756b350e675c53b5` |
 | Uniswap V2 Pool | `0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68` |
-| TTSRoundNFT | `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` |
-| Marketing Wallet | `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` |
 
-The v2 implementation is deployed but not yet active — the UUPS upgrade must go through the Gnosis Safe multisig.
+## Wallets
 
-## Round Schedule (canonical)
+| Label | Address | Purpose |
+|-------|---------|---------|
+| Bank / Deployer | `0xb1e991bf617459b58964eef7756b350e675c53b5` | Owner, house wallet, receives 10% prize cut |
+| Marketing / Bonus | `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` | Signup bonus + vote-match payments |
+| Polaris / Charity | `0xf7dd429d679cb61231e73785fd1737e60138aba3` | Receives 10% charity cut every settlement |
 
-| Event | Time |
-|-------|------|
-| Round starts | Monday 12:00am UTC (00:00 UTC) — TTS Start Round keeper fires |
-| Round ends | Sunday 11:59pm UTC (23:59 UTC) — TTS Settle Or Rollover keeper fires |
-| VRF settlement | Within minutes of round end — winner paid automatically on-chain |
-| New round confirmed | Check Monday 00:05 UTC that settlement + new round both occurred |
-| Social posts fire | 2pm EST daily (19:00 UTC) — Vercel scheduler cron `0 19 * * *` |
-| Content generated | Monday 8am UTC — content-generator cron `0 8 * * 1` |
+---
 
-**Any UI, dashboard, or documentation showing round timing must use these exact values.**
+## Canonical Game Parameters (never change without explicit instruction)
 
-## Staking Tiers (canonical — locked April 29 2026)
+### Round Schedule
+
+| Event | EDT (Canonical) | UTC | Chainlink Cron |
+|-------|----------------|-----|----------------|
+| Round starts | Monday 12:00 AM EDT | Monday 04:00 UTC | `0 4 * * 1` |
+| Round ends | Sunday 11:59 PM EDT | Monday 03:59 UTC | `59 3 * * 1` |
+| VRF settlement | Within minutes of round end — automatic | | |
+| Confirm new round | Check Monday 04:05 UTC | | |
+| Social posts fire | 2pm EDT / 3pm EST (19:00 UTC) | 19:00 UTC | Vercel cron `0 19 * * *` |
+| Content generated | Monday 8am UTC | 08:00 UTC | Vercel cron `0 8 * * 1` |
+
+**EDT is the canonical timezone for display.** Any UI, dashboard, documentation, or generated content must use EDT.
+
+**CHAINLINK CRONS NEED UPDATE by Jim at automation.chain.link/base:**
+- TTS Start Round: change `0 0 * * 1` → `0 4 * * 1`
+- TTS Settle Or Rollover: change `59 23 * * 0` → `59 3 * * 1`
+
+Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chainlink is UTC-only.
+
+### Prize Distribution (hardcoded in `fulfillRandomWords`)
+
+| Recipient | Share | Address |
+|-----------|-------|---------|
+| Top Voter | 40% | Wallet with most votes on winning profile |
+| Winning Profile | 40% | Profile's registered wallet |
+| Polaris Project | 10% | `0xf7dd429d679cb61231e73785fd1737e60138aba3` |
+| Blockchain Entertainment LLC | 10% | `0xb1e991bf617459b58964eef7756b350e675c53b5` |
+
+**This is the only correct split.** The previously circulated 60/20/10 split was wrong and has been removed everywhere.
+
+### Staking Tiers (locked April 29 2026)
 
 | Tier | Min Stake (USD) | APR | Vote Boost |
 |------|----------------|-----|-----------|
@@ -100,25 +128,28 @@ The v2 implementation is deployed but not yet active — the UUPS upgrade must g
 | Diamond | $1,000+ | 32% | 2x |
 | VIP | $5,000+ | 45% | 3x |
 
-**Display both USD threshold and live TTS equivalent in all UI.** TTS equivalent = USD threshold ÷ current Uniswap price (fetch live from pool). Tier multipliers are hardcoded in the staking contract — changing tiers requires redeployment. Do not drift from this table. Any surface showing different values is wrong and must be corrected. "Platinum" tier no longer exists — remove it wherever found.
+**Display both USD threshold and live TTS equivalent in all UI.** TTS equivalent = USD ÷ current Uniswap price. Tier multipliers are hardcoded — changing tiers requires contract redeployment. "Platinum" tier does not exist — remove if found anywhere.
 
-## Prize Distribution (canonical — hardcoded in fulfillRandomWords)
+### Other Parameters
 
-| Recipient | Share | Who |
-|-----------|-------|-----|
-| Top Voter | 40% | Wallet that voted the most on the winning profile |
-| Winning Profile | 40% | The profile wallet that received the most votes |
-| Polaris Project | 10% | Charity wallet (anti-trafficking nonprofit) |
-| Blockchain Entertainment LLC | 10% | House wallet |
+| Parameter | Value |
+|-----------|-------|
+| Minimum vote | 5 TTS |
+| Profile submission fee | 5 TTS |
+| Max vote cap per profile | 40% of pool per round |
+| Signup bonus | 500–50,000 TTS (~$5 USD) from Marketing wallet |
+| Vote match | First vote matched 1:1 up to 1,000 TTS from Marketing wallet |
+| Transfer tax | 1% — permanent, hardcoded, cannot be changed |
+| Total supply | 69,000,000,000 TTS — fixed, no mint function |
 
-**This is the only correct split.** Any website copy, social media templates, admin dashboard text, chatbot prompts, or generated content must use these exact percentages. The previously circulated 60/20/10 split was incorrect and has been removed.
+---
 
 ## Infrastructure
 
 | Service | Project/ID |
 |---|---|
 | Vercel | `temptation-token` (cryptofitjims-projects) |
-| Railway | `proud-unity` (Telegram bot) |
+| Railway | `proud-unity` (Telegram bot, Hobby plan) |
 | Supabase | `gmlikdxykgviyprqtqwz` (Pro) |
 | GitHub | `madscientist4-bigdaddy/temptation-token` |
 
@@ -137,77 +168,73 @@ Always `git add` + commit + push after every change.
 ## Telegram
 
 - Main bot: `@TTSGameBot` — token in Railway env as `BOT_TOKEN`
-- Broadcaster: `@TTSBroadcastBot` — token in Railway env as `BOT2_TOKEN`
-- Main channel: `@temptationtoken`
-- Community: `@TTSCommunityChat`
-- VIP Vault invite: `https://t.me/+F2lyVRf92n4xMDRh`
+- Broadcaster: `@TTSBroadcastBot` — token in Railway env as `BOT2_TOKEN` (BROADCAST_BOT_TOKEN in Vercel)
+- Main channel: `@temptationtoken` (ID: `-1002207667493`)
+- Community: `@TTSCommunityChat` (ID: `-1003930752060`)
+- Admin chat ID: `-5273368658`
+- VIP Vault: `https://t.me/+F2lyVRf92n4xMDRh`
 
-## Completed (April 28, 2026)
+**Required: Add @TTSBroadcastBot as admin to both @temptationtoken and @TTSCommunityChat for Post Now and scheduler to function.**
 
-- ✅ **TTSVotingV3b** deployed at `0xEC339baD1900447833C9fe905C4A768D1f0cA912` — keeper-compatible (adds `minProfilesPerRound()`, `getProfiles()`, `performUpkeep()`, `checkUpkeep()`, `getProfileCount()` wrappers). NFT minting hook via `setNFTContract(address)` (onlyAdmin). Round 1 started April 28.
+---
 
-- ✅ **Bonus system** — `api/signup-bonus.js` + `api/vote-match.js`. Welcome bonus fires on wallet connect; first-vote match fires after vote confirms. Both record to `bonus_claims` table. Both require `MARKETING_WALLET_PRIVATE_KEY` in Vercel env (gracefully disabled if missing).
+## Pending Actions (priority order)
 
-- ✅ **Live NFT display** — NFTScreen in App.jsx now fetches `balanceOf → tokenOfOwnerByIndex → tokenURI → base64 decode` for connected wallet. Grid display with image + name + description.
-
-- ✅ **KPI Bonus Section** — Admin dashboard KPI tab now shows signup bonus count/TTS and vote-match count/TTS from `bonus_claims` table.
-
-- ✅ **Admin dashboard audit** — 7 bugs fixed (votes.profile_id, users columns, staking tts_amount, referrals table, LINK balance on-chain fetch, dashboard zeros).
-
-- ✅ **Admin dashboard full overhaul** — 15-item CENTCOM pass:
-  - Command Center with live round countdown + health traffic lights
-  - Daily Priorities checklist (localStorage, auto-resets daily)
-  - KPI Dashboard (Supabase + on-chain metrics)
-  - Operations Manual with platform-linked templates
-  - Alerts Banner (clickable, navigates to fix)
-  - Railway plan updated to HOBBY (paid April 24) — no expiry warning
-  - All hardcoded dates replaced with `getCurrentWeekLabel()` (auto-updates)
-  - Live clock in topbar (updates every second)
-  - Prize pool pulls live from TTSVotingV3.getRound() on-chain
-  - Settlement history uses correct RoundSettled topic hash + eth_getLogs
-  - Photo Review: shows pending+approved, status filter, "Register On-Chain" modal
-  - Social Media tab: stats, Post Now (Telegram direct), DM outreach tracker, content preview, templates with platform links
-  - System Health: Railway Hobby status, referral system status card
-  - Auto-correction alerts in scheduler: LINK < 2, round overdue, no posts 25h+
-  - Operations Manual templates with Open → links for each platform
-  - Admin password: `TTS2026Admin!`
-  - `api/community-stats.js` added (Telegram member count endpoint)
-  - `api/social-post.js` updated to support direct telegram posting mode
-
-- ✅ **Beta audit fixes** — XSS in photo link buttons, wallet auto-populate, form reset on error, referral link full address
-- ✅ **TTSVotingV3** deployed + all steps complete (Round 1 active)
-- ✅ **Content Calendar** — weekly auto-generation via Claude Haiku, X/Telegram/Instagram, one-tap approve
-- ✅ **10 AI test profiles** in Supabase (status=approved, round_id=1)
-
-## Pending items (priority order)
-
-1. **🚀 Deploy NFT-enabled V3b** — `setNFTContract` reverts because the DEPLOYED contract at `0xEC339...` predates the NFT minting code. Must redeploy after Round 1 settles (May 5 2026 21:10 UTC). Run `forge create TTSVotingV3b` with same constructor args, then run the 6-step keeper handoff (see TTSVotingV3b Deployment section below). Confirm Round 1 settled first: check `0xEC339baD1900447833C9fe905C4A768D1f0cA912#events` on BaseScan.
-2. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat Telegram channels (required for Post Now and scheduler to work)
-3. **Run `bonus_claims` SQL** in Supabase (see `system_test.md` for exact SQL — creates table + unique index)
+1. **🚨 Update Chainlink crons** — automation.chain.link/base → change Start Round to `0 4 * * 1`, Settle to `59 3 * * 1` (requires MetaMask confirmation with deployer wallet)
+2. **🚀 Deploy NFT-enabled V3b after May 5** — Current V3b at 0xEC339... predates NFT code. After Round 1 settles (May 5 21:10 UTC), redeploy with current TTSVotingV3b.sol, run 6-step keeper handoff, call `setNFTContract(0x0768...)`. Confirm settlement on BaseScan first.
+3. **Run missing Supabase SQL** — `outputs/supabase_missing_tables.sql` in Supabase SQL Editor (creates referral_credits, outreach_queue, referrals tables)
 4. **Add MARKETING_WALLET_PRIVATE_KEY** to Vercel env — enables signup bonus + vote-match APIs
-5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — must use Remix IDE with same compiler settings)
-6. **Deploy TTS v2 M1 fix** upgrade through Gnosis Safe (2/2 multisig)
-7. **CoinGecko resubmission** — check current status
-8. **Blockaid** — submitted false positive reports; check portal for resolution status
-9. **X social media credentials** — set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env to enable X posting
+5. **Add @TTSBroadcastBot as admin** to @temptationtoken and @TTSCommunityChat channels
+6. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings)
+7. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env
+8. **CoinGecko resubmission** — use `outputs/exchange_submissions/coingecko_update.md`
+9. **Solidproof audit delivery** — expected 5-10 business days from April 29. When received: publish at temptationtoken.io/audit, resubmit to Blockaid, submit to CoinGecko/CMC.
+10. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig
 
-## Next session: start here
+---
 
-1. Run `bonus_claims` SQL in Supabase (exact SQL in `system_test.md`)
-2. Add `MARKETING_WALLET_PRIVATE_KEY` to Vercel env
-3. Run `setNFTContract` cast send command (see item 4 above)
-4. Add @TTSBroadcastBot as channel admin → test Post Now
-5. Check if V3b Round 1 has settled (~April 28 end) — if not, verify TTSKeeper2 automation via Chainlink dashboard
+## Session Start Instruction
 
-## TTSVotingV3 Deployment (✅ COMPLETE)
+**Every session: "Read CLAUDE.md and continue from where we left off."**
 
-`TTSVotingV3.sol` uses **VRF V2.5** (confirmed from TTSVotingV2 deployment tx constructor args).
-All params confirmed on-chain — zero placeholders.
+Check memory files for any session-specific context.
 
-### Why V3 is needed
-TTSVotingV2's `approveProfile` is `onlyOwner` where owner = TTSKeeper2. TTSKeeper2 has no `approveProfile` wrapper. V3 adds a separate `admin` role (deployer) for profile approval while keeper retains `owner` for round management.
+---
 
-### Constructor params — copy-paste into Remix, no edits needed
+## Completed History
+
+### April 28–30, 2026
+
+- ✅ TTSVotingV3b deployed at `0xEC339baD1900447833C9fe905C4A768D1f0cA912`
+- ✅ Round 1 started April 28 21:10 UTC — ends May 5 21:10 UTC — 14 profiles
+- ✅ api/signup-bonus.js + api/vote-match.js (bonus system)
+- ✅ Live NFT display in App.jsx (balanceOf → tokenOfOwnerByIndex → tokenURI → OpenSea links)
+- ✅ Admin dashboard full overhaul (15-item CENTCOM pass)
+- ✅ Content Calendar — weekly auto-generation, approve, post
+- ✅ Staking tiers canonical update — removed Platinum, locked 5-tier structure
+- ✅ Prize distribution fixed everywhere — 40/40/10/10
+- ✅ Round schedule fixed everywhere — EDT-based
+- ✅ Social post timing fixed — 2pm EDT (19:00 UTC)
+- ✅ content-generator.js Supabase insert fixed (normalized row keys)
+- ✅ Operations Manual staking reference added
+- ✅ Outputs folder created: daily_operations.md, blog posts (5), social SVGs (7), trust_page.html, enticement paper, investor one-pager, exchange submissions, income streams doc
+
+### Technical Notes
+
+- `setNFTContract` reverts on V3b — function absent from deployed bytecode (deployed before NFT code added). Fix requires redeployment after Round 1 settles.
+- Staking contract at 0xaA12B889... is a UUPS proxy. Implementation 0x370b8fd7... is unverified. Tier multipliers are hardcoded constants — no admin setters found. Tier update = redeploy.
+- RoundSettled topic hash: `0xabf0728119ba3c53309b0f987eda834ecf31e54dfaeec92465c1512c5eb9c2b9`
+- VRF V2.5 subscription ID: `58222014484560539249027457203866883376041731162442592604288474822166186263722`
+- Total staked on-chain: 0 (no stakers yet as of April 30)
+- Railway upgraded to Hobby plan April 24 — no expiry
+
+---
+
+## TTSVotingV3b Redeployment (after Round 1 settles — May 5+ EDT)
+
+**Before running:** Confirm RoundSettled event on BaseScan: `0xEC339baD1900447833C9fe905C4A768D1f0cA912#events`
+
+Constructor params (same as V3b, copy-paste into Remix):
 ```
 _ttsToken:        "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9"
 vrfCoordinator_:  "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634"
@@ -218,29 +245,15 @@ _charityWallet:   "0xf7dd429d679cb61231e73785fd1737e60138aba3"
 _houseWallet:     "0xb1e991bf617459b58964eef7756b350e675c53b5"
 ```
 
-Remix settings: **Solidity 0.8.20 · @chainlink/contracts@1.2.0 · @openzeppelin/contracts@5.0.0 · optimizations ON (200 runs) · Base mainnet (8453)**
+Remix settings: Solidity 0.8.20 · @chainlink/contracts@1.2.0 · @openzeppelin/contracts@5.0.0 · optimizations ON (200 runs) · Base mainnet (8453)
 
-How values were confirmed:
-- `vrfCoordinator_` + `keyHash` + `subscriptionId` — decoded from TTSVotingV2 deployment tx `0xb84f607e...` constructor args
-- `keyHash` independently matches Chainlink docs (Base mainnet VRF V2.5, 30 gwei lane)
-- `_charityWallet` — provided by user (Polaris Project)
-
-### Deployment sequence — ✅ ALL STEPS COMPLETE
-
-1. ✅ **Deploy TTSVotingV3.sol** — deployed at `0x49385909a23C97142c600f8d28D11Ba63410b65C`
-2. ✅ `V3.transferOwnership("0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48")`
-3. ✅ `keeper.setVotingContract("0x49385909a23C97142c600f8d28D11Ba63410b65C")`
-4. ✅ `keeper.acceptVotingOwnership()`
-5. ✅ `keeper.manualExecute(1)` — Round 1 started
-6. ✅ `V3.batchApproveProfiles(...)` — Dance TTS + Bunny Butt approved
-7. ✅ V3 added as VRF consumer
-8. ✅ `VOTING_ADDRESS` updated in `src/App.jsx`
-9. ✅ Deployed to Vercel production
-
-### Notes
-- `scripts/deployV3.js` fetches live Supabase profiles and outputs calldata — rerun each round
-- Staking tier multiplier is a graceful no-op (staking contract doesn't expose `getStakingTier`)
-- `0x6593c7De001fC8542bB1703532EE1e5aA0D458fD` (keeper slot 2) is the Chainlink Automation Registry, NOT the VRF coordinator
-- V2 (`0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA`) becomes unused once keeper points to V3
-- **Railway**: upgraded to Hobby plan April 24, 2026. No further action needed.
-- **RoundSettled topic hash**: `0xabf0728119ba3c53309b0f987eda834ecf31e54dfaeec92465c1512c5eb9c2b9`
+Deployment sequence:
+1. Deploy TTSVotingV3b.sol → note new address
+2. `newV3b.transferOwnership("0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48")`
+3. `keeper.setVotingContract(newAddress)`
+4. `keeper.acceptVotingOwnership()`
+5. `newV3b.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")`
+6. `newV3b.batchApproveProfiles([...approved profile addresses for new round])`
+7. Add newV3b as VRF consumer at vrf.chain.link/base
+8. Update `VOTING_ADDRESS` in src/App.jsx + all api/ files
+9. Deploy to Vercel

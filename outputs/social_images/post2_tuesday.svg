@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d0d0d"/>
+      <stop offset="100%" style="stop-color:#0d1a0d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+  <rect x="24" y="24" width="1032" height="1032" rx="20" fill="none" stroke="#c9a84c" stroke-width="2" opacity="0.4"/>
+  <text x="54" y="88" font-family="Georgia, serif" font-size="28" font-weight="700" fill="#c9a84c" letter-spacing="3">TEMPTATION TOKEN</text>
+  <text x="54" y="112" font-family="Arial, sans-serif" font-size="16" fill="#888" letter-spacing="2">$TTS · BASE BLOCKCHAIN</text>
+  <!-- Main message -->
+  <text x="540" y="300" font-family="Georgia, serif" font-size="72" font-weight="700" fill="#f5f5f5" text-anchor="middle">VOTE $TTS.</text>
+  <text x="540" y="400" font-family="Georgia, serif" font-size="72" font-weight="700" fill="#c9a84c" text-anchor="middle">WIN CRYPTO.</text>
+  <!-- How it works cards -->
+  <rect x="80" y="460" width="280" height="200" rx="16" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1"/>
+  <text x="220" y="520" font-size="56" text-anchor="middle">💰</text>
+  <text x="220" y="575" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#f5f5f5" text-anchor="middle">BUY $TTS</text>
+  <text x="220" y="605" font-family="Arial, sans-serif" font-size="15" fill="#888" text-anchor="middle">Uniswap on Base</text>
+  <text x="220" y="630" font-family="Arial, sans-serif" font-size="15" fill="#888" text-anchor="middle">pennies per vote</text>
+  <rect x="400" y="460" width="280" height="200" rx="16" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1"/>
+  <text x="540" y="520" font-size="56" text-anchor="middle">🗳️</text>
+  <text x="540" y="575" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#f5f5f5" text-anchor="middle">VOTE ON PROFILES</text>
+  <text x="540" y="605" font-family="Arial, sans-serif" font-size="15" fill="#888" text-anchor="middle">Pick your winner</text>
+  <text x="540" y="630" font-family="Arial, sans-serif" font-size="15" fill="#888" text-anchor="middle">Min. 5 TTS</text>
+  <rect x="720" y="460" width="280" height="200" rx="16" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="1"/>
+  <text x="860" y="520" font-size="56" text-anchor="middle">🏆</text>
+  <text x="860" y="575" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#f5f5f5" text-anchor="middle">WIN 40% POOL</text>
+  <text x="860" y="605" font-family="Arial, sans-serif" font-size="15" fill="#888" text-anchor="middle">Top voter wins big</text>
+  <text x="860" y="630" font-family="Arial, sans-serif" font-size="15" fill="#888" text-anchor="middle">Paid automatically</text>
+  <!-- Sub text -->
+  <text x="540" y="740" font-family="Arial, sans-serif" font-size="32" fill="#aaa" text-anchor="middle">Provably fair · Chainlink VRF · Base blockchain</text>
+  <text x="540" y="790" font-family="Arial, sans-serif" font-size="28" fill="#888" text-anchor="middle">Rounds close Sunday 11:59 PM EDT</text>
+  <!-- CTA -->
+  <rect x="290" y="860" width="500" height="72" rx="36" fill="#c9a84c"/>
+  <text x="540" y="904" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#0d0d0d" text-anchor="middle">START PLAYING →</text>
+  <text x="540" y="1010" font-family="Arial, sans-serif" font-size="24" fill="#c9a84c" text-anchor="middle" letter-spacing="2">app.temptationtoken.io</text>
+</svg>

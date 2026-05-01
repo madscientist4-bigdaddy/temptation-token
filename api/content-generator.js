@@ -119,7 +119,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' })
   }
 
-  const prompt = `You are the social media manager for Temptation Token ($TTS), a Web3 "Hot or Not" voting game on Base blockchain. Users vote for profiles by spending $TTS tokens. Stakers earn yield. The game is provocative but SFW.
+  const prompt = `You are the social media manager for Temptation Token ($TTS), a Web3 "Hot or Not" voting game on Base blockchain. Users vote for profiles by spending $TTS tokens. Stakers earn yield. The game is provocative but SFW. Round schedule: Monday 12:00 AM EDT → Sunday 11:59 PM EDT. Prize split: 40% top voter / 40% winning profile / 10% Polaris charity / 10% house.
 
 Context for this week:
 - Round ${roundId} is active
@@ -200,6 +200,7 @@ Generate a full week of social media content. Return ONLY a raw JSON object (no 
         platform: 'x', post_type: POST_TYPES[i], day_of_week: i,
         scheduled_at: toISO(weekStart, i, HOURS[i]),
         content: generated.x[day].slice(0, 280),
+        instagram_captions: null, selected_caption: null, image_hint: null,
         status: 'pending', week_start: weekStartStr
       })
     }
@@ -208,6 +209,7 @@ Generate a full week of social media content. Return ONLY a raw JSON object (no 
         platform: 'telegram', post_type: POST_TYPES[i], day_of_week: i,
         scheduled_at: toISO(weekStart, i, HOURS[i]),
         content: generated.telegram[day],
+        instagram_captions: null, selected_caption: null, image_hint: null,
         status: 'pending', week_start: weekStartStr
       })
     }

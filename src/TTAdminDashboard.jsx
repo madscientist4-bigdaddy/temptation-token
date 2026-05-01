@@ -1462,7 +1462,8 @@ function PayoutsScreen({ showToast }) {
       </div>
 
       <div style={{ background:'rgba(46,204,113,0.06)', border:'1px solid rgba(46,204,113,0.2)', borderRadius:10, padding:'14px 18px', fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8 }}>
-        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 40% to top voter, 40% to winning profile, 10% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.
+        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 40% to top voter, 40% to winning profile, 10% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.<br /><br />
+        🏆 <strong style={{ color:'var(--gold)' }}>Round 1 status:</strong> Active — ends May 5, 2026 at 5:10 PM EDT (21:10 UTC). NFT Champion Trophy will be minted to winner's wallet automatically at settlement starting Round 2 (after May 5). NFT minting requires V3b redeployment — see Daily Priorities.
       </div>
     </div>
   );
@@ -1829,9 +1830,9 @@ function SettingsScreen() {
         {
           title: "Weekly Round",
           fields: [
-            { label: "Round Schedule", value: "Monday 12:00am UTC → Sunday 11:59pm UTC" },
-            { label: "Round Start Keeper", value: "Monday 00:00 UTC (cron: 0 0 * * 1)" },
-            { label: "Round End Keeper", value: "Sunday 23:59 UTC (cron: 59 23 * * 0)" },
+            { label: "Round Schedule", value: "Monday 12:00 AM EDT → Sunday 11:59 PM EDT (04:00–03:59 UTC)" },
+            { label: "Round Start Keeper", value: "Monday 04:00 UTC (cron: 0 4 * * 1) — UPDATE REQUIRED" },
+            { label: "Round End Keeper", value: "Monday 03:59 UTC (cron: 59 3 * * 1) — UPDATE REQUIRED" },
             { label: "Round Duration", value: "604800 seconds (7 days exactly)" },
             { label: "Max Profiles Per Week", value: "50" },
             { label: "Max Submissions Per Wallet", value: "3 per week" },
@@ -2108,14 +2109,14 @@ function SystemScreen() {
           <tbody>
             <tr>
               <td style={{fontSize:'.75rem'}}>TTS Start Round</td>
-              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 0 * * 1</code></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Monday 12:00am UTC (start of round)</td>
+              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--rose)'}}>0 4 * * 1</code> <span style={{fontSize:'.55rem',color:'var(--rose)'}}>UPDATE</span></td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Monday 04:00 UTC = Monday 12:00 AM EDT</td>
               <td style={{fontSize:'.72rem',color:'var(--muted)'}}>604800s (7 days)</td>
             </tr>
             <tr>
               <td style={{fontSize:'.75rem'}}>TTS Settle Or Rollover</td>
-              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>59 23 * * 0</code></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Sunday 11:59pm UTC (end of round)</td>
+              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--rose)'}}>59 3 * * 1</code> <span style={{fontSize:'.55rem',color:'var(--rose)'}}>UPDATE</span></td>
+              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Monday 03:59 UTC = Sunday 11:59 PM EDT</td>
               <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
             </tr>
             <tr>
@@ -2133,7 +2134,7 @@ function SystemScreen() {
           </tbody>
         </table>
         <div style={{padding:'10px 16px',fontSize:'.62rem',color:'var(--muted)',lineHeight:1.7}}>
-          ⚠️ TTSVotingV3b does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper fires Monday 12:00am UTC. If it misses, use Manual Round Control below to start manually.
+          ⚠️ TTSVotingV3b does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper fires Monday 04:00 UTC (12:00 AM EDT). If it misses, use Manual Round Control below to start manually. <strong style={{color:'var(--rose)'}}>ACTION REQUIRED: Update Chainlink crons at automation.chain.link/base — see Chainlink Cron Update instructions in Jim's daily ops.</strong>
           {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify schedules at automation.chain.link →</a>
         </div>
       </div>
@@ -3059,7 +3060,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Start Checklist', emoji: '🚀',
     steps: [
-      'TTSKeeper2 fires automatically at Monday 12:00am UTC (00:00 UTC) via Chainlink Automation — verify on BaseScan',
+      'TTSKeeper2 fires automatically at Monday 04:00 UTC (12:00 AM EDT) via Chainlink Automation — verify on BaseScan. Cron must be 0 4 * * 1 — update at automation.chain.link/base if currently 0 0 * * 1',
       'If automation fails: BaseScan → TTSKeeper2 (0xB17b…C61A48) → Write → manualExecute(1)',
       'Approve pending profiles: Photo Review tab → Approve (updates Supabase; on-chain approval requires batchApproveProfiles via BaseScan)',
       'Generate + approve content calendar: Content Calendar tab → Generate This Week → approve posts',
@@ -3069,7 +3070,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Settlement', emoji: '🏆',
     steps: [
-      'Keeper fires automatically at round end (Sunday 11:59pm UTC / 23:59 UTC) — calls settleRound → requests VRF',
+      'Keeper fires automatically at Monday 03:59 UTC (Sunday 11:59 PM EDT) — calls settleRound → requests VRF. Cron must be 59 3 * * 1 — update at automation.chain.link/base if currently 59 23 * * 0',
       'Chainlink VRF V2.5 fulfills within ~30s (3 confirmations) — winner selected proportionally to tickets',
       'Payout split: 40% winner profile · 40% top voter · 10% house · 10% charity (Polaris Project)',
       'If keeper misses: BaseScan → TTSKeeper2 → Write → manualExecute(3)',
