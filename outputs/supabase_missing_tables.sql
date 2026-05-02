@@ -37,6 +37,21 @@ CREATE TABLE IF NOT EXISTS referrals (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS referrals_referred_wallet_idx ON referrals(referred_wallet);
 
+-- club_partners table (used by /api/set-club-wallet.js and Admin Referrals tab)
+CREATE TABLE IF NOT EXISTS club_partners (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_code TEXT NOT NULL UNIQUE,
+  club_name TEXT NOT NULL,
+  wallet_address TEXT NOT NULL,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS club_partners_code_idx ON club_partners(club_code);
+
+-- submissions table: add referral_code column if not already present
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS referral_code TEXT;
+
 -- Verify bonus_claims exists and has correct schema
 -- (should already exist from previous session)
 -- If not, run:

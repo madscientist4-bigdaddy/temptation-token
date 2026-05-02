@@ -1173,6 +1173,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [lt, setLt] = useState('')
   const [lu, setLu] = useState('')
   const [wallet, setWallet] = useState(address || '')
+  const [clubCode, setClubCode] = useState('')
   const [a1, setA1] = useState(false)
   const [a2, setA2] = useState(false)
   const fRef = useRef()
@@ -1261,7 +1262,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       const r = await fetch(SUPABASE_URL + '/rest/v1/submissions', {
         method: 'POST',
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending' })
+        body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending', referral_code: clubCode.trim().toLowerCase() || null })
       })
       if (r.ok) {
         showToast('Submission sent for review!', 's')
@@ -1279,7 +1280,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       return
     }
 
-    setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false)
+    setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false); setClubCode('')
     setSubmitting(false)
   }
 
@@ -1311,6 +1312,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         <label className="flabel">External Link URL</label>
         <input className="finput" type="url" placeholder="https://yourlink.com" value={lu} onChange={e => { setLu(e.target.value); setLuErr('') }} />
         {luErr && <div style={{ color:'var(--rose)', fontSize:'.7rem', marginTop:-8, marginBottom:8 }}>⚠ {luErr}</div>}
+        <label className="flabel">Club Referral Code <span style={{ color:'var(--muted)', fontWeight:400 }}>(optional — if sent by a club)</span></label>
+        <input className="finput" type="text" placeholder="e.g. VIXENS or DOLLHOUSE" value={clubCode} onChange={e => setClubCode(e.target.value)} style={{ textTransform:'lowercase' }} />
         <label className="flabel">Your Base Wallet Address (prize payouts)</label>
         <input className="finput" type="text" placeholder="0x…" value={wallet} onChange={e => { setWallet(e.target.value); setWalletErr('') }} />
         {walletErr && <div style={{ color:'var(--rose)', fontSize:'.7rem', marginTop:-8, marginBottom:8 }}>⚠ {walletErr}</div>}

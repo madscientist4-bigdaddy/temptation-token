@@ -1600,6 +1600,10 @@ function ReferralScreen({ showToast }) {
   const [saving, setSaving] = React.useState(false)
   const [referrers, setReferrers] = React.useState([])
   const [loading, setLoading] = React.useState(true)
+  const [clubs, setClubs] = React.useState([])
+  const [clubsLoading, setClubsLoading] = React.useState(true)
+  const [newClub, setNewClub] = React.useState({ clubName:'', clubCode:'', walletAddress:'' })
+  const [addingClub, setAddingClub] = React.useState(false)
 
   React.useEffect(() => {
     sb.get('referral_settings','id=eq.1&select=*').then(d => { if(Array.isArray(d)&&d.length>0) setSettings(d[0]) }).catch(()=>{})
@@ -1611,7 +1615,52 @@ function ReferralScreen({ showToast }) {
       }
       setLoading(false)
     }).catch(()=>setLoading(false))
+    loadClubs()
   },[])
+
+  const loadClubs = () => {
+    setClubsLoading(true)
+    sb.get('club_partners','order=created_at.desc&select=*').then(d => {
+      setClubs(Array.isArray(d) ? d : [])
+      setClubsLoading(false)
+    }).catch(()=>setClubsLoading(false))
+  }
+
+  const addClub = async () => {
+    if (!newClub.clubCode.trim()) { showToast('Club code required','error'); return }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(newClub.walletAddress)) { showToast('Invalid wallet address','error'); return }
+    setAddingClub(true)
+    try {
+      const r = await fetch('/api/set-club-wallet', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ clubName: newClub.clubName, clubCode: newClub.clubCode.trim().toLowerCase(), walletAddress: newClub.walletAddress })
+      })
+      const d = await r.json()
+      if (d.ok) {
+        showToast(`Club ${newClub.clubCode} registered · tx: ${d.txHash?.slice(0,12)}…`,'success')
+        setNewClub({ clubName:'', clubCode:'', walletAddress:'' })
+        loadClubs()
+      } else {
+        showToast(`Failed: ${d.error}`,'error')
+      }
+    } catch(e) { showToast('Request failed','error') }
+    setAddingClub(false)
+  }
+
+  const removeClub = async (code) => {
+    if (!window.confirm(`Deregister club "${code}"? Their wallet will no longer receive payouts.`)) return
+    try {
+      const r = await fetch('/api/set-club-wallet', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ clubCode: code, walletAddress: '0x0000000000000000000000000000000000000000' })
+      })
+      const d = await r.json()
+      if (d.ok) { showToast(`Club ${code} deregistered`,'success'); loadClubs() }
+      else showToast(`Failed: ${d.error}`,'error')
+    } catch { showToast('Request failed','error') }
+  }
 
   const save = async () => {
     setSaving(true)
@@ -1627,7 +1676,79 @@ function ReferralScreen({ showToast }) {
       <div className="page-header">
         <div className="page-title">Referral Program</div>
         <div className="gold-rule"/>
-        <div className="page-sub">Adjust bonuses and view top referrers. Changes take effect immediately.</div>
+        <div className="page-sub">Adjust bonuses, manage club partners, and view top referrers.</div>
+      </div>
+
+      {/* ── CLUB PARTNERS ── */}
+      <div style={{marginBottom:32}}>
+        <div style={{fontSize:".82rem",fontWeight:700,color:"var(--text)",marginBottom:4,textTransform:"uppercase",letterSpacing:".08em"}}>Club Partners</div>
+        <div style={{fontSize:".72rem",color:"var(--muted)",marginBottom:16,lineHeight:1.6}}>
+          Registered clubs receive <strong style={{color:"var(--gold)"}}>5% of each round pool</strong> when a winner was submitted with their referral code. House share reduces from 10% → 5%. Set via on-chain <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>setClubWallet(code, wallet)</code>.
+        </div>
+
+        {/* Add Club Form */}
+        <div className="stat-card" style={{marginBottom:16}}>
+          <div style={{fontSize:".75rem",fontWeight:700,color:"var(--gold)",marginBottom:14,textTransform:"uppercase",letterSpacing:".08em"}}>Add Club Partner</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr auto",gap:10,alignItems:"end"}}>
+            <div>
+              <div style={{fontSize:".62rem",color:"var(--muted)",marginBottom:5,textTransform:"uppercase",letterSpacing:".08em"}}>Club Name</div>
+              <input
+                style={{width:"100%",background:"rgba(255,255,255,.05)",border:"1px solid var(--border-gold)",borderRadius:6,color:"var(--text)",padding:"9px 12px",fontSize:".82rem"}}
+                placeholder="The Dollhouse"
+                value={newClub.clubName}
+                onChange={e=>setNewClub(s=>({...s,clubName:e.target.value}))}
+              />
+            </div>
+            <div>
+              <div style={{fontSize:".62rem",color:"var(--muted)",marginBottom:5,textTransform:"uppercase",letterSpacing:".08em"}}>Referral Code</div>
+              <input
+                style={{width:"100%",background:"rgba(255,255,255,.05)",border:"1px solid var(--border-gold)",borderRadius:6,color:"var(--text)",padding:"9px 12px",fontSize:".82rem",textTransform:"lowercase"}}
+                placeholder="dollhouse"
+                value={newClub.clubCode}
+                onChange={e=>setNewClub(s=>({...s,clubCode:e.target.value}))}
+              />
+            </div>
+            <div>
+              <div style={{fontSize:".62rem",color:"var(--muted)",marginBottom:5,textTransform:"uppercase",letterSpacing:".08em"}}>Club Wallet Address</div>
+              <input
+                style={{width:"100%",background:"rgba(255,255,255,.05)",border:"1px solid var(--border-gold)",borderRadius:6,color:"var(--text)",padding:"9px 12px",fontSize:".82rem",fontFamily:"monospace"}}
+                placeholder="0x…"
+                value={newClub.walletAddress}
+                onChange={e=>setNewClub(s=>({...s,walletAddress:e.target.value}))}
+              />
+            </div>
+            <button className="login-btn" onClick={addClub} disabled={addingClub} style={{minWidth:120,padding:"10px 16px",fontSize:".78rem"}}>
+              {addingClub ? 'Registering…' : '+ Register Club'}
+            </button>
+          </div>
+        </div>
+
+        {/* Club Table */}
+        {clubsLoading
+          ? <div style={{color:"var(--muted)",fontSize:".85rem",padding:"12px 0"}}>Loading clubs…</div>
+          : clubs.length === 0
+            ? <div className="empty-state"><span className="empty-icon">🏢</span>No club partners registered yet.</div>
+            : <table className="data-table" style={{width:"100%"}}>
+                <thead><tr><th>Club Name</th><th>Code</th><th>Wallet</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>{clubs.map(c=>(
+                  <tr key={c.club_code}>
+                    <td style={{fontWeight:700}}>{c.club_name}</td>
+                    <td><span style={{fontFamily:"monospace",fontSize:".82rem",color:"var(--gold)"}}>{c.club_code}</span></td>
+                    <td><span style={{fontFamily:"monospace",fontSize:".7rem",color:"var(--muted)"}}>{c.wallet_address?.slice(0,10)}…{c.wallet_address?.slice(-6)}</span></td>
+                    <td>
+                      <span style={{fontSize:".7rem",fontWeight:700,color:c.active?"var(--green)":"var(--rose)"}}>
+                        {c.active ? '● Active' : '○ Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <button onClick={()=>removeClub(c.club_code)} style={{background:"rgba(232,64,90,.1)",border:"1px solid rgba(232,64,90,.3)",borderRadius:4,color:"var(--rose)",padding:"4px 10px",fontSize:".68rem",cursor:"pointer"}}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+        }
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:16,marginBottom:28}}>
         <div className="stat-card" style={{gridColumn:"1/-1",display:"flex",alignItems:"center",justifyContent:"space-between"}}>

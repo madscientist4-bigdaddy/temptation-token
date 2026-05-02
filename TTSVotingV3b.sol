@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// TTSVotingV3b — identical to V3 plus 5 keeper-compatibility wrappers:
-//   minProfilesPerRound()   — TTSKeeper2 calls without try/catch (V3 missing → revert)
-//   getProfiles(roundId)    — TTSKeeper2 calls without try/catch (V3 missing → revert)
-//   requestSettlement()     — alias for settleRound() (V3 has settleRound, keeper wants requestSettlement)
-//   rolloverRound()         — marks round settled with no payout so next round can start
-//   takeMidpointSnapshot()  — alias for midpointSnapshot() (V3 renamed it)
+// TTSVotingV3b — V3b keeper-compatibility wrappers + club referral payout system
 //
-// Deployment sequence (same as V3):
+// Club referral payout (added in this revision):
+//   - Admin registers club referral codes via setClubWallet(code, wallet)
+//   - Admin links a profile to a club code via setProfileClub(profileId, clubCode)
+//     (called automatically by api/approve-profile.js if submission has referral_code set)
+//   - On settlement, if winning profile has a club code with a registered wallet:
+//       40% top voter / 40% winning profile / 10% Polaris / 5% house / 5% club
+//   - If no club: unchanged split: 40/40/10/10
+//
+// Deployment sequence:
 //   1.  Deploy this contract -> note V3b_ADDRESS
 //   2.  V3b.transferOwnership("0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48")
 //   3.  keeper.setVotingContract("V3b_ADDRESS")
-//   4.  keeper.manualExecute(1)   — starts Round 1 on V3b
-//   5.  V3b.batchApproveProfiles(profileIds[], wallets[])
-//   6.  Add V3b_ADDRESS as VRF consumer at vrf.chain.link
-//   7.  Update VOTING_ADDRESS in src/App.jsx + admin dashboard + api routes
-//   8.  npm run build && npx vercel --prod
+//   4.  keeper.acceptVotingOwnership("V3b_ADDRESS")
+//   5.  V3b.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")
+//   6.  V3b.batchApproveProfiles(profileIds[], wallets[])
+//   7.  Add V3b_ADDRESS as VRF consumer at vrf.chain.link/base
+//   8.  Update VOTING_ADDRESS in src/App.jsx + admin dashboard + api routes
+//   9.  npm run build && npx vercel --prod
 
 // -----------------------------------------------------------------------------
 // Interfaces
@@ -126,7 +130,7 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
     bytes private constant VRF_EXTRA_ARGS = hex"92fd133800000000000000000000000000000000000000000000000000000000"
                                             hex"0000000000000000000000000000000000000000000000000000000000000000";
 
-    // Admin role (deployer): profile approval
+    // Admin role (deployer): profile approval, club management
     address public admin;
 
     event AdminTransferred(address indexed previous, address indexed next);
@@ -160,6 +164,28 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
     // Voting constants
     uint256 public constant MIN_VOTE         = 5e18;
     uint256 public constant MAX_VOTE_CAP_BPS = 4000;
+
+    // ── Club referral mappings ────────────────────────────────────────────────
+    // clubCode => club wallet address (registered by admin via setClubWallet)
+    mapping(string => address) public clubWallets;
+    // profileId => club referral code (set by admin at approval time)
+    mapping(string => string)  public profileClub;
+
+    event ClubWalletSet(string indexed clubCode, address indexed wallet);
+    event ProfileClubSet(string indexed profileId, string indexed clubCode);
+    event ClubPayoutSent(uint256 indexed roundId, string clubCode, address indexed clubWallet, uint256 amount);
+
+    // Register or update a club's payout wallet. Pass address(0) to deregister.
+    function setClubWallet(string calldata code, address wallet) external onlyAdmin {
+        clubWallets[code] = wallet;
+        emit ClubWalletSet(code, wallet);
+    }
+
+    // Link a profile to a club code. Called at approval time when submission has referral_code.
+    function setProfileClub(string calldata profileId, string calldata clubCode) external onlyAdmin {
+        profileClub[profileId] = clubCode;
+        emit ProfileClubSet(profileId, clubCode);
+    }
 
     // Structs
     struct Profile {
@@ -223,23 +249,18 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
     // Keeper compatibility wrappers (NEW in V3b)
     // -------------------------------------------------------------------------
 
-    // TTSKeeper2 calls this WITHOUT try/catch — must exist and return a value
     function minProfilesPerRound() external pure returns (uint256) {
         return 1;
     }
 
-    // TTSKeeper2 calls this WITHOUT try/catch — must exist and return the profile list
     function getProfiles(uint256 roundId) external view returns (string[] memory) {
         return _rounds[roundId].profileIds;
     }
 
-    // TTSKeeper2 calls requestSettlement() (with try/catch) — alias for settleRound()
     function requestSettlement() external onlyOwner {
         _requestSettlement();
     }
 
-    // TTSKeeper2 calls rolloverRound() when profiles < minProfilesPerRound (with try/catch)
-    // Marks round as settled (no payout) so next round can start
     function rolloverRound() external onlyOwner {
         Round storage r = _rounds[currentRoundId];
         require(r.startTime > 0, "Round not started");
@@ -249,7 +270,6 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
         emit RoundRolledOver(currentRoundId);
     }
 
-    // TTSKeeper2 calls takeMidpointSnapshot() (with try/catch) — alias for midpointSnapshot()
     function takeMidpointSnapshot() external onlyOwner {
         // no-op, kept for compatibility
     }
@@ -369,7 +389,22 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
         uint256 profileShare = pool * 40 / 100;
         uint256 voterShare   = pool * 40 / 100;
         uint256 charityShare = pool * 10 / 100;
-        uint256 houseShare   = pool - profileShare - voterShare - charityShare;
+
+        // ── Club referral payout ──────────────────────────────────────────────
+        // If the winning profile is linked to a club with a registered wallet,
+        // send 5% to the club and reduce house share to 5% (from 10%).
+        // If no club: house gets the full remaining 10%.
+        string memory clubCode  = profileClub[winnerId];
+        address clubWallet = bytes(clubCode).length > 0 ? clubWallets[clubCode] : address(0);
+
+        uint256 clubShare  = 0;
+        uint256 houseShare;
+        if (clubWallet != address(0)) {
+            clubShare  = pool * 5 / 100;
+            houseShare = pool - profileShare - voterShare - charityShare - clubShare;
+        } else {
+            houseShare = pool - profileShare - voterShare - charityShare;
+        }
 
         ttsToken.transfer(winner.wallet, profileShare);
         ttsToken.transfer(
@@ -378,6 +413,11 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
         );
         ttsToken.transfer(charityWallet, charityShare);
         ttsToken.transfer(houseWallet, houseShare);
+
+        if (clubShare > 0) {
+            ttsToken.transfer(clubWallet, clubShare);
+            emit ClubPayoutSent(roundId, clubCode, clubWallet, clubShare);
+        }
 
         if (nftContract != address(0)) {
             try ITTSRoundNFT(nftContract).mint(winner.wallet, roundId, winnerId, pool / 1e18) {} catch {}
