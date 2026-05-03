@@ -17,7 +17,7 @@
 
 ## Project Description
 
-Temptation Token ($TTS) is a weekly vote-to-earn game on Base blockchain. Users vote $TTS on competing profiles each week; the top voter on the winning profile wins 40% of the prize pool automatically at round close. Chainlink VRF ensures provably fair winner selection.
+Temptation Token ($TTS) is a weekly vote-to-earn game on Base blockchain. Users vote $TTS on competing profiles each week; the top voter on the winning profile wins 35% of the prize pool automatically at round close. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%. Chainlink VRF ensures provably fair winner selection.
 
 Staking system: Bronze (8% APR, 1.1x) through VIP (45% APR, 3x). Fixed supply, no inflation. Audited by Solidproof.
 

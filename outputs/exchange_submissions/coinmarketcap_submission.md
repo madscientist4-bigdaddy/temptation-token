@@ -14,7 +14,7 @@
 
 ## Description (for CMC listing — 150 words)
 
-Temptation Token ($TTS) is the first vote-to-earn gaming token on Base blockchain. Weekly voting rounds open Monday 12:00 AM EDT and close Sunday 11:59 PM EDT. Users vote $TTS on competing profiles — the top voter on the winning profile automatically receives 40% of the weekly prize pool. The winning profile receives 40%. Settlement is executed by Chainlink VRF, making outcomes provably fair and immutable.
+Temptation Token ($TTS) is the first vote-to-earn gaming token on Base blockchain. Weekly voting rounds open Monday 12:00 AM EDT and close Sunday 11:59 PM EDT. Users vote $TTS on competing profiles — the top voter on the winning profile automatically receives 35% of the weekly prize pool. The winning profile receives 35%. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%. Settlement is executed by Chainlink VRF, making outcomes provably fair and immutable.
 
 TTS is audited by Solidproof (zero critical findings), with liquidity locked 12 months on Team.Finance and treasury held in a Gnosis Safe 2/2 multisig. The staking system offers up to 45% APR with vote multipliers up to 3x. Minted as a fixed supply of 69 billion tokens with a 1% transfer tax funding the prize ecosystem.
 

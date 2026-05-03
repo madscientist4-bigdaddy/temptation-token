@@ -90,7 +90,9 @@ All submissions are reviewed by admins before going live. Violating content is r
 | Winning Profile (you, if you win) | 35% |
 | Top Voter on your profile | 35% |
 | Polaris Project (charity) | 10% |
-| Blockchain Entertainment LLC | 10% |
+| Blockchain Entertainment LLC | 20% |
+
+Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%.
 
 If your profile wins, 35% of everything voted this week goes straight to your wallet. Automatically. On-chain. In under a minute after settlement.
 

@@ -7,7 +7,7 @@
 |-------|-------|
 | Token Name | Temptation Token |
 | Symbol | TTS |
-| Description | The first vote-to-earn game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 40% of the prize pool. Audited, LP locked, Chainlink VRF. |
+| Description | The first vote-to-earn game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 35% of the prize pool (35% to top voter, 35% to winning profile, 10% charity, 20% house). Audited, LP locked, Chainlink VRF. |
 | Website | https://temptationtoken.io |
 | App | https://app.temptationtoken.io |
 | Twitter | https://twitter.com/TemptationToken |

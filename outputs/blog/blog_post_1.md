@@ -54,9 +54,11 @@ When Sunday night ends, the round closes. Chainlink VRF selects the winner using
 | Top Voter (most votes on winning profile) | 35% |
 | Winning Profile | 35% |
 | Polaris Project (anti-trafficking charity) | 10% |
-| Blockchain Entertainment LLC | 10% |
+| Blockchain Entertainment LLC | 20% |
 
 Funds hit your wallet automatically. No claiming, no waiting, no trust required.
+
+Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%.
 
 ---
 

@@ -17,7 +17,7 @@
 
 ## Description (use exactly)
 
-Temptation Token ($TTS) is the first vote-to-earn cryptocurrency game on Base blockchain. Each week, users vote $TTS tokens on competing profiles. The profile with the most weighted votes wins, and the top voter takes 40% of the weekly prize pool — paid automatically by the smart contract. Winner selection is provably fair via Chainlink VRF. LP is locked for 12 months. Audited by Solidproof.
+Temptation Token ($TTS) is the first vote-to-earn cryptocurrency game on Base blockchain. Each week, users vote $TTS tokens on competing profiles. The profile with the most weighted votes wins, and the top voter takes 35% of the weekly prize pool — paid automatically by the smart contract. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. Winner selection is provably fair via Chainlink VRF. LP is locked for 12 months. Audited by Solidproof.
 
 ## Market Data
 

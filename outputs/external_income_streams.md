@@ -8,7 +8,7 @@
 **Status: Active since Round 1 (April 28, 2026)**
 
 ### Sources:
-- **10% house cut** on every prize pool → automatically received at 0xb1e991... on each settlement
+- **20% house cut** on every prize pool (10% when club partner is involved) → automatically received at 0xb1e991... on each settlement. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%.
 - **5 TTS submission fee** per profile → goes to house wallet at time of submission
 - **1% transfer tax** on all TTS transactions → accumulates in token contract, claimable by admin
 

@@ -18,7 +18,7 @@
 Temptation Token ($TTS) is the first vote-to-earn cryptocurrency game deployed on Base blockchain (Coinbase's Ethereum Layer 2). The project combines social voting mechanics with real cryptocurrency stakes in a weekly on-chain competition.
 
 **How It Works:**
-Each week, a new voting round opens Monday 12:00 AM EDT. Approved profiles compete for votes. Users purchase $TTS and vote on profiles they believe will win the round. The user who votes the most $TTS on the winning profile at round close receives 40% of the entire prize pool. The winning profile itself receives 40%. Settlement happens automatically via Chainlink VRF within minutes of round close (Sunday 11:59 PM EDT).
+Each week, a new voting round opens Monday 12:00 AM EDT. Approved profiles compete for votes. Users purchase $TTS and vote on profiles they believe will win the round. The user who votes the most $TTS on the winning profile at round close receives 35% of the entire prize pool. The winning profile itself receives 35%. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%. Settlement happens automatically via Chainlink VRF within minutes of round close (Sunday 11:59 PM EDT).
 
 **Token Utility:**
 $TTS has direct in-game utility — it is both the betting currency and the prize currency. Users must hold and spend $TTS to participate. Stakers who lock $TTS earn up to 45% APR and receive vote multipliers up to 3x, creating strong holding incentives.

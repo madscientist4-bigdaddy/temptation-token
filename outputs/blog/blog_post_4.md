@@ -100,7 +100,7 @@ Reading a verified contract on BaseScan: click the address → click "Contract" 
 **WHAT THE ADMIN CANNOT DO:**
 - Change who wins a round — winner selection is fully on-chain via Chainlink VRF
 - Steal votes — votes are locked in the contract until settlement
-- Modify the prize distribution percentages — they are hardcoded in `fulfillRandomWords`
+- Modify the prize distribution percentages — they are hardcoded in `fulfillRandomWords`. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%.
 - Remove liquidity from the pool — LP is locked on Team.Finance for 12 months
 - Mint additional tokens — the token contract has no mint function beyond the initial supply
 - Access user funds — only the contract can distribute prizes, not any wallet

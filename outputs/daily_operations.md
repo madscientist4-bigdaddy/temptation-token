@@ -67,7 +67,7 @@ Hey [Name] 👋
 
 I built a crypto voting game called Temptation Token where men vote real cryptocurrency on women's profiles weekly.
 
-Top voted profile wins 40% of the prize pool — paid automatically to your crypto wallet. No exclusivity. No fees. You keep everything.
+Top voted profile wins 35% of the prize pool — paid automatically to your crypto wallet. No exclusivity. No fees. You keep everything. Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity, and 20% to Blockchain Entertainment LLC. When a profile was submitted through a club partner, the split adjusts to 35/35/10/10/10 — the club receives 10% and the house receives 10%.
 
 Beta launching now — personally selecting founding profiles. With your following you'd be a top contender.
 
