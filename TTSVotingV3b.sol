@@ -3,13 +3,16 @@ pragma solidity ^0.8.20;
 
 // TTSVotingV3b — V3b keeper-compatibility wrappers + club referral payout system
 //
-// Club referral payout (added in this revision):
+// Canonical prize split:
+//   No club:   35% top voter / 35% winning profile / 10% charity / 20% house
+//   With club: 35% top voter / 35% winning profile / 10% charity / 10% club / 10% house
+//
+// Club referral payout:
 //   - Admin registers club referral codes via setClubWallet(code, wallet)
 //   - Admin links a profile to a club code via setProfileClub(profileId, clubCode)
 //     (called automatically by api/approve-profile.js if submission has referral_code set)
-//   - On settlement, if winning profile has a club code with a registered wallet:
-//       40% top voter / 40% winning profile / 10% Polaris / 5% house / 5% club
-//   - If no club: unchanged split: 40/40/10/10
+//   - On settlement, if winning profile has a club with a registered wallet:
+//       club gets 10%, house drops from 20% to 10%
 //
 // Deployment sequence:
 //   1.  Deploy this contract -> note V3b_ADDRESS
@@ -386,24 +389,25 @@ contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
         uint256 pool = winner.rawVotes;
         if (pool == 0 || winner.wallet == address(0)) return;
 
-        uint256 profileShare = pool * 40 / 100;
-        uint256 voterShare   = pool * 40 / 100;
+        // Canonical split: 35% top voter / 35% winning profile / 10% charity
+        // No club  → 20% house
+        // With club → 10% club + 10% house
+        uint256 profileShare = pool * 35 / 100;
+        uint256 voterShare   = pool * 35 / 100;
         uint256 charityShare = pool * 10 / 100;
 
-        // ── Club referral payout ──────────────────────────────────────────────
-        // If the winning profile is linked to a club with a registered wallet,
-        // send 5% to the club and reduce house share to 5% (from 10%).
-        // If no club: house gets the full remaining 10%.
-        string memory clubCode  = profileClub[winnerId];
+        string memory clubCode = profileClub[winnerId];
         address clubWallet = bytes(clubCode).length > 0 ? clubWallets[clubCode] : address(0);
 
         uint256 clubShare  = 0;
         uint256 houseShare;
         if (clubWallet != address(0)) {
-            clubShare  = pool * 5 / 100;
+            clubShare  = pool * 10 / 100;
             houseShare = pool - profileShare - voterShare - charityShare - clubShare;
+            // 100 - 35 - 35 - 10 - 10 = 10%
         } else {
             houseShare = pool - profileShare - voterShare - charityShare;
+            // 100 - 35 - 35 - 10 = 20%
         }
 
         ttsToken.transfer(winner.wallet, profileShare);
