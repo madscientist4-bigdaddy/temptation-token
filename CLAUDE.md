@@ -190,12 +190,36 @@ Always `git add` + commit + push after every change.
 
 ---
 
+## Vercel Environment Variables
+
+| Variable | Purpose | Status |
+|----------|---------|--------|
+| `DEPLOYER_PRIVATE_KEY` | approve-profile, referral-credit on-chain calls | ✅ Set Apr 22 |
+| `MARKETING_WALLET_PRIVATE_KEY` | signup-bonus, vote-match TTS sends | ✅ Set May 1 |
+| `ANTHROPIC_API_KEY` | chatbot + content generator | ✅ Set |
+| `BROADCAST_BOT_TOKEN` | Telegram @TTSBroadcastBot | ✅ Set |
+| `X_API_KEY` | X app credential (shared) | ✅ Set |
+| `X_API_SECRET` | X app credential (shared) | ✅ Set |
+| `X_ACCESS_TOKEN` | @CryptoFitJim user token | ✅ Set (needs Read+Write) |
+| `X_ACCESS_SECRET` | @CryptoFitJim user secret | ✅ Set (needs Read+Write) |
+| `TTS_X_ACCESS_TOKEN` | @temptationtoken user token | ❌ **Needs adding** |
+| `TTS_X_ACCESS_SECRET` | @temptationtoken user secret | ❌ **Needs adding** |
+| `SUPABASE_URL` | Supabase project URL | ✅ Set |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key | ✅ Set |
+
+**To add TTS_X_ACCESS_TOKEN / TTS_X_ACCESS_SECRET:**
+1. Go to developer.twitter.com → Projects & Apps → your app → User authentication settings
+2. Log in as @temptationtoken, generate Access Token + Secret with Read+Write permissions
+3. Add both to Vercel: vercel.com/cryptofitjims-projects/temptation-token/settings/environment-variables
+
+---
+
 ## Pending Actions (priority order)
 
 1. **🚨 Fund Marketing wallet with TTS** — `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` has 0 TTS. Send TTS from deployer/house wallet to enable signup bonus + vote-match payouts. Marketing wallet has ETH for gas ✅ but needs TTS tokens.
 2. **🚀 Deploy NFT-enabled V3b after May 5** — Current V3b at 0xEC339... predates NFT code. After Round 1 settles (May 5 21:10 UTC), redeploy with current TTSVotingV3b.sol, run 6-step keeper handoff, call `setNFTContract(0x0768...)`. Confirm settlement on BaseScan first.
 3. **Add DEPLOYER_PRIVATE_KEY** to Vercel env — enables approve-profile API (one-click approve in Photo Review tab) and referral-credit API. This is the deployer/house wallet private key.
-4. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env → enables auto X posting
+4. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env → enables @CryptoFitJim auto posting. **Also add TTS_X_ACCESS_TOKEN + TTS_X_ACCESS_SECRET** for @temptationtoken brand account (log into X Developer Console as @temptationtoken → User authentication settings → generate Access Token + Secret → add to Vercel)
 5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings)
 6. **CoinGecko resubmission** — use `outputs/exchange_submissions/coingecko_update.md`
 7. **Solidproof audit delivery** — expected 5-10 business days from April 29. When received: publish at temptationtoken.io/audit, resubmit to Blockaid, submit to CoinGecko/CMC.

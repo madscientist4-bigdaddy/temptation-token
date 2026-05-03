@@ -1,13 +1,19 @@
 // POST /api/social-post — posts to X (Twitter) and mirrors to Telegram channels
 //
-// Required env vars (set in Vercel + Railway):
-//   X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET
+// Required env vars (set in Vercel):
+//   X_API_KEY, X_API_SECRET         — app credentials (shared by both X accounts)
+//   X_ACCESS_TOKEN, X_ACCESS_SECRET — @CryptoFitJim user credentials
+//   TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET — @temptationtoken user credentials (optional)
 //   BROADCAST_BOT_TOKEN   — @TTSBroadcastBot token
-//   MAIN_CHANNEL_ID       — @temptationtoken channel ID (e.g. "@temptationtoken" or numeric)
+//   MAIN_CHANNEL_ID       — @temptationtoken channel ID
 //   COMMUNITY_CHAT_ID     — @TTSCommunityChat chat ID
 //
-// Call from any backend trigger (admin panel, on-chain event watcher, etc.)
-// Body: { type: 'round_start'|'round_settled'|'profile_approved', data: { roundId, profileCount, pool, profileName } }
+// Posting rules:
+//   @CryptoFitJim     — all template types + content calendar (personal voice)
+//   @temptationtoken  — round_start, round_settled, profile_approved only (brand voice)
+//
+// Body: { type: 'round_start'|'round_settled'|'profile_approved', data: { roundId, profileCount, pool } }
+//   OR: { platform: 'telegram', content: '...', chatId: '...' }  — direct Telegram mode
 
 import crypto from 'crypto'
 
@@ -57,6 +63,7 @@ async function sendTelegram(chatId, text, token) {
   return r.json()
 }
 
+// @CryptoFitJim — personal voice, all event types
 const TEMPLATES = {
   round_start: ({ roundId, profileCount, pool }) =>
     `🔥 Round ${roundId} is LIVE on Temptation Token\n\n${profileCount} profiles competing for ${pool ? pool.toLocaleString() + ' $TTS' : '$TTS'}\n\nVote now → app.temptationtoken.io\n\n#TTS #Base #Crypto`,
@@ -66,6 +73,18 @@ const TEMPLATES = {
 
   profile_approved: () =>
     `🔥 New profile just approved\n\nVote $TTS to back your favorite\nWinner takes 35% of the pool\n\nt.me/TTSGameBot`,
+}
+
+// @temptationtoken — brand voice, event-driven announcements only
+const TTS_TEMPLATES = {
+  round_start: ({ roundId, profileCount }) =>
+    `🎮 Round ${roundId} is now LIVE on Temptation Token. ${profileCount || 14} profiles competing. Vote now → app.temptationtoken.io $TTS #Base #Crypto`,
+
+  round_settled: ({ roundId, pool }) =>
+    `🏆 Round ${roundId} winner announced! ${pool ? pool.toLocaleString() + ' $TTS' : '$TTS'} paid automatically on-chain. Round ${Number(roundId) + 1} starts Monday. app.temptationtoken.io $TTS`,
+
+  profile_approved: ({ roundId }) =>
+    `👑 New profile approved and live${roundId ? ` in Round ${roundId}` : ''}! Vote now → app.temptationtoken.io $TTS #TemptationToken`,
 }
 
 export default async function handler(req, res) {
@@ -89,25 +108,37 @@ export default async function handler(req, res) {
   const { type, data = {} } = body
   if (!type || !TEMPLATES[type]) return res.status(400).json({ error: 'Unknown type' })
 
-  const text = TEMPLATES[type](data)
   const results = {}
 
-  const env = {
-    X_API_KEY: process.env.X_API_KEY,
-    X_API_SECRET: process.env.X_API_SECRET,
-    X_ACCESS_TOKEN: process.env.X_ACCESS_TOKEN,
-    X_ACCESS_SECRET: process.env.X_ACCESS_SECRET,
-  }
+  const apiKey    = process.env.X_API_KEY
+  const apiSecret = process.env.X_API_SECRET
 
-  // Post to X
-  if (env.X_API_KEY && env.X_API_SECRET && env.X_ACCESS_TOKEN && env.X_ACCESS_SECRET) {
+  // Post to @CryptoFitJim (personal voice — all types)
+  const jimToken  = process.env.X_ACCESS_TOKEN
+  const jimSecret = process.env.X_ACCESS_SECRET
+  if (apiKey && apiSecret && jimToken && jimSecret) {
+    const jimText = TEMPLATES[type](data)
     try {
-      results.twitter = await postTweet(text, env)
+      results.twitter_jim = await postTweet(jimText, { X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: jimToken, X_ACCESS_SECRET: jimSecret })
     } catch(e) {
-      results.twitter_error = e.message
+      results.twitter_jim_error = e.message
     }
   } else {
-    results.twitter = 'skipped — X credentials not configured'
+    results.twitter_jim = 'skipped — @CryptoFitJim X credentials not configured'
+  }
+
+  // Post to @temptationtoken (brand voice — event types only)
+  const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
+  const ttsSecret = process.env.TTS_X_ACCESS_SECRET
+  if (apiKey && apiSecret && ttsToken && ttsSecret && TTS_TEMPLATES[type]) {
+    const ttsText = TTS_TEMPLATES[type](data)
+    try {
+      results.twitter_tts = await postTweet(ttsText, { X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: ttsToken, X_ACCESS_SECRET: ttsSecret })
+    } catch(e) {
+      results.twitter_tts_error = e.message
+    }
+  } else if (!ttsToken || !ttsSecret) {
+    results.twitter_tts = 'skipped — TTS_X_ACCESS_TOKEN/SECRET not configured'
   }
 
   // Mirror to Telegram channels
@@ -115,12 +146,12 @@ export default async function handler(req, res) {
   const mainChannelId   = process.env.MAIN_CHANNEL_ID   || '-1002207667493'
   const communityChatId = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
   if (broadcastToken) {
-    const telegramText = text
+    const telegramText = TEMPLATES[type](data)
     try { results.main_channel = await sendTelegram(mainChannelId, telegramText, broadcastToken) } catch(e) { results.main_channel_error = e.message }
     try { results.community    = await sendTelegram(communityChatId, telegramText, broadcastToken) } catch(e) { results.community_error = e.message }
   } else {
     results.telegram = 'skipped — BROADCAST_BOT_TOKEN not configured'
   }
 
-  return res.status(200).json({ ok: true, text, results })
+  return res.status(200).json({ ok: true, jim_text: TEMPLATES[type](data), tts_text: TTS_TEMPLATES[type]?.(data) || null, results })
 }
