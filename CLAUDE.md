@@ -68,7 +68,7 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 | TTS v2 Implementation (M1 fix, pending upgrade) | `0xb995b63cdf848b7884cdc51da82e4a80ad02395a` |
 | TTSVotingV2 (deprecated) | `0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA` |
 | TTSVotingV3 (deprecated) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
-| **TTSVotingV3b (ACTIVE)** | **`0x1c1446F4d984983d56954e8829ceA4b7576D9EdA`** |
+| **TTSVotingV3b (ACTIVE — FINAL)** | **`0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8`** |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
 | **TTSRoundNFT** | **`0x0768e862D3AB14d85213BfeF8f1D012E77721da2`** |
@@ -224,7 +224,7 @@ Check memory files for any session-specific context.
 
 ### April 28 – May 1, 2026
 
-- ✅ TTSVotingV3b deployed at `0x1c1446F4d984983d56954e8829ceA4b7576D9EdA`
+- ✅ TTSVotingV3b (final) deployed at `0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8`
 - ✅ Round 1 started April 28 21:10 UTC — ends May 5 21:10 UTC — 14 profiles
 - ✅ api/signup-bonus.js + api/vote-match.js (bonus system, private key corrected May 1)
 - ✅ Marketing wallet ETH funded (May 1); TTS balance still 0 — needs TTS transfer
@@ -256,7 +256,7 @@ Check memory files for any session-specific context.
 
 ## TTSVotingV3b Redeployment (after Round 1 settles — May 5+ EDT)
 
-**Before running:** Confirm RoundSettled event on BaseScan: `0x1c1446F4d984983d56954e8829ceA4b7576D9EdA#events`
+**Before running:** Confirm RoundSettled event on BaseScan: `0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8#events`
 
 Constructor params (same as V3b, copy-paste into Remix):
 ```
