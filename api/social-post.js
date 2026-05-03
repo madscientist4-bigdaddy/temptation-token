@@ -65,7 +65,7 @@ const TEMPLATES = {
     `🏆 Round ${roundId} SETTLED\n\nWinner paid automatically on Base\nChainlink VRF — provably fair\n\nRound ${roundId + 1} starts Monday 🔥\n\napp.temptationtoken.io`,
 
   profile_approved: () =>
-    `🔥 New profile just approved\n\nVote $TTS to back your favorite\nWinner takes 40% of the pool\n\nt.me/TTSGameBot`,
+    `🔥 New profile just approved\n\nVote $TTS to back your favorite\nWinner takes 35% of the pool\n\nt.me/TTSGameBot`,
 }
 
 export default async function handler(req, res) {

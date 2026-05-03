@@ -119,7 +119,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' })
   }
 
-  const prompt = `You are the social media manager for Temptation Token ($TTS), a Web3 "Hot or Not" voting game on Base blockchain. Users vote for profiles by spending $TTS tokens. Stakers earn yield. The game is provocative but SFW. Round schedule: Monday 12:00 AM EDT → Sunday 11:59 PM EDT. Prize split: 40% top voter / 40% winning profile / 10% Polaris charity / 10% house.
+  const prompt = `You are the social media manager for Temptation Token ($TTS), a Web3 "Hot or Not" voting game on Base blockchain. Users vote for profiles by spending $TTS tokens. Stakers earn yield. The game is provocative but SFW. Round schedule: Monday 12:00 AM EDT → Sunday 11:59 PM EDT. Prize split: 35% top voter / 35% winning profile / 10% Polaris charity / 20% house.
 
 Context for this week:
 - Round ${roundId} is active

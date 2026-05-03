@@ -1,12 +1,12 @@
 ---
 title: "Submit Your Photo to Temptation Token and Compete for Weekly Crypto Prizes"
 target_keyword: "submit photo earn crypto"
-meta_description: "Women can submit their photo to Temptation Token and win 40% of the weekly prize pool — paid directly to your crypto wallet. No exclusivity, no fees, NFT trophy for winners."
+meta_description: "Women can submit their photo to Temptation Token and win 35% of the weekly prize pool — paid directly to your crypto wallet. No exclusivity, no fees, NFT trophy for winners."
 ---
 
 # Submit Your Photo to Temptation Token and Compete for Weekly Crypto Prizes
 
-Every week, women on Temptation Token compete in a crypto voting game — and the winner takes home 40% of the prize pool, paid automatically to their crypto wallet.
+Every week, women on Temptation Token compete in a crypto voting game — and the winner takes home 35% of the prize pool, paid automatically to their crypto wallet.
 
 No agency. No exclusivity contract. No platform fees. You keep everything.
 
@@ -16,7 +16,7 @@ Here's exactly how it works.
 
 ## What Is Temptation Token?
 
-Temptation Token ($TTS) is a provably fair voting game on Base blockchain. Men buy $TTS tokens and vote on profiles they like. The profile with the most votes at the end of the week wins 40% of the entire prize pool.
+Temptation Token ($TTS) is a provably fair voting game on Base blockchain. Men buy $TTS tokens and vote on profiles they like. The profile with the most votes at the end of the week wins 35% of the entire prize pool.
 
 Your job: get people to vote for you.
 
@@ -87,12 +87,12 @@ All submissions are reviewed by admins before going live. Violating content is r
 
 | Recipient | Share |
 |-----------|-------|
-| Winning Profile (you, if you win) | 40% |
-| Top Voter on your profile | 40% |
+| Winning Profile (you, if you win) | 35% |
+| Top Voter on your profile | 35% |
 | Polaris Project (charity) | 10% |
 | Blockchain Entertainment LLC | 10% |
 
-If your profile wins, 40% of everything voted this week goes straight to your wallet. Automatically. On-chain. In under a minute after settlement.
+If your profile wins, 35% of everything voted this week goes straight to your wallet. Automatically. On-chain. In under a minute after settlement.
 
 ---
 

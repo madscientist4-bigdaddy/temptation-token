@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Temptation Token — Business Cards (Print)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── SCREEN ──────────────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a1a;
+      font-family: 'Montserrat', sans-serif;
+      padding: 24px;
+      color: #f5f5f5;
+    }
+
+    h1 {
+      text-align: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      color: #c9a84c;
+      margin-bottom: 4px;
+    }
+    .instructions {
+      text-align: center;
+      font-size: .72rem;
+      color: #888;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .instructions strong { color: #c9a84c; }
+
+    .print-btn {
+      display: block;
+      margin: 0 auto 24px;
+      background: #c9a84c;
+      color: #0d0d0d;
+      border: none;
+      padding: 10px 32px;
+      border-radius: 50px;
+      font-weight: 800;
+      font-size: .85rem;
+      cursor: pointer;
+      letter-spacing: .05em;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: .65rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: #c9a84c;
+      font-weight: 700;
+      margin: 20px 0 10px;
+    }
+
+    /* ── CARD GRID ───────────────────────────────────────────────── */
+    /* Business card: 3.5in × 2in + 0.125in bleed on each side = 3.75in × 2.25in */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, auto);
+      gap: 16px;
+      justify-content: center;
+    }
+
+    .card-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-label {
+      font-size: .55rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: #555;
+      align-self: flex-start;
+    }
+
+    /* card includes bleed zone */
+    .card {
+      width: 3.75in;
+      height: 2.25in;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    /* bleed border (shown on screen, hidden on print via clip) */
+    .bleed-frame {
+      position: absolute;
+      inset: 0;
+      border: 1px dashed rgba(201,168,76,0.35);
+      border-radius: 2px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    /* safe area = 0.125in inset on each side */
+    .card-face {
+      position: absolute;
+      inset: 0.125in;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── FRONT FACE ──────────────────────────────────────────────── */
+    .front {
+      background: #0d0d0d;
+    }
+
+    .front-inner {
+      padding: 0.18in 0.2in 0.16in;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    /* Top: logo */
+    .card-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: .9rem;
+      font-weight: 700;
+      color: #c9a84c;
+      letter-spacing: .04em;
+      line-height: 1;
+    }
+    .card-ticker {
+      font-size: .38rem;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: rgba(201,168,76,0.6);
+      margin-top: 2px;
+    }
+
+    /* Gold rule */
+    .card-rule {
+      height: 1px;
+      background: linear-gradient(90deg, #c9a84c, transparent);
+      margin: 0.1in 0 0.08in;
+      opacity: 0.5;
+    }
+
+    /* Name + title */
+    .card-name {
+      font-size: .85rem;
+      font-weight: 800;
+      color: #f5f5f5;
+      letter-spacing: .02em;
+      line-height: 1;
+    }
+    .card-title {
+      font-size: .5rem;
+      font-weight: 600;
+      color: #c9a84c;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    /* spacer */
+    .card-spacer { flex: 1; }
+
+    /* bottom row */
+    .card-contact {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .card-contact-left { display: flex; flex-direction: column; gap: 2px; }
+    .card-contact-item {
+      font-size: .42rem;
+      color: #888;
+      letter-spacing: .03em;
+    }
+    .card-contact-item strong {
+      color: #c9a84c;
+      font-weight: 700;
+    }
+
+    /* ── BACK FACE ───────────────────────────────────────────────── */
+    .back {
+      background: #0d0d0d;
+      position: relative;
+    }
+
+    /* subtle grid pattern on back */
+    .back::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(201,168,76,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201,168,76,0.03) 1px, transparent 1px);
+      background-size: 12px 12px;
+    }
+
+    .back-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 0;
+      padding: 0.12in;
+      text-align: center;
+    }
+
+    .back-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #c9a84c;
+      letter-spacing: .04em;
+      line-height: 1;
+    }
+
+    .back-tagline {
+      font-size: .5rem;
+      font-weight: 700;
+      color: #f5f5f5;
+      letter-spacing: .3em;
+      text-transform: uppercase;
+      margin-top: 5px;
+    }
+
+    .back-url {
+      font-size: .48rem;
+      color: rgba(201,168,76,0.7);
+      letter-spacing: .1em;
+      margin-top: 8px;
+    }
+
+    .back-qr {
+      width: 0.55in;
+      height: 0.55in;
+      border: 1.5px dashed rgba(201,168,76,0.35);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .28rem;
+      color: #555;
+      text-align: center;
+      line-height: 1.3;
+      margin-top: 8px;
+    }
+
+    .back-gold-line-top {
+      width: 60%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+      opacity: 0.4;
+      margin-bottom: 8px;
+    }
+    .back-gold-line-bottom {
+      width: 60%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+      opacity: 0.4;
+      margin-top: 8px;
+    }
+
+    /* ── PRINT ───────────────────────────────────────────────────── */
+    @media print {
+      body {
+        background: white;
+        padding: 0.25in;
+      }
+      h1, .instructions, .print-btn, .section-label { display: none; }
+      .card-label { color: #999; font-size: .45rem; }
+
+      /* Layout: 2 columns, fronts sheet then backs sheet */
+      .card-grid {
+        gap: 12px;
+        page-break-inside: avoid;
+      }
+
+      /* Keep bleed guides on print for cutting */
+      .bleed-frame {
+        border: 0.5px solid #ccc;
+      }
+
+      /* Force new page between front and back sheets */
+      .page-break { page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Temptation Token — Business Cards</h1>
+  <p class="instructions">
+    <strong>Size:</strong> 3.5" × 2" standard business card · <strong>Bleed:</strong> 0.125" on each side (dashed line)<br/>
+    <strong>Print:</strong> Send this HTML to Staples/Vistaprint or Print → Save as PDF → upload as-is<br/>
+    <strong>Settings:</strong> Paper size: Letter · Scale: 100% (actual size) · No margins · Background graphics: ON
+  </p>
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+
+  <!-- ── FRONT SIDE ── -->
+  <div class="section-label">▸ Front Side — Print 5 Cards Per Sheet</div>
+  <div class="card-grid" id="fronts">
+
+    <!-- CARD 1 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 1 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 2 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 2 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 3 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 3 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 4 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 4 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 5 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 5 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 6 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 6 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 7 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 7 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 8 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 8 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 9 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 9 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 10 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 10 — Front</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face front">
+          <div class="front-inner">
+            <div class="card-logo">Temptation Token</div>
+            <div class="card-ticker">$TTS · Base Blockchain</div>
+            <div class="card-rule"></div>
+            <div class="card-name">Jim Goetz</div>
+            <div class="card-title">Founder &amp; CEO</div>
+            <div class="card-spacer"></div>
+            <div class="card-contact">
+              <div class="card-contact-left">
+                <div class="card-contact-item"><strong>E:</strong> support@temptationtoken.io</div>
+                <div class="card-contact-item"><strong>W:</strong> app.temptationtoken.io</div>
+                <div class="card-contact-item"><strong>X:</strong> @TemptationToken</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /fronts -->
+
+  <!-- PAGE BREAK + BACK SIDE -->
+  <div class="page-break"></div>
+  <div class="section-label" style="margin-top:32px;">▸ Back Side — Print on Reverse of Front Sheet</div>
+  <div class="card-grid" id="backs">
+
+    <!-- BACKS 1-10 (identical) -->
+    <!-- Note: when printing duplex, the back grid mirrors left-right so card 1 back aligns with card 1 front.
+         For single-sided printing at Staples, give them both pages and they align per row. -->
+
+    <!-- BACK 1 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 1 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 2 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 2 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 3 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 3 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 4 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 4 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 5 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 5 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 6 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 6 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 7 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 7 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 8 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 8 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 9 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 9 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK 10 -->
+    <div class="card-wrapper">
+      <div class="card-label">Card 10 — Back</div>
+      <div class="card">
+        <div class="bleed-frame"></div>
+        <div class="card-face back">
+          <div class="back-inner">
+            <div class="back-gold-line-top"></div>
+            <div class="back-logo">Temptation Token</div>
+            <div class="back-tagline">Vote. Win. Earn.</div>
+            <div class="back-url">temptationtoken.io</div>
+            <div class="back-qr">QR<br/>app.temptation<br/>token.io</div>
+            <div class="back-gold-line-bottom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /backs -->
+
+</body>
+</html>

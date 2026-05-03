@@ -1048,9 +1048,9 @@ function OverviewScreen() {
           {livePool !== null && <span style={{ fontSize:'.6rem', color:'var(--green)', marginLeft:8 }}>● Live</span>}
         </div>
         <div className="payout-row"><span className="payout-label">Total Pool (on-chain)</span><span className="payout-amount">{Math.round(pool).toLocaleString()} $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">🏆 Top Voter (40%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>{Math.round(pool * 0.4).toLocaleString()} $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">📸 Winning Profile (40%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>{Math.round(pool * 0.4).toLocaleString()} $TTS</span></div>
-        <div className="payout-row"><span className="payout-label">🏢 Blockchain Entertainment LLC (10%)</span><span className="payout-amount">{Math.round(pool * 0.1).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">🏆 Top Voter (35%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>{Math.round(pool * 0.35).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">📸 Winning Profile (35%)</span><span className="payout-amount" style={{ color: "var(--gold-light)" }}>{Math.round(pool * 0.35).toLocaleString()} $TTS</span></div>
+        <div className="payout-row"><span className="payout-label">🏢 Blockchain Entertainment LLC (20%)</span><span className="payout-amount">{Math.round(pool * 0.2).toLocaleString()} $TTS</span></div>
         <div className="payout-row"><span className="payout-label">💙 Polaris Project (10%)</span><span className="payout-amount">{Math.round(pool * 0.1).toLocaleString()} $TTS</span></div>
         <div className="payout-row"><span className="payout-label">🔥 Losing votes burned</span><span className="payout-amount" style={{ color: "var(--muted)" }}>Remainder</span></div>
       </div>
@@ -1466,7 +1466,7 @@ function PayoutsScreen({ showToast }) {
       </div>
 
       <div style={{ background:'rgba(46,204,113,0.06)', border:'1px solid rgba(46,204,113,0.2)', borderRadius:10, padding:'14px 18px', fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8 }}>
-        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 40% to top voter, 40% to winning profile, 10% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.<br /><br />
+        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 35% to top voter, 35% to winning profile, 20% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.<br /><br />
         🏆 <strong style={{ color:'var(--gold)' }}>Round 1 status:</strong> Active — ends May 5, 2026 at 5:10 PM EDT (21:10 UTC). NFT Champion Trophy will be minted to winner's wallet automatically at settlement starting Round 2 (after May 5). NFT minting requires V3b redeployment — see Daily Priorities.
       </div>
     </div>
@@ -3197,7 +3197,7 @@ const OPS_MANUAL = [
     steps: [
       'Keeper fires automatically at Monday 03:59 UTC (Sunday 11:59 PM EDT) — calls settleRound → requests VRF. Cron must be 59 3 * * 1 — update at automation.chain.link/base if currently 59 23 * * 0',
       'Chainlink VRF V2.5 fulfills within ~30s (3 confirmations) — winner selected proportionally to tickets',
-      'Payout split: 40% winner profile · 40% top voter · 10% house · 10% charity (Polaris Project)',
+      'Payout split: 35% winner profile · 35% top voter · 20% house · 10% charity (Polaris Project)',
       'If keeper misses: BaseScan → TTSKeeper2 → Write → manualExecute(3)',
       'Confirm settlement: BaseScan → TTSVotingV3 → Events tab → look for RoundSettled',
     ]

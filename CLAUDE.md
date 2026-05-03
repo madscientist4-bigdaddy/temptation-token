@@ -109,14 +109,26 @@ Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chain
 
 ### Prize Distribution (hardcoded in `fulfillRandomWords`)
 
+**No club involved (standard):**
+
 | Recipient | Share | Address |
 |-----------|-------|---------|
-| Top Voter | 40% | Wallet with most votes on winning profile |
-| Winning Profile | 40% | Profile's registered wallet |
+| Top Voter | 35% | Wallet with most votes on winning profile |
+| Winning Profile | 35% | Profile's registered wallet |
 | Polaris Project | 10% | `0xf7dd429d679cb61231e73785fd1737e60138aba3` |
-| Blockchain Entertainment LLC | 10% | `0xb1e991bf617459b58964eef7756b350e675c53b5` |
+| Blockchain Entertainment LLC | 20% | `0xb1e991bf617459b58964eef7756b350e675c53b5` |
 
-**This is the only correct split.** The previously circulated 60/20/10 split was wrong and has been removed everywhere.
+**With club referral (club code set + registered wallet):**
+
+| Recipient | Share |
+|-----------|-------|
+| Top Voter | 35% |
+| Winning Profile | 35% |
+| Polaris Project | 10% |
+| Club Wallet | 10% |
+| Blockchain Entertainment LLC | 10% |
+
+**Both splits sum to 100%.** The club's 10% comes from the house allocation. The previously circulated 40/40/10/10 and 60/20/10 splits are wrong and have been removed everywhere.
 
 ### Staking Tiers (locked April 29 2026)
 

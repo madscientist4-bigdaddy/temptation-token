@@ -83,7 +83,7 @@ Staking makes your votes worth more. Here's what that means competitively:
 **Unstaked voter vs. Diamond staker, both vote 500 TTS on a profile:**
 - Unstaked: 500 TTS in tickets
 - Diamond (2x): 1,000 TTS in tickets
-- Diamond voter has 2x the odds of being the "top voter" and winning 40% of the pool
+- Diamond voter has 2x the odds of being the "top voter" and winning 35% of the pool
 
 At VIP (3x), you need to spend 1/3 as much TTS as an unstaked voter to match their influence. Or you spend the same and have 3x the edge.
 

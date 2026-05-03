@@ -781,7 +781,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         <div style={{ fontSize:'.54rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Live on Base Blockchain</div>
         <h2>Vote &amp; Win</h2>
         <div className="grule" />
-        <p>Swipe or use arrows · Place $TTS to win 40% of the pool</p>
+        <p>Swipe or use arrows · Place $TTS to win 35% of the pool</p>
       </div>
 
       <div className="wtimer">
@@ -941,7 +941,7 @@ function LeaderboardScreen() {
       <div className="prize-box">
         <div className="prize-title">Prize Pool — Current Round{totalPool > 0 && ` · ${totalPool.toLocaleString()} $TTS`}</div>
         <div className="prize-grid">
-          {[['🏆 Top Voter','40% of pool'],['📸 Winning Profile','40% of pool'],['🏢 Blockchain Ent.','10% of pool'],['💙 Polaris Project','10% donation']].map(([l,v]) => (
+          {[['🏆 Top Voter','35% of pool'],['📸 Winning Profile','35% of pool'],['🏢 Blockchain Ent.','20% of pool'],['💙 Polaris Project','10% donation']].map(([l,v]) => (
             <div key={l} className="prize-cell"><div className="prize-cl">{l}</div><div className="prize-cv">{v}</div></div>
           ))}
         </div>
@@ -1008,7 +1008,7 @@ function NFTScreen({ address, connected }) {
             <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>NFT trophies are awarded to Round winners 🏆</div>
           <div style={{ fontSize:'.85rem', color:'var(--muted)', lineHeight:1.6 }}>
             Win a round to earn yours. Minting begins Round 2 (after May 5).<br /><br />
-            <strong style={{ color:'var(--gold)' }}>How to win:</strong> Vote on the winning profile and be the top voter — you earn 40% of the prize pool + an exclusive NFT trophy minted to your wallet on Base.
+            <strong style={{ color:'var(--gold)' }}>How to win:</strong> Vote on the winning profile and be the top voter — you earn 35% of the prize pool + an exclusive NFT trophy minted to your wallet on Base.
           </div>
         </div>
       ) : (
@@ -1431,7 +1431,7 @@ function HowToWinScreen() {
     { icon:"🏆", title:"Pick Your Winner", body:"Find the profile you think will get the most votes by Sunday night. That is your bet." },
     { icon:"💰", title:"Vote $TTS on That Profile", body:"Minimum 5 $TTS per vote. No maximum. The more you put on the winning profile, the bigger your edge. Votes cannot be removed." },
     { icon:"👑", title:"Be the Top Voter on the Winning Profile", body:"The player who put the MOST $TTS specifically on the winning profile is the Top Voter." },
-    { icon:"💸", title:"Collect Your Prize", body:"Top Voter wins 40% of the winning profile's vote pool. Goes straight to your wallet." },
+    { icon:"💸", title:"Collect Your Prize", body:"Top Voter wins 35% of the winning profile's vote pool. Goes straight to your wallet." },
   ]
   const tips = [
     { t:"Vote Early, Vote Big", b:"Lock in a large vote early. Other players see the total — they will have to outspend you to take the top spot." },
@@ -1478,9 +1478,9 @@ function HowToWinScreen() {
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
           <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--text)',marginBottom:14}}>💰 Prize Breakdown — Every Week</div>
           {[
-            ["🥇 Top Voter","40% of winning votes","var(--gold-light)"],
-            ["📸 Winning Profile","40% of winning votes","var(--gold-light)"],
-            ["🏢 Blockchain Ent.","10% to company wallet","var(--muted)"],
+            ["🥇 Top Voter","35% of winning votes","var(--gold-light)"],
+            ["📸 Winning Profile","35% of winning votes","var(--gold-light)"],
+            ["🏢 Blockchain Ent.","20% to company wallet","var(--muted)"],
             ["💙 Polaris Project","10% to nonprofit","var(--muted)"],
             ["🔥 Losing votes","Burned — maintains token value","var(--muted)"],
           ].map(([l,v,c]) => (
@@ -1500,7 +1500,7 @@ function RulesScreen() {
     { t:'Weekly Voting Cycle', b:'Each week begins Monday 12:00 AM EDT and ends Sunday 11:59 PM EDT. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
-    { t:'Prize Distribution', b:'Top Voter: 40% of winning pool.\nWinning Profile: 40% of pool.\nBlockchain Entertainment LLC: 10%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
+    { t:'Prize Distribution', b:'Top Voter: 35% of winning pool.\nWinning Profile: 35% of pool.\nBlockchain Entertainment LLC: 20%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
     { t:'Staking', b:'Lock $TTS to earn APR rewards and vote multipliers up to 3x. Once locked, funds cannot be accessed early under any circumstances.' },
     { t:'Fairness & Privacy', b:'Voting is provably fair via Chainlink VRF on Base blockchain. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
   ]
