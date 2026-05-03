@@ -25,9 +25,9 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
    - `/api/chat.js` — Proxies to Claude Haiku with `web_search` tool for the support chatbot
    - `/api/rpc.js` — Caches RPC calls to Base to reduce provider load
    - `/api/notify.js` — Sends Telegram admin notification on new submission
-   - `/api/social-post.js` — Posts to X (Twitter) and/or Telegram; supports `{type,data}` template mode OR `{platform:'telegram',content,chatId}` direct mode
-   - `/api/scheduler.js` — Cron at 19:00 UTC daily: fires approved scheduled_posts + daily round status + auto-correction alerts (LINK < 2, round overdue, no posts 25h+)
-   - `/api/content-generator.js` — Monday 8am UTC cron: generates weekly content via Claude Haiku, saves to `scheduled_posts` table
+   - `/api/social-post.js` — Posts to X and/or Telegram; `{type,data}` template mode, `{platform:'telegram',content}` direct Telegram, `{platform:'x_tts',content}` direct @temptationtoken X post
+   - `/api/scheduler.js` — Fires at 00, 13, 18, 19 UTC daily (4 Vercel crons): fires approved scheduled_posts + 19:00 Telegram round status + auto-correction alerts
+   - `/api/content-generator.js` — Monday 8am UTC: generates @CryptoFitJim week (Claude Haiku, status=pending) + @temptationtoken 21 posts (templates, status=approved). POST `{tts_bootstrap:true}` regenerates only TTS posts.
    - `/api/referral-credit.js` — Credits referrer wallet on new user signup. Uses `referral_credits` table.
    - `/api/community-stats.js` — Returns Telegram community member count via bot API
    - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends $5 USD of TTS (min 500, max 50,000) from Marketing wallet on first connect. Live Uniswap price. 20/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY` in Vercel env.
@@ -96,7 +96,10 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 | Round ends | Sunday 11:59 PM EDT | Monday 03:59 UTC | `59 3 * * 1` |
 | VRF settlement | Within minutes of round end — automatic | | |
 | Confirm new round | Check Monday 04:05 UTC | | |
-| Social posts fire | 2pm EDT / 3pm EST (19:00 UTC) | 19:00 UTC | Vercel cron `0 19 * * *` |
+| @CryptoFitJim posts | 2pm EST (19:00 UTC) | 19:00 UTC | Vercel cron `0 19 * * *` |
+| @temptationtoken morning | 9am EDT (13:00 UTC) | 13:00 UTC | Vercel cron `0 13 * * *` |
+| @temptationtoken afternoon | 2pm EDT (18:00 UTC) | 18:00 UTC | Vercel cron `0 18 * * *` |
+| @temptationtoken evening | 8pm EDT (00:00 UTC next day) | 00:00 UTC | Vercel cron `0 0 * * *` |
 | Content generated | Monday 8am UTC | 08:00 UTC | Vercel cron `0 8 * * 1` |
 
 **EDT is the canonical timezone for display.** Any UI, dashboard, documentation, or generated content must use EDT.
@@ -202,8 +205,8 @@ Always `git add` + commit + push after every change.
 | `X_API_SECRET` | X app credential (shared) | ✅ Set |
 | `X_ACCESS_TOKEN` | @CryptoFitJim user token | ✅ Set (needs Read+Write) |
 | `X_ACCESS_SECRET` | @CryptoFitJim user secret | ✅ Set (needs Read+Write) |
-| `TTS_X_ACCESS_TOKEN` | @temptationtoken user token | ❌ **Needs adding** |
-| `TTS_X_ACCESS_SECRET` | @temptationtoken user secret | ❌ **Needs adding** |
+| `TTS_X_ACCESS_TOKEN` | @temptationtoken user token | ✅ Set — if 401 errors, regenerate after enabling Read+Write in dev portal |
+| `TTS_X_ACCESS_SECRET` | @temptationtoken user secret | ✅ Set — same as above |
 | `SUPABASE_URL` | Supabase project URL | ✅ Set |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key | ✅ Set |
 
