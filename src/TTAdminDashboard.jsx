@@ -2309,12 +2309,13 @@ function SystemScreen() {
 
 // ─── CONTENT CALENDAR ─────────────────────────────────────────────────────────
 
-const PLATFORM_ICON = { x: '𝕏', telegram: '📨', instagram: '📸' }
-const PLATFORM_LABEL = { x: 'X / Twitter', telegram: 'Telegram', instagram: 'Instagram' }
+const PLATFORM_ICON = { x: '𝕏', telegram: '📨', instagram: '📸', x_tts: '🎮' }
+const PLATFORM_LABEL = { x: 'X @CryptoFitJim', telegram: 'Telegram', instagram: 'Instagram', x_tts: 'X @temptationtoken' }
 const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 const POST_TYPE_LABEL = {
   round_start: 'Round Start', leaderboard: 'Leaderboard', midpoint: 'Midpoint',
-  spotlight: 'Spotlight', weekend_push: 'Weekend Push', community: 'Community', round_end: 'Round End'
+  spotlight: 'Spotlight', weekend_push: 'Weekend Push', community: 'Community', round_end: 'Round End',
+  tts_morning: '9 AM EDT', tts_afternoon: '2 PM EDT', tts_evening: '8 PM EDT',
 }
 
 function getWeekStartStr(from = new Date()) {
@@ -2403,10 +2404,13 @@ function ContentCalendarScreen({ showToast }) {
     setFiring(f => ({ ...f, [post.id]: false }))
   }
 
-  // Group posts by day_of_week
-  const byDay = Array.from({ length: 7 }, (_, i) =>
-    posts.filter(p => p.day_of_week === i)
-  )
+  // Separate TTS posts from Jim/general posts
+  const jimPosts = posts.filter(p => p.platform !== 'x_tts')
+  const ttsPosts = posts.filter(p => p.platform === 'x_tts')
+
+  // Group by day_of_week
+  const jimByDay = Array.from({ length: 7 }, (_, i) => jimPosts.filter(p => p.day_of_week === i))
+  const ttsByDay = Array.from({ length: 7 }, (_, i) => ttsPosts.filter(p => p.day_of_week === i))
 
   const weekLabel = (() => {
     const d = new Date(weekStart + 'T00:00:00Z')
@@ -2419,7 +2423,7 @@ function ContentCalendarScreen({ showToast }) {
       <div className="page-header">
         <div className="page-title">Content Calendar</div>
         <div className="gold-rule" />
-        <div className="page-sub">Approve posts before their scheduled time · Posts fire at 2pm EST (19:00 UTC) daily · Auto-generated every Monday</div>
+        <div className="page-sub">@CryptoFitJim: approve before 19:00 UTC daily · @temptationtoken: auto-approved, fires 13:00 / 18:00 / 00:00 UTC · Generated every Monday 8am UTC</div>
       </div>
 
       <div className="cal-toolbar">
@@ -2445,84 +2449,108 @@ function ContentCalendarScreen({ showToast }) {
         </div>
       )}
 
-      {!loading && byDay.map((dayPosts, dayIdx) => {
-        if (dayPosts.length === 0) return null
-        return (
-          <div key={dayIdx} className="cal-day-group">
-            <div className="cal-day-label">{DAY_NAMES[dayIdx]}</div>
-            {dayPosts.map(post => {
-              const isPosted   = post.status === 'posted'
-              const isApproved = post.status === 'approved'
-              const isFailed   = post.status === 'failed'
-              const schedTime  = new Date(post.scheduled_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
-              const captions   = post.instagram_captions || []
-              const selIdx     = post.selected_caption ?? 0
-
-              return (
-                <div key={post.id} className={`cal-post-card${isPosted ? ' posted' : ''}`}>
-                  <div className="cal-platform-icon">{PLATFORM_ICON[post.platform]}</div>
-                  <div className="cal-post-body">
-                    <div className="cal-post-meta">
-                      <span className="cal-post-type">{PLATFORM_LABEL[post.platform]} · {POST_TYPE_LABEL[post.post_type] || post.post_type}</span>
-                      <span className="cal-post-time">{schedTime}</span>
-                      <span className={`cal-status-badge cal-status-${post.status}`}>{post.status}</span>
-                      {isFailed && post.error && <span style={{ fontSize:'0.55rem', color:'var(--rose)' }}>{post.error}</span>}
-                    </div>
-
-                    {/* Instagram: show caption picker */}
-                    {post.platform === 'instagram' && captions.length > 0 ? (
-                      <>
-                        {post.image_hint && <div className="cal-image-hint">📷 Use: {post.image_hint}</div>}
-                        <div className="cal-captions">
-                          {captions.map((cap, ci) => (
-                            <label key={ci} className="cal-caption-opt">
-                              <input type="radio" name={`cap-${post.id}`} checked={selIdx === ci}
-                                onChange={() => !isPosted && selectCaption(post, ci)} disabled={isPosted} />
-                              <span className={`cal-caption-text${selIdx === ci ? ' selected' : ''}`}>{cap}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="cal-post-content">{post.content}</div>
-                    )}
-
-                    <div className="cal-actions">
-                      {!isPosted && !isApproved && (
-                        <button className="cal-approve-btn"
-                          disabled={!!approving[post.id]}
-                          onClick={() => approve(post)}>
-                          {approving[post.id] ? '…' : '✓ Approve & Schedule'}
-                        </button>
-                      )}
-                      {isApproved && !isPosted && (
-                        <>
-                          <span style={{ fontSize:'0.62rem', color:'#2196f3', fontWeight:700 }}>✓ Scheduled</span>
-                          <button className="cal-approve-btn" style={{ background:'var(--green)' }}
-                            disabled={!!firing[post.id]} onClick={() => postNow(post)}>
-                            {firing[post.id] ? 'Posting…' : '▶ Post Now'}
-                          </button>
-                          <button className="cal-copy-btn" onClick={() => unapprove(post)}>Unschedule</button>
-                        </>
-                      )}
-                      {isPosted && <span style={{ fontSize:'0.62rem', color:'var(--green)', fontWeight:700 }}>✓ Posted</span>}
-                      {isFailed && (
-                        <button className="cal-approve-btn" onClick={() => approve(post)}>↺ Retry</button>
-                      )}
-                      {post.platform === 'instagram' && (
-                        <button className="cal-copy-btn" onClick={() => copyCaption(post.content)}>📋 Copy Caption</button>
-                      )}
-                      {post.platform === 'instagram' && isPosted && (
-                        <span className="cal-insta-note">📲 Post manually on Instagram</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+      {/* ── @CryptoFitJim Posts ─────────────────────────────────────────── */}
+      {!loading && jimPosts.length > 0 && (
+        <>
+          <div style={{ display:'flex', alignItems:'center', gap:12, margin:'24px 0 12px', padding:'0 0 8px', borderBottom:'2px solid var(--border)' }}>
+            <span style={{ fontSize:'𝕏', fontWeight:800, fontSize:'1rem' }}>𝕏</span>
+            <span style={{ fontWeight:700, fontSize:'0.85rem', color:'var(--text)' }}>@CryptoFitJim Posts</span>
+            <span style={{ fontSize:'0.65rem', color:'var(--muted)', marginLeft:'auto' }}>Personal voice · Fires 2pm EST (19:00 UTC) · Requires approval</span>
           </div>
-        )
-      })}
+          {jimByDay.map((dayPosts, dayIdx) => {
+            if (dayPosts.length === 0) return null
+            return (
+              <div key={dayIdx} className="cal-day-group">
+                <div className="cal-day-label">{DAY_NAMES[dayIdx]}</div>
+                {dayPosts.map(post => <CalPostCard key={post.id} post={post} approving={approving} firing={firing} approve={approve} unapprove={unapprove} postNow={postNow} selectCaption={selectCaption} copyCaption={copyCaption} />)}
+              </div>
+            )
+          })}
+        </>
+      )}
+
+      {/* ── @temptationtoken Posts ──────────────────────────────────────── */}
+      {!loading && ttsPosts.length > 0 && (
+        <>
+          <div style={{ display:'flex', alignItems:'center', gap:12, margin:'32px 0 12px', padding:'0 0 8px', borderBottom:'2px solid rgba(139,105,20,0.4)' }}>
+            <span style={{ fontWeight:800, fontSize:'1rem' }}>🎮</span>
+            <span style={{ fontWeight:700, fontSize:'0.85rem', color:'var(--gold)' }}>@temptationtoken Posts</span>
+            <span style={{ fontSize:'0.65rem', color:'var(--muted)', marginLeft:'auto' }}>Brand voice · 9AM / 2PM / 8PM EDT · Auto-approved — fires automatically</span>
+          </div>
+          {ttsByDay.map((dayPosts, dayIdx) => {
+            if (dayPosts.length === 0) return null
+            return (
+              <div key={dayIdx} className="cal-day-group">
+                <div className="cal-day-label">{DAY_NAMES[dayIdx]}</div>
+                {dayPosts.map(post => <CalPostCard key={post.id} post={post} approving={approving} firing={firing} approve={approve} unapprove={unapprove} postNow={postNow} selectCaption={selectCaption} copyCaption={copyCaption} />)}
+              </div>
+            )
+          })}
+        </>
+      )}
+    </div>
+  )
+}
+
+function CalPostCard({ post, approving, firing, approve, unapprove, postNow, selectCaption, copyCaption }) {
+  const isPosted   = post.status === 'posted'
+  const isApproved = post.status === 'approved'
+  const isFailed   = post.status === 'failed'
+  const schedTime  = new Date(post.scheduled_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
+  const captions   = post.instagram_captions || []
+  const selIdx     = post.selected_caption ?? 0
+  const isTTS      = post.platform === 'x_tts'
+
+  return (
+    <div className={`cal-post-card${isPosted ? ' posted' : ''}`} style={isTTS ? { borderLeft: '3px solid var(--gold-dim)' } : {}}>
+      <div className="cal-platform-icon">{PLATFORM_ICON[post.platform]}</div>
+      <div className="cal-post-body">
+        <div className="cal-post-meta">
+          <span className="cal-post-type">{PLATFORM_LABEL[post.platform]} · {POST_TYPE_LABEL[post.post_type] || post.post_type}</span>
+          <span className="cal-post-time">{schedTime}</span>
+          <span className={`cal-status-badge cal-status-${post.status}`}>{post.status}</span>
+          {isFailed && post.error && <span style={{ fontSize:'0.55rem', color:'var(--rose)' }}>{post.error}</span>}
+        </div>
+
+        {post.platform === 'instagram' && captions.length > 0 ? (
+          <>
+            {post.image_hint && <div className="cal-image-hint">📷 Use: {post.image_hint}</div>}
+            <div className="cal-captions">
+              {captions.map((cap, ci) => (
+                <label key={ci} className="cal-caption-opt">
+                  <input type="radio" name={`cap-${post.id}`} checked={selIdx === ci}
+                    onChange={() => !isPosted && selectCaption(post, ci)} disabled={isPosted} />
+                  <span className={`cal-caption-text${selIdx === ci ? ' selected' : ''}`}>{cap}</span>
+                </label>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="cal-post-content">{post.content}</div>
+        )}
+
+        <div className="cal-actions">
+          {!isPosted && !isApproved && !isTTS && (
+            <button className="cal-approve-btn" disabled={!!approving[post.id]} onClick={() => approve(post)}>
+              {approving[post.id] ? '…' : '✓ Approve & Schedule'}
+            </button>
+          )}
+          {isApproved && !isPosted && (
+            <>
+              <span style={{ fontSize:'0.62rem', color:'#2196f3', fontWeight:700 }}>✓ Scheduled</span>
+              <button className="cal-approve-btn" style={{ background:'var(--green)' }}
+                disabled={!!firing[post.id]} onClick={() => postNow(post)}>
+                {firing[post.id] ? 'Posting…' : '▶ Post Now'}
+              </button>
+              {!isTTS && <button className="cal-copy-btn" onClick={() => unapprove(post)}>Unschedule</button>}
+            </>
+          )}
+          {isPosted && <span style={{ fontSize:'0.62rem', color:'var(--green)', fontWeight:700 }}>✓ Posted</span>}
+          {isFailed && <button className="cal-approve-btn" onClick={() => approve(post)}>↺ Retry</button>}
+          {post.platform === 'instagram' && <button className="cal-copy-btn" onClick={() => copyCaption(post.content)}>📋 Copy Caption</button>}
+          {post.platform === 'instagram' && isPosted && <span className="cal-insta-note">📲 Post manually on Instagram</span>}
+        </div>
+      </div>
     </div>
   )
 }

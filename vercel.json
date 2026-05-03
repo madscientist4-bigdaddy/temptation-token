@@ -4,7 +4,10 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/scheduler",         "schedule": "0 19 * * *"  },
-    { "path": "/api/content-generator", "schedule": "0 8 * * 1"   }
+    { "path": "/api/scheduler",         "schedule": "0 0 * * *" },
+    { "path": "/api/scheduler",         "schedule": "0 13 * * *" },
+    { "path": "/api/scheduler",         "schedule": "0 18 * * *" },
+    { "path": "/api/scheduler",         "schedule": "0 19 * * *" },
+    { "path": "/api/content-generator", "schedule": "0 8 * * 1" }
   ]
 }

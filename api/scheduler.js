@@ -106,19 +106,29 @@ function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret
     .join(', ')
 }
 
-async function postTweet(text) {
-  const { X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET } = process.env
-  if (!X_API_KEY || !X_API_SECRET || !X_ACCESS_TOKEN || !X_ACCESS_SECRET) {
-    return { skipped: 'X credentials not set' }
-  }
+async function postTweetAs(text, accessToken, accessSecret) {
+  const { X_API_KEY, X_API_SECRET } = process.env
+  if (!X_API_KEY || !X_API_SECRET) return { skipped: 'X app credentials not set' }
   const url = 'https://api.twitter.com/2/tweets'
-  const auth = oauthSign('POST', url, {}, X_API_KEY, X_API_SECRET, X_ACCESS_SECRET, X_ACCESS_TOKEN)
+  const auth = oauthSign('POST', url, {}, X_API_KEY, X_API_SECRET, accessSecret, accessToken)
   const r = await fetch(url, {
     method: 'POST',
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({ text })
   })
   return r.json()
+}
+
+async function postTweet(text) {
+  const { X_ACCESS_TOKEN, X_ACCESS_SECRET } = process.env
+  if (!X_ACCESS_TOKEN || !X_ACCESS_SECRET) return { skipped: 'X_ACCESS credentials not set' }
+  return postTweetAs(text, X_ACCESS_TOKEN, X_ACCESS_SECRET)
+}
+
+async function postTweetTTS(text) {
+  const { TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
+  if (!TTS_X_ACCESS_TOKEN || !TTS_X_ACCESS_SECRET) return { skipped: 'TTS X credentials not set' }
+  return postTweetAs(text, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET)
 }
 
 // ── Fire a single scheduled post ─────────────────────────────────────────────
@@ -144,6 +154,11 @@ async function firePost(post) {
 
   if (post.platform === 'x') {
     try { results.x = await postTweet(content) }
+    catch (e) { results.x_error = e.message; anyError = e.message }
+  }
+
+  if (post.platform === 'x_tts') {
+    try { results.x = await postTweetTTS(content) }
     catch (e) { results.x_error = e.message; anyError = e.message }
   }
 

@@ -92,6 +92,23 @@ export default async function handler(req, res) {
 
   const body = req.body || {}
 
+  // Direct X post to @temptationtoken: { platform: 'x_tts', content }
+  if (body.platform === 'x_tts' && body.content) {
+    const _apiKey   = process.env.X_API_KEY
+    const _apiSecret= process.env.X_API_SECRET
+    const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
+    const ttsSecret = process.env.TTS_X_ACCESS_SECRET
+    if (!_apiKey || !_apiSecret || !ttsToken || !ttsSecret) {
+      return res.status(200).json({ ok: false, error: 'TTS X credentials not configured' })
+    }
+    try {
+      const r = await postTweet(body.content, { X_API_KEY: _apiKey, X_API_SECRET: _apiSecret, X_ACCESS_TOKEN: ttsToken, X_ACCESS_SECRET: ttsSecret })
+      return res.status(200).json({ ok: true, tweet: r })
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message })
+    }
+  }
+
   // Direct content mode: { platform, content, chatId }
   if (body.platform === 'telegram' && body.content) {
     const broadcastToken = process.env.BROADCAST_BOT_TOKEN
