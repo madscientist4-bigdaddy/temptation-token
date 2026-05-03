@@ -3303,6 +3303,276 @@ function ManualScreen() {
   );
 }
 
+// ─── FINANCIAL KPI ───────────────────────────────────────────────────────────
+const SEED_EXPENSES = [
+  { expense_date: '2026-04-08', vendor: 'Chainlink VRF',   category: 'Infrastructure', amount_usd: 50,   notes: 'VRF subscription initial funding' },
+  { expense_date: '2026-04-22', vendor: 'Railway',         category: 'Infrastructure', amount_usd: 5,    notes: 'Hobby plan — Telegram bot hosting' },
+  { expense_date: '2026-04-22', vendor: 'Supabase',        category: 'Infrastructure', amount_usd: 25,   notes: 'Pro plan — database' },
+  { expense_date: '2026-04-22', vendor: 'Vercel',          category: 'Infrastructure', amount_usd: 0,    notes: 'Hobby plan — frontend + API' },
+  { expense_date: '2026-04-23', vendor: 'Team.Finance',    category: 'Security',       amount_usd: 50,   notes: 'LP lock fee (12 months)' },
+  { expense_date: '2026-04-29', vendor: 'Solidproof',      category: 'Security',       amount_usd: 1100, notes: 'Smart contract audit + KYC' },
+  { expense_date: '2026-04-30', vendor: 'Base Gas Fees',   category: 'Gas Fees',       amount_usd: 50,   notes: 'Multiple contract deployments (April)' },
+  { expense_date: '2026-05-02', vendor: 'Base Gas Fees',   category: 'Gas Fees',       amount_usd: 30,   notes: 'V3b redeployments (May)' },
+];
+
+const CATEGORY_COLORS = {
+  Infrastructure: '#3b82f6',
+  Security:       '#8b5cf6',
+  'Gas Fees':     '#f59e0b',
+  Marketing:      '#10b981',
+  Legal:          '#ef4444',
+  Other:          '#6b7280',
+};
+
+function FinancialKPIScreen({ showToast }) {
+  const [expenses, setExpenses] = useState([]);
+  const [loadingExp, setLoadingExp] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ expense_date: '', vendor: '', category: 'Infrastructure', amount_usd: '', notes: '', receipt_url: '' });
+  const [saving, setSaving] = useState(false);
+  const [manualIncome, setManualIncome] = useState([]);
+  const [loadingIncome, setLoadingIncome] = useState(false);
+  const [newIncome, setNewIncome] = useState({ source: '', amount_usd: '', notes: '', income_date: '' });
+  const [addingIncome, setAddingIncome] = useState(false);
+  const [houseRevTTS, setHouseRevTTS] = useState(null);
+
+  useEffect(() => { loadExpenses(); loadManualIncome(); loadHouseRevenue(); }, []);
+
+  async function loadExpenses() {
+    setLoadingExp(true);
+    try {
+      const rows = await sb.get('project_expenses', 'order=expense_date.asc');
+      if (Array.isArray(rows) && rows.length > 0) {
+        setExpenses(rows);
+      } else {
+        setExpenses(SEED_EXPENSES);
+      }
+    } catch {
+      setExpenses(SEED_EXPENSES);
+    }
+    setLoadingExp(false);
+  }
+
+  async function loadManualIncome() {
+    setLoadingIncome(true);
+    try {
+      const rows = await sb.get('project_income', 'order=income_date.desc');
+      if (Array.isArray(rows)) setManualIncome(rows);
+    } catch { setManualIncome([]); }
+    setLoadingIncome(false);
+  }
+
+  async function loadHouseRevenue() {
+    try {
+      const rows = await sb.get('votes', 'select=tts_amount');
+      if (Array.isArray(rows)) {
+        const total = rows.reduce((s, v) => s + (Number(v.tts_amount) || 0), 0);
+        setHouseRevTTS(Math.round(total * 0.20));
+      }
+    } catch { setHouseRevTTS(0); }
+  }
+
+  async function saveExpense() {
+    if (!form.vendor || !form.amount_usd || !form.expense_date) return;
+    setSaving(true);
+    try {
+      await sb.post('project_expenses', { ...form, amount_usd: Number(form.amount_usd) });
+      setShowModal(false);
+      setForm({ expense_date: '', vendor: '', category: 'Infrastructure', amount_usd: '', notes: '', receipt_url: '' });
+      await loadExpenses();
+      showToast && showToast('Expense added', 'success');
+    } catch (e) {
+      showToast && showToast('Save failed: ' + e.message, 'error');
+    }
+    setSaving(false);
+  }
+
+  async function saveIncome() {
+    if (!newIncome.source || !newIncome.amount_usd) return;
+    setAddingIncome(true);
+    try {
+      await sb.post('project_income', { ...newIncome, amount_usd: Number(newIncome.amount_usd) });
+      setNewIncome({ source: '', amount_usd: '', notes: '', income_date: '' });
+      await loadManualIncome();
+      showToast && showToast('Income recorded', 'success');
+    } catch (e) {
+      showToast && showToast('Save failed: ' + e.message, 'error');
+    }
+    setAddingIncome(false);
+  }
+
+  function exportCSV() {
+    const header = 'Date,Vendor,Category,Amount USD,Notes\n';
+    const rows = expenses.map(e => `${e.expense_date},${e.vendor},${e.category},${e.amount_usd},"${(e.notes||'').replace(/"/g,'""')}"`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'tts_expenses.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount_usd) || 0), 0);
+  const monthlyBurn = 30; // Railway $5 + Supabase $25
+  const manualIncomeTotal = manualIncome.reduce((s, i) => s + (Number(i.amount_usd) || 0), 0);
+  const netPL = manualIncomeTotal - totalExpenses;
+  const runway = monthlyBurn > 0 ? (netPL >= 0 ? '∞' : Math.round(Math.abs(netPL) / monthlyBurn) + ' mo') : '∞';
+
+  const catTotals = {};
+  expenses.forEach(e => { catTotals[e.category] = (catTotals[e.category] || 0) + (Number(e.amount_usd) || 0); });
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Financial KPI</div>
+        <div className="gold-rule" />
+        <div className="page-sub">Project expenses, income, and P&amp;L · Supabase-backed</div>
+      </div>
+
+      {/* SUMMARY CARDS */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:28 }}>
+        {[
+          { label:'Total Expenses', value:`$${totalExpenses.toLocaleString()}`, color:'var(--rose)', sub:'all time' },
+          { label:'Total Revenue', value:`$${manualIncomeTotal.toLocaleString()}`, color:'var(--green)', sub:'recorded income' },
+          { label:'Net P&L', value:`${netPL >= 0 ? '+' : ''}$${netPL.toLocaleString()}`, color: netPL >= 0 ? 'var(--green)' : 'var(--rose)', sub:'revenue − expenses' },
+          { label:'Monthly Burn', value:`$${monthlyBurn}/mo`, color:'var(--amber)', sub:'infra fixed costs' },
+          { label:'Runway', value: runway, color:'var(--gold)', sub: typeof runway === 'string' && runway.includes('mo') ? 'at current burn' : 'profitable' },
+          { label:'House Rev (TTS)', value: houseRevTTS !== null ? houseRevTTS.toLocaleString() : '…', color:'var(--gold)', sub:'20% of all pools' },
+        ].map((c,i) => (
+          <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, padding:'16px 18px' }}>
+            <div style={{ fontSize:'.65rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>{c.label}</div>
+            <div style={{ fontSize:'1.4rem', fontWeight:700, color:c.color, lineHeight:1.1 }}>{c.value}</div>
+            <div style={{ fontSize:'.65rem', color:'var(--muted)', marginTop:4 }}>{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* EXPENSE BY CATEGORY */}
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, padding:'18px 20px', marginBottom:24 }}>
+        <div style={{ fontSize:'.7rem', letterSpacing:'.15em', textTransform:'uppercase', color:'var(--gold)', fontWeight:700, marginBottom:14 }}>Spend by Category</div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+          {Object.entries(catTotals).map(([cat, amt]) => (
+            <div key={cat} style={{ background:'var(--surface2)', borderRadius:8, padding:'8px 14px', fontSize:'.8rem', display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background: CATEGORY_COLORS[cat]||'#666', display:'inline-block' }} />
+              <span style={{ color:'var(--text)', fontWeight:600 }}>{cat}</span>
+              <span style={{ color:'var(--muted)' }}>${amt.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* EXPENSES TABLE */}
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', marginBottom:24 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ fontSize:'.7rem', letterSpacing:'.15em', textTransform:'uppercase', color:'var(--gold)', fontWeight:700 }}>Project Expenses</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={exportCSV} style={{ background:'transparent', border:'1px solid var(--border)', borderRadius:6, padding:'6px 14px', fontSize:'.7rem', color:'var(--muted)', cursor:'pointer' }}>⬇ CSV</button>
+            <button onClick={() => setShowModal(true)} style={{ background:'var(--gold)', border:'none', borderRadius:6, padding:'6px 16px', fontSize:'.7rem', fontWeight:700, color:'#fff', cursor:'pointer' }}>+ Add Expense</button>
+          </div>
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'.8rem' }}>
+            <thead>
+              <tr style={{ background:'var(--surface2)' }}>
+                {['Date','Vendor','Category','Amount','Notes','Receipt'].map(h => (
+                  <th key={h} style={{ textAlign:'left', padding:'10px 14px', fontSize:'.62rem', letterSpacing:'.1em', textTransform:'uppercase', color:'var(--muted)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loadingExp ? (
+                <tr><td colSpan={6} style={{ padding:24, textAlign:'center', color:'var(--muted)' }}>Loading…</td></tr>
+              ) : expenses.map((e, i) => (
+                <tr key={e.id||i} style={{ borderBottom:'1px solid var(--border2)' }}>
+                  <td style={{ padding:'10px 14px', color:'var(--muted)', whiteSpace:'nowrap' }}>{e.expense_date}</td>
+                  <td style={{ padding:'10px 14px', fontWeight:600, color:'var(--text)' }}>{e.vendor}</td>
+                  <td style={{ padding:'10px 14px' }}>
+                    <span style={{ background: (CATEGORY_COLORS[e.category]||'#666')+'22', color: CATEGORY_COLORS[e.category]||'#666', borderRadius:4, padding:'2px 8px', fontSize:'.7rem', fontWeight:600 }}>{e.category}</span>
+                  </td>
+                  <td style={{ padding:'10px 14px', fontWeight:700, color:'var(--rose)' }}>${Number(e.amount_usd).toLocaleString()}</td>
+                  <td style={{ padding:'10px 14px', color:'var(--muted)', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes||'—'}</td>
+                  <td style={{ padding:'10px 14px' }}>{e.receipt_url ? <a href={e.receipt_url} target="_blank" rel="noreferrer" style={{ color:'var(--gold)', fontSize:'.7rem' }}>View</a> : <span style={{ color:'var(--border)' }}>—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* INCOME SECTION */}
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', marginBottom:24 }}>
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)' }}>
+          <div style={{ fontSize:'.7rem', letterSpacing:'.15em', textTransform:'uppercase', color:'var(--gold)', fontWeight:700, marginBottom:4 }}>Project Income</div>
+          <div style={{ fontSize:'.75rem', color:'var(--muted)' }}>House revenue (on-chain) is auto-calculated from vote data. Record partnerships, investment, and other off-chain income here.</div>
+        </div>
+
+        {/* On-chain auto row */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px', borderBottom:'1px solid var(--border2)', background:'var(--surface2)' }}>
+          <div>
+            <div style={{ fontWeight:600, fontSize:'.85rem' }}>House Revenue (on-chain)</div>
+            <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>20% of all voting pools · auto-tracked from Supabase votes</div>
+          </div>
+          <div style={{ fontWeight:700, fontSize:'1.1rem', color:'var(--green)' }}>{houseRevTTS !== null ? houseRevTTS.toLocaleString() + ' TTS' : '…'}</div>
+        </div>
+
+        {/* Manual income list */}
+        {!loadingIncome && manualIncome.map((inc, i) => (
+          <div key={inc.id||i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderBottom:'1px solid var(--border2)' }}>
+            <div>
+              <div style={{ fontWeight:600, fontSize:'.85rem' }}>{inc.source}</div>
+              <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>{inc.income_date} · {inc.notes||''}</div>
+            </div>
+            <div style={{ fontWeight:700, color:'var(--green)' }}>${Number(inc.amount_usd).toLocaleString()}</div>
+          </div>
+        ))}
+
+        {/* Add income row */}
+        <div style={{ padding:'14px 20px' }}>
+          <div style={{ fontSize:'.65rem', letterSpacing:'.1em', textTransform:'uppercase', color:'var(--muted)', marginBottom:10, fontWeight:600 }}>Record Income</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 120px auto', gap:8, alignItems:'end' }}>
+            <input placeholder="Source (e.g. Partnership)" value={newIncome.source} onChange={e => setNewIncome(p=>({...p,source:e.target.value}))} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontSize:'.78rem', color:'var(--text)', outline:'none' }} />
+            <input type="number" placeholder="Amount USD" value={newIncome.amount_usd} onChange={e => setNewIncome(p=>({...p,amount_usd:e.target.value}))} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontSize:'.78rem', color:'var(--text)', outline:'none' }} />
+            <input placeholder="Notes" value={newIncome.notes} onChange={e => setNewIncome(p=>({...p,notes:e.target.value}))} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontSize:'.78rem', color:'var(--text)', outline:'none' }} />
+            <input type="date" value={newIncome.income_date} onChange={e => setNewIncome(p=>({...p,income_date:e.target.value}))} style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontSize:'.78rem', color:'var(--text)', outline:'none' }} />
+            <button onClick={saveIncome} disabled={addingIncome} style={{ background:'var(--green)', border:'none', borderRadius:6, padding:'8px 14px', fontSize:'.72rem', fontWeight:700, color:'#fff', cursor:'pointer', whiteSpace:'nowrap' }}>{addingIncome ? '…' : '+ Add'}</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ADD EXPENSE MODAL */}
+      {showModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+          <div style={{ background:'var(--surface)', borderRadius:16, padding:'28px 32px', width:'100%', maxWidth:500, border:'1px solid var(--border)' }}>
+            <div style={{ fontWeight:700, fontSize:'1rem', marginBottom:20 }}>Add Expense</div>
+            {[
+              { label:'Date', key:'expense_date', type:'date' },
+              { label:'Vendor', key:'vendor', type:'text', placeholder:'e.g. Railway' },
+              { label:'Amount (USD)', key:'amount_usd', type:'number', placeholder:'0.00' },
+              { label:'Notes', key:'notes', type:'text', placeholder:'Optional description' },
+              { label:'Receipt URL', key:'receipt_url', type:'url', placeholder:'https://...' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:'.65rem', letterSpacing:'.1em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>{f.label}</div>
+                <input type={f.type} placeholder={f.placeholder||''} value={form[f.key]} onChange={e => setForm(p=>({...p,[f.key]:e.target.value}))}
+                  style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'10px 12px', fontSize:'.82rem', color:'var(--text)', outline:'none' }} />
+              </div>
+            ))}
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:'.65rem', letterSpacing:'.1em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>Category</div>
+              <select value={form.category} onChange={e => setForm(p=>({...p,category:e.target.value}))}
+                style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'10px 12px', fontSize:'.82rem', color:'var(--text)', outline:'none' }}>
+                {['Infrastructure','Security','Gas Fees','Marketing','Legal','Other'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+              <button onClick={() => setShowModal(false)} style={{ flex:1, background:'transparent', border:'1px solid var(--border)', borderRadius:8, padding:'10px', fontSize:'.78rem', color:'var(--muted)', cursor:'pointer' }}>Cancel</button>
+              <button onClick={saveExpense} disabled={saving} style={{ flex:2, background:'var(--gold)', border:'none', borderRadius:8, padding:'10px', fontSize:'.78rem', fontWeight:700, color:'#fff', cursor:'pointer' }}>{saving ? 'Saving…' : 'Save Expense'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SIDEBAR NAV CONFIG ───────────────────────────────────────────────────────
 const NAV = [
   { section: "Command", items: [
@@ -3319,6 +3589,7 @@ const NAV = [
     { key: "system",    icon: "🛡️", label: "System Health" },
   ]},
   { section: "Finance", items: [
+    { key: "finance",   icon: "📊", label: "Financial KPI" },
     { key: "payouts",   icon: "💸", label: "Payouts" },
     { key: "staking",   icon: "🔒", label: "Staking" },
     { key: "wallets",   icon: "💼", label: "Wallets" },
@@ -3358,13 +3629,15 @@ export default function AdminApp() {
     referral:   <ReferralScreen showToast={showToast} />,
     settings:   <SettingsScreen />,
     system:     <SystemScreen />,
+    finance:    <FinancialKPIScreen showToast={showToast} />,
   };
 
   const titles = {
     command: "Command Center", priorities: "Daily Priorities", kpi: "KPI Dashboard", manual: "Operations Manual",
     overview: "Overview", review: "Photo Review", content: "Content Calendar", social: "Social Media",
     users: "User Management", wallets: "Wallets", payouts: "Payouts",
-    staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health"
+    staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health",
+    finance: "Financial KPI",
   };
 
   return (
