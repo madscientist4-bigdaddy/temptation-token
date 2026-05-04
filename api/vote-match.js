@@ -51,6 +51,9 @@ export default async function handler(req, res) {
   if (!voteAmount || isNaN(Number(voteAmount)) || Number(voteAmount) <= 0) {
     return res.status(400).json({ success: false, reason: 'Invalid vote amount' })
   }
+  if (!txHash || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    return res.status(400).json({ success: false, reason: 'Invalid txHash — must be a valid 64-char hex transaction hash' })
+  }
 
   const pk = process.env.MARKETING_WALLET_PRIVATE_KEY
   if (!pk) {
@@ -81,23 +84,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, reason: 'Vote amount too small to match' })
   }
 
-  // Send TTS from Marketing wallet
+  // Send TTS from Marketing wallet (retry once on failure)
   const pkClean = pk.trim().replace(/^["']|["']$/g, '').trim()
   const pkHex = pkClean.startsWith('0x') ? pkClean : `0x${pkClean}`
   let matchTxHash
-  try {
-    const account      = privateKeyToAccount(pkHex)
-    const walletClient = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
-    const publicClient = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
-    matchTxHash = await walletClient.writeContract({
-      address: TTS_ADDRESS, abi: TTS_ABI, functionName: 'transfer',
-      args: [walletAddress, ttsAmount],
-    })
-    await publicClient.waitForTransactionReceipt({ hash: matchTxHash })
-  } catch (e) {
-    console.error('vote-match tx failed:', e)
-    return res.status(500).json({ success: false, reason: e.message })
+  const account      = privateKeyToAccount(pkHex)
+  const walletClient = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
+  const publicClient = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  let lastErr
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 3000))
+      matchTxHash = await walletClient.writeContract({
+        address: TTS_ADDRESS, abi: TTS_ABI, functionName: 'transfer',
+        args: [walletAddress, ttsAmount],
+      })
+      await publicClient.waitForTransactionReceipt({ hash: matchTxHash })
+      lastErr = null
+      break
+    } catch (e) {
+      lastErr = e
+      console.error(`vote-match tx attempt ${attempt + 1} failed:`, e.message)
+    }
   }
+  if (lastErr) return res.status(500).json({ success: false, reason: lastErr.message })
 
   // Record in bonus_claims
   await sb('/bonus_claims', {

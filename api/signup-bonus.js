@@ -109,20 +109,27 @@ export default async function handler(req, res) {
       reason: 'MARKETING_WALLET_PRIVATE_KEY is invalid — must be 64 hex chars (32 bytes). It was set to the wallet address instead of the private key. Export the private key from MetaMask and update in Vercel env vars.'
     })
   }
-  let txHash
-  try {
-    const account = privateKeyToAccount(pkHex)
-    const walletClient = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
-    const publicClient = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
-    txHash = await walletClient.writeContract({
-      address: TTS_ADDRESS, abi: TTS_ABI, functionName: 'transfer',
-      args: [walletAddress, ttsAmount],
-    })
-    await publicClient.waitForTransactionReceipt({ hash: txHash })
-  } catch (e) {
-    console.error('signup-bonus tx failed:', e)
-    return res.status(500).json({ success: false, reason: e.message })
+  // Send TTS (retry once on failure)
+  const account = privateKeyToAccount(pkHex)
+  const walletClient = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
+  const publicClient = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  let txHash, lastErr
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 3000))
+      txHash = await walletClient.writeContract({
+        address: TTS_ADDRESS, abi: TTS_ABI, functionName: 'transfer',
+        args: [walletAddress, ttsAmount],
+      })
+      await publicClient.waitForTransactionReceipt({ hash: txHash })
+      lastErr = null
+      break
+    } catch (e) {
+      lastErr = e
+      console.error(`signup-bonus tx attempt ${attempt + 1} failed:`, e.message)
+    }
   }
+  if (lastErr) return res.status(500).json({ success: false, reason: lastErr.message })
 
   // Record in bonus_claims
   await sb('/bonus_claims', {

@@ -283,7 +283,7 @@ const S = `
   .stk-tier.sel { border-color:var(--gold); }
   .tn { font-size:.82rem; font-weight:700; letter-spacing:.06em; }
   .tn.Bronze{color:#cd7f32;}.tn.Silver{color:#c0c0c0;}.tn.Gold{color:var(--gold);}
-  .tn.Platinum{color:#e5e4e2;}.tn.Diamond{color:#b9f2ff;}
+  .tn.Diamond{color:#b9f2ff;}
   .tr2 { font-size:.74rem; color:var(--muted); }
   .tboost { font-size:.78rem; color:var(--rose); font-weight:700; }
   .tapr { font-size:.78rem; color:var(--gold-dim); }
