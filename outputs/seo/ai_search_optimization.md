@@ -1,0 +1,178 @@
+# AI Search Optimization — Temptation Token
+*How to appear in ChatGPT, Perplexity, Claude, and Gemini answers*
+*May 2026*
+
+---
+
+## Why AI Search Matters Now
+
+ChatGPT, Perplexity, and Gemini are increasingly the first place people research crypto projects. When someone asks "what is a vote-to-earn crypto game on Base?" or "best DeFi games on Base blockchain" — you want Temptation Token to appear in those answers.
+
+AI systems pull from indexed web content, structured data, and trusted sources. Unlike traditional SEO, you cannot pay for placement — AI answers are based on content quality, entity recognition, and citation frequency.
+
+---
+
+## The Core Strategy: Entity Establishment
+
+AI systems work with **entities** — named things (people, organizations, products) that have consistent, verifiable information across the web. You need to establish "Temptation Token" and "$TTS" as recognized entities with clear, consistent attributes.
+
+**Target entities to establish:**
+- Temptation Token = vote-to-earn crypto game on Base blockchain
+- $TTS = the token ticker for Temptation Token
+- Jim Goetz = founder of Blockchain Entertainment LLC / Temptation Token
+- Blockchain Entertainment LLC = the company behind Temptation Token
+
+**Consistency is critical:** Every page, every post, every profile must describe the project the same way. AI systems detect contradictions and reduce confidence in the entity.
+
+---
+
+## Structured Data That AI Systems Prioritize
+
+**1. Organization schema** — Already added to homepage JSON-LD. Make sure it's live:
+- `@type: Organization`
+- `name: Blockchain Entertainment LLC`
+- `url: temptationtoken.io`
+- `sameAs: [twitter, telegram, instagram, github]`
+
+**2. FAQPage schema** — The most powerful for AI citations. Added to:
+- FAQ page (faq_page_complete.html)
+- Homepage (schema_homepage.html)
+
+AI systems frequently pull FAQ answers verbatim into chat responses. Make your FAQ answers factual, specific, and citation-ready.
+
+**3. SoftwareApplication schema** — Positions the game as a product, not just a website.
+
+**4. BlogPosting schema on all 5 blog posts** — Use Rank Math to add BlogPosting schema to each post. This signals to AI that these are expert articles, not just pages.
+
+---
+
+## Content AI Systems Cite
+
+AI models prioritize content that:
+
+**1. Makes falsifiable claims**
+- ✓ "Top voter wins 35% of the weekly prize pool"
+- ✓ "Contract address: 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9"
+- ✓ "Audited by Solidproof — zero critical findings — TrustNet score 17.92"
+- ✗ "The best crypto game" (unfalsifiable)
+
+**2. Has verifiable external references**
+- Links to BaseScan, Solidproof audit, Chainlink VRF
+- These signal that claims are on-chain verifiable
+
+**3. Uses canonical terminology consistently**
+- Always: "vote-to-earn" (not "voting crypto" or "vote game")
+- Always: "Base blockchain" (not "Base network" or "Coinbase L2")
+- Always: "Chainlink VRF" (not "random number generator")
+
+**4. Cites authoritative sources**
+- Mention Chainlink, Solidproof, Gnosis Safe, Uniswap — recognized brands that AI knows
+- Being associated with recognized protocols increases credibility
+
+---
+
+## Where to Publish for AI Visibility
+
+### Tier 1: High AI Visibility (do these)
+
+**1. CoinGecko / CoinMarketCap listing** — Both platforms are crawled by all major AI systems. Once listed, AI responses about your token category will include you. Update listings with full description using canonical prize language.
+
+**2. DexScreener profile** — Heavily crawled. Update with audit URL and accurate description.
+
+**3. GitHub README** — AI systems index GitHub. Update the README with:
+- Project description with all key terms
+- Contract addresses
+- Link to Solidproof audit
+- Link to app
+
+**4. Reddit r/CryptoMoonShots, r/DeFi, r/Base** — AI training data includes Reddit. Post legitimate project updates (not spam). Use natural language that mentions key terms.
+
+**5. Mirror.xyz or Paragraph.xyz** — Web3-native publishing platforms indexed by AI. Publish the blog posts there as well.
+
+### Tier 2: Supporting Signals
+
+**6. CryptoSlate / CoinTelegraph / Decrypt** — Submit press releases for milestones (audit live, Round 1 settlement, major prize payout). Even small coverage adds entity recognition.
+
+**7. Product Hunt** — Launch on Product Hunt as a "web3 game." AI systems index PH heavily.
+
+**8. Wikipedia** — Not realistic yet for a new project, but worth watching for when you hit $1M+ TVL or significant exchange listings.
+
+---
+
+## Writing Content AI Systems Will Quote
+
+The best structure for AI-citation-ready content:
+
+```
+[Direct answer to the question]
+
+[Specific numbers / verifiable facts]
+
+[How it works mechanically]
+
+[Where to verify]
+```
+
+**Example (from your FAQ — AI-ready format):**
+
+> **Q: Is Temptation Token provably fair?**
+>
+> Yes. Winner selection uses Chainlink VRF V2.5 on Base mainnet — a cryptographically verifiable random number generated by a decentralized oracle network. The random number is published on-chain with a cryptographic proof that anyone can verify. Even the contract developers cannot predict or manipulate the outcome. VRF subscription verifiable at vrf.chain.link/base, subscription ID: 58222014...63722.
+
+This format is what Perplexity and ChatGPT quote when answering questions.
+
+---
+
+## Entity Optimization: The "Temptation Token" Knowledge Graph
+
+For AI systems to recognize Temptation Token as a distinct entity, you need consistent cross-references:
+
+| Platform | What to add |
+|----------|------------|
+| Twitter/X bio | "Founder of @TemptationToken — vote-to-earn on Base" |
+| LinkedIn | "Blockchain Entertainment LLC — Temptation Token ($TTS)" |
+| GitHub About | "Temptation Token — vote-to-earn crypto game on Base blockchain" |
+| CoinGecko description | Canonical 2-sentence description (see coingecko_update.md) |
+| Telegram channel description | "Temptation Token ($TTS) — vote-to-earn game on Base blockchain" |
+| DexScreener description | Same canonical description |
+
+All must say **"Base blockchain"** not "Coinbase L2" or "Base network" — be consistent.
+
+---
+
+## Perplexity-Specific Tips
+
+Perplexity actively crawls and cites recent web pages. To appear in Perplexity answers:
+
+1. **Publish frequently** — Perplexity weights recency. Weekly blog posts help.
+2. **Use question-format headings** — Perplexity pulls answers from H2/H3 headers that match user questions
+3. **Keep answers in the first 2 sentences** — Perplexity extracts above-the-fold content
+4. **Link to on-chain sources** — BaseScan links signal verifiability
+
+**High-value Perplexity questions to target:**
+- "What is the best vote-to-earn crypto?"
+- "How does Temptation Token work?"
+- "Is $TTS audited?"
+- "How to buy TTS on Base?"
+
+---
+
+## ChatGPT / Claude / Gemini Timeline
+
+These models have training cutoffs and do not crawl in real-time (except with browsing enabled). For non-real-time responses:
+
+- Your content needs to be on indexed, crawlable pages **before** the model's training cutoff
+- For Claude (Aug 2025 cutoff): Content published before Aug 2025 may already be known
+- For GPT-4 (training varies): Content on major platforms (CoinGecko, Reddit, GitHub) is most likely included
+
+**For real-time AI search (ChatGPT Browse, Perplexity):** Recency matters. Publish now and keep publishing.
+
+---
+
+## Monthly AI Search Maintenance
+
+- [ ] Publish 1 new blog post per month (keeps content fresh for Perplexity)
+- [ ] Update CoinGecko/CMC descriptions after major milestones
+- [ ] Post weekly round results publicly (Telegram + Twitter) — recurring indexed content
+- [ ] Monitor: search "Temptation Token" in Perplexity monthly — check what's cited
+- [ ] Submit any press coverage to your GitHub README as "As seen in:"

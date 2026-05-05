@@ -1,0 +1,146 @@
+<!--
+  Temptation Token — Homepage JSON-LD Schema Block
+  Paste into: WordPress → Homepage → Rank Math → Schema → Custom Schema
+  OR: Insert as Custom HTML block anywhere on homepage
+  OR: Add to WordPress theme's <head> via functions.php or Rank Math custom code field
+-->
+
+<script type="application/ld+json">
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://temptationtoken.io/#organization",
+    "name": "Blockchain Entertainment LLC",
+    "url": "https://temptationtoken.io",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://temptationtoken.io/wp-content/uploads/2024/06/Copy-of-Temptation-Token-Coin-1024x1024.webp",
+      "width": 1024,
+      "height": 1024
+    },
+    "sameAs": [
+      "https://twitter.com/TemptationToken",
+      "https://t.me/temptationtoken",
+      "https://instagram.com/temptationtoken",
+      "https://github.com/madscientist4-bigdaddy/temptation-token"
+    ],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "email": "support@temptationtoken.io",
+      "contactType": "customer support"
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://temptationtoken.io/#website",
+    "name": "Temptation Token",
+    "url": "https://temptationtoken.io",
+    "publisher": {
+      "@id": "https://temptationtoken.io/#organization"
+    },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://temptationtoken.io/?s={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "@id": "https://app.temptationtoken.io/#app",
+    "name": "Temptation Token",
+    "url": "https://app.temptationtoken.io",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Web Browser",
+    "description": "The first vote-to-earn cryptocurrency game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 35% of the prize pool. Provably fair via Chainlink VRF. Audited by Solidproof.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    },
+    "creator": {
+      "@id": "https://temptationtoken.io/#organization"
+    },
+    "featureList": [
+      "Weekly on-chain voting rounds",
+      "35% prize to top voter",
+      "Chainlink VRF provably fair winner selection",
+      "Staking with up to 45% APR",
+      "10% charity donation to Polaris Project every round",
+      "NFT winner certificates",
+      "Solidproof audited smart contracts"
+    ],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "1",
+      "reviewCount": "1"
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": "https://temptationtoken.io/#faq",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Temptation Token?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Temptation Token ($TTS) is the first vote-to-earn cryptocurrency game on Base blockchain. Players vote $TTS on weekly profiles. The top voter on the winning profile wins 35% of the prize pool, automatically paid by smart contract. Winner selection uses Chainlink VRF — provably fair and immutable."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does the prize split work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Prize distribution: 35% to the top voter, 35% to the winning profile, 10% to Polaris Project charity (hardcoded), and 20% to Blockchain Entertainment LLC. With a club partner referral, the house split becomes 10% club / 10% house."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is Temptation Token audited?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Temptation Token was audited by Solidproof in April 2026. Zero critical findings. Zero high findings. TrustNet score: 17.92. Full report available at app.solidproof.io/projects/temptation-token."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I buy $TTS?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Buy $TTS on Uniswap V2 on Base. Contract: 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9. Set slippage to 2%+ due to the 1% transfer tax. Bridge ETH to Base first via bridge.base.org."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What are the staking APR rates?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Five tiers: Bronze ($50 / 8% APR / 1.1x), Silver ($100 / 12% / 1.25x), Gold ($250 / 18% / 1.5x), Diamond ($1,000 / 32% / 2x), VIP ($5,000 / 45% / 3x). Staking also multiplies voting power."
+        }
+      }
+    ]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://temptationtoken.io"
+      }
+    ]
+  }
+]
+</script>
