@@ -210,10 +210,18 @@ Always `git add` + commit + push after every change.
 | `SUPABASE_URL` | Supabase project URL | ✅ Set |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key | ✅ Set |
 
-**To add TTS_X_ACCESS_TOKEN / TTS_X_ACCESS_SECRET:**
-1. Go to developer.twitter.com → Projects & Apps → your app → User authentication settings
-2. Log in as @temptationtoken, generate Access Token + Secret with Read+Write permissions
-3. Add both to Vercel: vercel.com/cryptofitjims-projects/temptation-token/settings/environment-variables
+**X credential status (diagnosed May 5 2026):**
+- All 6 X env vars are set in Vercel ✅
+- Current X_API_KEY prefix: `IbtlJxK5xF...`
+- GET /2/users/me returns 401 for BOTH accounts — this confirms the **app credentials (consumer key/secret) are invalid or mismatched**, not just the user tokens
+- Cause: X_API_KEY in Vercel belongs to an app that is either (a) deleted/suspended, or (b) using the wrong X_API_SECRET
+- Fix (Jim must do this in developer.twitter.com):
+  1. Go to developer.twitter.com → your project/app
+  2. Find the app whose API Key starts with `IbtlJxK5xF` — if it exists, regenerate the API Key & Secret and update `X_API_KEY` + `X_API_SECRET` in Vercel
+  3. If that app no longer exists: create a new app, enable Read+Write permissions, copy new API Key & Secret to Vercel
+  4. While logged in as @CryptoFitJim: Keys & Tokens → Generate Access Token & Secret → update `X_ACCESS_TOKEN` + `X_ACCESS_SECRET` in Vercel
+  5. While logged in as @temptationtoken: same app → Keys & Tokens → Generate Access Token & Secret → update `TTS_X_ACCESS_TOKEN` + `TTS_X_ACCESS_SECRET` in Vercel
+  6. After updating all 4 tokens, call `POST /api/social-post {"_diag":true}` to confirm 200 OK from /2/users/me
 
 ---
 
@@ -228,6 +236,39 @@ Always `git add` + commit + push after every change.
 7. **Solidproof audit delivery** — expected 5-10 business days from April 29. When received: publish at temptationtoken.io/audit, resubmit to Blockaid, submit to CoinGecko/CMC.
 8. **Publish website content** — deploy outputs/trust_page.html to temptationtoken.io/trust, publish blog posts from outputs/blog/ to temptationtoken.io/blog
 9. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig
+
+---
+
+## Planned V2 Token Contract Fixes
+
+These changes are staged for the next UUPS proxy upgrade of the TTS token (0x5570eA97d53A53170e973894A9Fa7feb5785d3b9). Do **not** redeploy without Gnosis Safe 2/2 multisig approval. The upgrade transaction must go through the safe at 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86.
+
+### Fix 1 — Solidproof Medium Finding #1: Zero-Amount Transfer Guard
+
+**Issue:** In both `transfer()` and `transferFrom()`, the tax logic runs even when `amount == 0`. This creates a risk of arithmetic underflow and violates EIP-20 compliance, which states that zero-value transfers MUST succeed without side effects.
+
+**Fix:** Add an early return at the top of both functions, before any tax calculation:
+
+```solidity
+// In transfer():
+function transfer(address to, uint256 amount) public override returns (bool) {
+    if (amount == 0) return true;  // ADD THIS — EIP-20 compliance + underflow guard
+    // ... existing tax logic below
+}
+
+// In transferFrom():
+function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+    if (amount == 0) return true;  // ADD THIS — EIP-20 compliance + underflow guard
+    // ... existing allowance + tax logic below
+}
+```
+
+**Why:** EIP-20 requires zero-value transfers to succeed. Without this guard, protocols that send 0-value transfers for accounting purposes will revert unexpectedly. Also prevents the `taxAmount = amount * 100 / 10000` calculation from producing unexpected results on edge-case amounts.
+
+**Implementation contract:** 0xb995b63cdf848b7884cdc51da82e4a80ad02395a (M1 fix, pending upgrade)
+**Upgrade path:** Deploy new implementation → Gnosis Safe proposeUpgrade transaction → 2/2 sign → execute
+
+---
 
 ### ✅ Completed (May 1 2026)
 - MARKETING_WALLET_PRIVATE_KEY corrected in Vercel (was wallet address, now actual private key)

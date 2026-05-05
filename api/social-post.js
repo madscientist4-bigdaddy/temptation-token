@@ -50,7 +50,20 @@ async function postTweet(text, env) {
     headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
     body: JSON.stringify({ text })
   })
-  return r.json()
+  const body = await r.json()
+  if (!r.ok) body._http_status = r.status
+  return body
+}
+
+async function verifyCredentials(env, label) {
+  const url = 'https://api.twitter.com/2/users/me'
+  const authHeader = oauthSign(
+    'GET', url, {},
+    env.X_API_KEY, env.X_API_SECRET, env.X_ACCESS_SECRET, env.X_ACCESS_TOKEN
+  )
+  const r = await fetch(url, { headers: { Authorization: authHeader } })
+  const body = await r.json()
+  return { label, status: r.status, ok: r.ok, body, key_prefix: env.X_API_KEY?.slice(0,8)+'...', token_prefix: env.X_ACCESS_TOKEN?.slice(0,8)+'...' }
 }
 
 async function sendTelegram(chatId, text, token) {
@@ -91,6 +104,32 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const body = req.body || {}
+
+  // Diagnostic mode: { _diag: true } — verifies credentials without posting
+  if (body._diag) {
+    const apiKey    = process.env.X_API_KEY
+    const apiSecret = process.env.X_API_SECRET
+    const jimToken  = process.env.X_ACCESS_TOKEN
+    const jimSecret = process.env.X_ACCESS_SECRET
+    const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
+    const ttsSecret = process.env.TTS_X_ACCESS_SECRET
+    const results = {
+      env_set: {
+        X_API_KEY: !!apiKey,
+        X_API_SECRET: !!apiSecret,
+        X_ACCESS_TOKEN: !!jimToken,
+        X_ACCESS_SECRET: !!jimSecret,
+        TTS_X_ACCESS_TOKEN: !!ttsToken,
+        TTS_X_ACCESS_SECRET: !!ttsSecret,
+      },
+      key_prefix: apiKey?.slice(0,10) + '...',
+      jim_token_prefix: jimToken?.slice(0,10) + '...',
+      tts_token_prefix: ttsToken?.slice(0,10) + '...',
+    }
+    try { results.jim_verify = await verifyCredentials({ X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: jimToken, X_ACCESS_SECRET: jimSecret }, '@CryptoFitJim') } catch(e) { results.jim_verify_err = e.message }
+    try { results.tts_verify = await verifyCredentials({ X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: ttsToken, X_ACCESS_SECRET: ttsSecret }, '@temptationtoken') } catch(e) { results.tts_verify_err = e.message }
+    return res.status(200).json({ ok: true, diagnostic: results })
+  }
 
   // Direct X post to @temptationtoken: { platform: 'x_tts', content }
   if (body.platform === 'x_tts' && body.content) {

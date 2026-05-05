@@ -1220,9 +1220,9 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
 
     // Input sanitization
     setNameErr(''); setLuErr(''); setWalletErr('')
-    if (!/^[a-zA-Z0-9 _-]{1,30}$/.test(name.trim())) {
-      setNameErr('Letters, numbers, spaces, underscores, and hyphens only — max 30 characters')
-      showToast('Letters, numbers, spaces, underscores, and hyphens only — max 30 characters','e'); return
+    if (!/^[\p{L}\p{N} '_-]{1,30}$/u.test(name.trim())) {
+      setNameErr("Letters, numbers, spaces, apostrophes, underscores, and hyphens only — max 30 characters")
+      showToast("Letters, numbers, spaces, apostrophes, underscores, and hyphens only — max 30 characters",'e'); return
     }
     if (lu.trim() && !/^https?:\/\/.+/.test(lu.trim())) {
       setLuErr('Must start with http:// or https://')
