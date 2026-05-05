@@ -89,7 +89,7 @@
 
 <!-- BADGE ROW -->
 <div class="badge-row">
-  <div class="badge">✓ Solidproof Audit</div>
+  <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener" class="badge" style="text-decoration:none">✓ Solidproof Audited</a>
   <div class="badge">✓ Chainlink VRF</div>
   <div class="badge">✓ LP Locked 12mo</div>
   <div class="badge">✓ Gnosis Multisig</div>
@@ -102,14 +102,51 @@
   <div class="section">
     <div class="section-tag">Security Audit</div>
     <h2>Solidproof Audit — Zero Critical Findings</h2>
-    <p>Temptation Token's smart contracts were independently audited by <strong>Solidproof</strong>, a professional blockchain security firm. The audit covered reentrancy, access control, integer overflow, logic errors in prize distribution, and token minting controls.</p>
+    <p>Temptation Token's smart contracts were independently audited by <strong><a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener">Solidproof</a></strong>, a professional blockchain security firm based in Germany. The audit covered reentrancy, access control, integer overflow, logic errors in prize distribution, and token minting controls.</p>
     <br/>
-    <p><strong style="color:var(--green)">Result: Zero critical findings.</strong></p>
-    <br/>
-    <div class="card">
-      <h3>📄 Audit Report</h3>
-      <p>Full PDF report available at <a href="https://temptationtoken.io/audit" target="_blank">temptationtoken.io/audit</a>. Every finding is documented with severity rating and resolution status.</p>
+
+    <!-- TrustNet Score + Result Badges -->
+    <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:24px;align-items:center;">
+      <div style="background:rgba(46,204,113,0.08);border:2px solid rgba(46,204,113,0.4);border-radius:12px;padding:16px 28px;text-align:center;">
+        <div style="font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">TrustNet Score</div>
+        <div style="font-size:2rem;font-weight:800;color:var(--green);font-family:'Cormorant Garamond',serif;">17.92</div>
+        <div style="font-size:.65rem;color:var(--muted)">/ 100 risk scale (lower = safer)</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:8px;padding:10px 20px;font-size:.85rem;font-weight:700;color:var(--green)">✓ Zero Critical Findings</div>
+        <div style="background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:8px;padding:10px 20px;font-size:.85rem;font-weight:700;color:var(--green)">✓ Zero High Findings</div>
+      </div>
     </div>
+
+    <div class="card">
+      <h3>📄 Full Audit Report</h3>
+      <p>Published at <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener">app.solidproof.io/projects/temptation-token</a>. Auditor: Solidproof GmbH (Germany). Audit date: April 2026. Contracts audited: TTS Token + TTSVotingV3b.</p>
+    </div>
+
+    <br/>
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:12px;color:var(--text)">Medium Findings — All Acknowledged</h3>
+    <table>
+      <thead>
+        <tr><th>Finding</th><th>Description</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>M-1: ERC-20 Zero Transfer</td>
+          <td style="color:var(--muted);font-weight:400">Transfer/transferFrom process tax on zero-amount calls — non-compliant with EIP-20 and potential underflow path.</td>
+          <td style="color:#f0a500">Acknowledged — fix queued</td>
+        </tr>
+        <tr>
+          <td>M-2: Centralization Risk</td>
+          <td style="color:var(--muted);font-weight:400">Owner can update charity/house wallet addresses without timelock. Mitigated by Gnosis Safe 2/2 multisig requirement.</td>
+          <td style="color:#f0a500">Acknowledged — fix queued</td>
+        </tr>
+        <tr>
+          <td>M-3: Prize Rounding</td>
+          <td style="color:var(--muted);font-weight:400">Integer division in prize distribution may leave dust amounts in contract. No user funds at risk.</td>
+          <td style="color:#f0a500">Acknowledged — fix queued</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- VRF -->

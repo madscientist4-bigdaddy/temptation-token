@@ -33,13 +33,13 @@ TTS is audited by Solidproof (zero critical findings), with liquidity locked 12 
 - App: https://app.temptationtoken.io
 - Twitter: https://twitter.com/TemptationToken
 - Telegram: https://t.me/temptationtoken
-- Audit: https://temptationtoken.io/audit
+- Audit: https://app.solidproof.io/projects/temptation-token
 
 ## Security Documentation
 
 - Audit firm: Solidproof (solidproof.io)
 - Audit result: Complete — zero critical findings
-- Audit PDF: https://temptationtoken.io/audit
+- Audit PDF: https://app.solidproof.io/projects/temptation-token
 - LP lock: Team.Finance — 12 months from liquidity provision date
 - Multisig: Gnosis Safe — 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86
 

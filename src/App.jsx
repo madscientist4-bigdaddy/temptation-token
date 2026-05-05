@@ -1623,6 +1623,10 @@ export default function App() {
         </div>
       </div>
 
+      <div style={{background:'rgba(46,204,113,0.08)',borderBottom:'1px solid rgba(46,204,113,0.15)',padding:'5px 16px',textAlign:'center',fontSize:'.6rem',letterSpacing:'.08em',color:'#2ecc71',fontWeight:600}}>
+        ✓ Audited by Solidproof · Zero critical findings · <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener" style={{color:'#2ecc71'}}>View Report →</a>
+      </div>
+
       <div className="nav">
         <div className="nav-inner">
           {tabs.map(t => (

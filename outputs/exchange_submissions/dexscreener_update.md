@@ -16,7 +16,7 @@
 ## Boost Links (copy-paste into DexScreener profile)
 
 - 🎮 Play: https://app.temptationtoken.io
-- 🔍 Audit: https://temptationtoken.io/audit
+- 🔍 Audit: https://app.solidproof.io/projects/temptation-token
 - 💬 Community: https://t.me/TTSCommunityChat
 - 📱 Instagram: https://instagram.com/temptationtoken
 

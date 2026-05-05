@@ -233,7 +233,7 @@ Always `git add` + commit + push after every change.
 4. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env → enables @CryptoFitJim auto posting. **Also add TTS_X_ACCESS_TOKEN + TTS_X_ACCESS_SECRET** for @temptationtoken brand account (log into X Developer Console as @temptationtoken → User authentication settings → generate Access Token + Secret → add to Vercel)
 5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings)
 6. **CoinGecko resubmission** — use `outputs/exchange_submissions/coingecko_update.md`
-7. **Solidproof audit delivery** — expected 5-10 business days from April 29. When received: publish at temptationtoken.io/audit, resubmit to Blockaid, submit to CoinGecko/CMC.
+7. ✅ **Solidproof audit complete and live** — TrustNet score 17.92. Zero critical findings. Zero high findings. 3 medium findings (acknowledged). Report: app.solidproof.io/projects/temptation-token. Pending from Jim: (a) acknowledge findings on Solidproof portal, (b) complete KYC verification on portal, (c) resubmit to Blockaid with audit URL, (d) publish outputs/trust_page.html to temptationtoken.io/trust.
 8. **Publish website content** — deploy outputs/trust_page.html to temptationtoken.io/trust, publish blog posts from outputs/blog/ to temptationtoken.io/blog
 9. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig
 

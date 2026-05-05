@@ -42,7 +42,7 @@ Temptation Token ($TTS) is the first vote-to-earn cryptocurrency game on Base bl
 | Feature | Status |
 |---------|--------|
 | Smart Contract Audit | Solidproof — complete, zero critical findings |
-| Audit Report URL | https://temptationtoken.io/audit |
+| Audit Report URL | https://app.solidproof.io/projects/temptation-token |
 | LP Lock | 12 months — Team.Finance |
 | Contract Verified | Yes — BaseScan (all contracts) |
 | Chainlink VRF | Active — Subscription ID 58222014...63722 |

@@ -24,7 +24,7 @@ Each week, a new voting round opens Monday 12:00 AM EDT. Approved profiles compe
 $TTS has direct in-game utility — it is both the betting currency and the prize currency. Users must hold and spend $TTS to participate. Stakers who lock $TTS earn up to 45% APR and receive vote multipliers up to 3x, creating strong holding incentives.
 
 **Security:**
-- Solidproof audit: complete — zero critical findings (report at temptationtoken.io/audit)
+- Solidproof audit: complete — zero critical findings (report at app.solidproof.io/projects/temptation-token)
 - Chainlink VRF V2.5: provably fair winner selection
 - LP locked: 12 months on Team.Finance
 - Treasury: Gnosis Safe 2/2 multisig
