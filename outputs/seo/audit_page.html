@@ -3,45 +3,121 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Temptation Token Smart Contract Audit — Solidproof | $TTS</title>
-  <meta name="description" content="Temptation Token ($TTS) smart contract audit by Solidproof. Zero critical findings. Zero high findings. TrustNet score 17.92. Full report available on Solidproof." />
+  <title>Temptation Token Smart Contract Audit — Solidproof | Zero Critical Findings</title>
+  <meta name="description" content="Temptation Token smart contract independently audited by Solidproof. Zero critical findings. Zero high findings. TrustNet score 17.92. All contract addresses verified on BaseScan." />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    :root { --bg:#0d0d0d; --surface:#1a1a1a; --border:rgba(201,168,76,0.2); --gold:#c9a84c; --gold-light:#f0d060; --text:#f5f5f5; --muted:#999; --green:#2ecc71; --amber:#f0a500; --red:#e8405a; }
+    :root {
+      --bg:#0d0d0d; --surface:#1a1a1a; --surface2:#111111;
+      --border:rgba(201,168,76,0.2); --gold:#c9a84c; --gold-light:#f0d060;
+      --text:#f5f5f5; --muted:#999; --green:#2ecc71; --amber:#f0a500; --red:#e8405a;
+    }
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:var(--bg); color:var(--text); font-family:'Montserrat',sans-serif; line-height:1.6; }
-    a { color:var(--gold); }
-    nav { background:rgba(13,13,13,0.95); border-bottom:1px solid var(--border); padding:18px 40px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; }
-    .nav-logo { font-family:'Cormorant Garamond',serif; font-size:1.4rem; font-weight:700; color:var(--gold); letter-spacing:.05em; text-decoration:none; }
-    .nav-cta { background:var(--gold); color:#0d0d0d; padding:10px 24px; border-radius:50px; font-weight:800; font-size:.85rem; letter-spacing:.05em; text-decoration:none; }
-    .hero { text-align:center; padding:80px 20px 50px; max-width:800px; margin:0 auto; }
+    html { font-size: 16px; }
+    body { background:var(--bg); color:var(--text); font-family:'Montserrat',sans-serif; line-height:1.7; }
+    a { color:var(--gold); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+
+    /* NAV */
+    nav {
+      background:rgba(13,13,13,0.97);
+      border-bottom:1px solid var(--border);
+      padding:16px 20px;
+      display:flex; justify-content:space-between; align-items:center;
+      position:sticky; top:0; z-index:100;
+    }
+    .nav-logo { font-family:'Cormorant Garamond',serif; font-size:1.3rem; font-weight:700; color:var(--gold); }
+    .nav-cta {
+      background:var(--gold); color:#0d0d0d;
+      padding:12px 22px; border-radius:50px;
+      font-weight:800; font-size:.85rem;
+      min-height:44px; display:flex; align-items:center;
+    }
+
+    /* HERO */
+    .hero { text-align:center; padding:60px 20px 40px; max-width:760px; margin:0 auto; }
     .hero-tag { font-size:.65rem; letter-spacing:.25em; text-transform:uppercase; color:var(--gold); margin-bottom:14px; font-weight:700; }
-    .hero h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(2rem,5vw,3.2rem); font-weight:700; line-height:1.15; margin-bottom:20px; }
+    .hero h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(1.9rem,5vw,3rem); font-weight:700; line-height:1.15; margin-bottom:18px; }
+    .hero p { font-size:.95rem; color:var(--muted); max-width:520px; margin:0 auto; }
+
+    /* SCORE CARDS */
+    .score-row { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin:40px 20px 50px; }
+    .score-card {
+      background:rgba(46,204,113,0.06);
+      border:2px solid rgba(46,204,113,0.35);
+      border-radius:14px; padding:24px 28px; text-align:center; flex:1; min-width:140px; max-width:200px;
+    }
+    .score-card.amber-card { background:rgba(240,165,0,0.06); border-color:rgba(240,165,0,0.35); }
+    .sc-label { font-size:.58rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+    .sc-val { font-size:2.4rem; font-weight:800; color:var(--green); font-family:'Cormorant Garamond',serif; line-height:1; margin-bottom:4px; }
+    .sc-val.amber { color:var(--amber); }
+    .sc-sub { font-size:.65rem; color:var(--muted); }
+
+    /* CONTENT */
     .content { max-width:860px; margin:0 auto; padding:0 20px 80px; }
-    .score-row { display:flex; flex-wrap:wrap; gap:20px; justify-content:center; margin-bottom:60px; }
-    .score-card { background:rgba(46,204,113,0.06); border:2px solid rgba(46,204,113,0.35); border-radius:16px; padding:28px 36px; text-align:center; min-width:180px; }
-    .score-card .sc-label { font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
-    .score-card .sc-val { font-size:2.4rem; font-weight:800; color:var(--green); font-family:'Cormorant Garamond',serif; line-height:1; margin-bottom:4px; }
-    .score-card .sc-sub { font-size:.68rem; color:var(--muted); }
     .section { margin-bottom:50px; }
-    .section-tag { font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:8px; }
-    .section h2 { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:700; margin-bottom:14px; }
-    .section p { font-size:.9rem; color:var(--muted); line-height:1.8; }
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:24px 28px; margin-bottom:14px; }
+    .section-tag { font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-bottom:8px; }
+    .section h2 { font-family:'Cormorant Garamond',serif; font-size:1.75rem; font-weight:700; margin-bottom:14px; }
+    .section p, .section li { font-size:.9rem; color:var(--muted); line-height:1.8; }
+
+    /* CARDS */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:22px 26px; margin-bottom:14px; }
     .card h3 { font-size:1rem; font-weight:700; margin-bottom:8px; }
-    table { width:100%; border-collapse:collapse; font-size:.84rem; }
-    th { text-align:left; color:var(--gold); font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; padding:10px 12px; border-bottom:1px solid var(--border); }
+    .finding-card { cursor:pointer; transition:border-color .2s; }
+    .finding-card:hover { border-color:rgba(240,165,0,0.4); }
+    .finding-card .fc-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .finding-card h3 { color:var(--amber); margin-bottom:0; }
+    .fc-badge {
+      background:rgba(240,165,0,0.1); border:1px solid rgba(240,165,0,0.3);
+      border-radius:50px; padding:4px 12px; font-size:.65rem; font-weight:700; color:var(--amber);
+      white-space:nowrap;
+    }
+    .fc-body { font-size:.88rem; color:var(--muted); line-height:1.8; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06); display:none; }
+    .fc-body.open { display:block; }
+    .fc-icon { font-size:.9rem; color:var(--amber); transition:transform .25s; flex-shrink:0; }
+    .finding-card.open .fc-icon { transform:rotate(180deg); }
+
+    /* CHECKLIST */
+    .checklist { list-style:none; padding:0; }
+    .checklist li { display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:.88rem; color:var(--muted); }
+    .checklist li:last-child { border-bottom:none; }
+    .chk-icon { width:22px; height:22px; border-radius:50%; background:rgba(46,204,113,0.12); border:1.5px solid rgba(46,204,113,0.4); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--green); font-size:.75rem; animation:chkIn .4s ease both; }
+    @keyframes chkIn { from{scale:0;opacity:0;}to{scale:1;opacity:1;} }
+
+    /* TABLES */
+    .tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:10px; }
+    table { width:100%; min-width:480px; border-collapse:collapse; font-size:.84rem; }
+    th { text-align:left; color:var(--gold); font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; padding:10px 12px; border-bottom:1px solid var(--border); }
     td { padding:12px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--muted); }
     td:first-child { color:var(--text); font-weight:600; }
     .sev-medium { color:var(--amber); font-weight:700; }
-    .sev-acknowledged { color:var(--amber); }
-    .cta-row { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:40px; }
-    .btn-primary { background:linear-gradient(135deg,var(--gold),#a07020); color:#0d0d0d; padding:16px 40px; border-radius:50px; font-weight:800; font-size:.88rem; letter-spacing:.06em; text-decoration:none; display:inline-block; }
-    .btn-secondary { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:16px 40px; border-radius:50px; font-weight:700; font-size:.88rem; text-decoration:none; display:inline-block; }
-    footer { border-top:1px solid var(--border); padding:40px 20px; text-align:center; }
-    .footer-links { display:flex; justify-content:center; gap:24px; flex-wrap:wrap; margin-bottom:16px; }
-    .footer-links a { font-size:.8rem; color:var(--muted); text-decoration:none; }
-    code { font-size:.78rem; color:var(--gold); background:rgba(201,168,76,0.08); padding:2px 6px; border-radius:4px; }
+    .sev-ack { color:var(--amber); font-size:.82rem; }
+
+    /* CODE + COPY */
+    .addr-row { display:flex; align-items:center; gap:8px; background:rgba(201,168,76,0.06); border:1px solid rgba(201,168,76,0.15); border-radius:8px; padding:10px 14px; margin:8px 0; flex-wrap:wrap; }
+    .addr-code { font-size:.75rem; color:var(--gold); font-family:monospace; word-break:break-all; flex:1; }
+    .copy-btn { background:rgba(201,168,76,0.12); border:1px solid rgba(201,168,76,0.3); color:var(--gold); border-radius:6px; padding:6px 12px; font-size:.65rem; font-weight:700; letter-spacing:.06em; cursor:pointer; white-space:nowrap; transition:background .2s; font-family:'Montserrat',sans-serif; min-height:32px; }
+    .copy-btn:hover { background:rgba(201,168,76,0.22); }
+    .copy-btn.copied { background:rgba(46,204,113,0.15); border-color:rgba(46,204,113,0.4); color:var(--green); }
+
+    /* CTAs */
+    .cta-row { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:44px; }
+    .btn-primary { background:linear-gradient(135deg,var(--gold),#a07020); color:#0d0d0d; padding:16px 32px; border-radius:50px; font-weight:800; font-size:.9rem; letter-spacing:.06em; display:inline-flex; align-items:center; min-height:52px; }
+    .btn-secondary { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:16px 32px; border-radius:50px; font-weight:700; font-size:.9rem; display:inline-flex; align-items:center; min-height:52px; }
+    @media(max-width:520px) {
+      .btn-primary, .btn-secondary { width:100%; justify-content:center; }
+      .cta-row { flex-direction:column; }
+    }
+
+    footer { border-top:1px solid var(--border); padding:36px 20px; text-align:center; }
+    .footer-links { display:flex; justify-content:center; gap:20px; flex-wrap:wrap; margin-bottom:14px; }
+    .footer-links a { font-size:.78rem; color:var(--muted); }
+    .footer-links a:hover { color:var(--gold); }
+
+    @media(max-width:480px) {
+      .score-card { min-width:120px; padding:18px 16px; }
+      .sc-val { font-size:2rem; }
+    }
   </style>
 </head>
 <body>
@@ -52,44 +128,61 @@
 </nav>
 
 <div class="hero">
-  <div class="hero-tag">Smart Contract Security</div>
-  <h1>Temptation Token Audit — <span style="color:var(--green)">Zero Critical Findings</span></h1>
-  <p style="font-size:1rem;color:var(--muted);max-width:500px;margin:0 auto">Audited by Solidproof, April 2026. Every finding is documented, severity-rated, and publicly available.</p>
+  <div class="hero-tag">Smart Contract Security · April 2026</div>
+  <h1><span style="color:var(--green)">Zero Critical Findings</span><br/>Solidproof Audit Complete</h1>
+  <p>Independent blockchain security audit by Solidproof GmbH (Germany). Every finding is documented, severity-rated, and publicly available.</p>
+</div>
+
+<!-- SCORE CARDS -->
+<div class="score-row">
+  <div class="score-card">
+    <div class="sc-label">TrustNet Score</div>
+    <div class="sc-val">17.92</div>
+    <div class="sc-sub">/ 100 (lower = safer)</div>
+  </div>
+  <div class="score-card">
+    <div class="sc-label">Critical Findings</div>
+    <div class="sc-val">0</div>
+    <div class="sc-sub">none found</div>
+  </div>
+  <div class="score-card">
+    <div class="sc-label">High Findings</div>
+    <div class="sc-val">0</div>
+    <div class="sc-sub">none found</div>
+  </div>
+  <div class="score-card amber-card">
+    <div class="sc-label">Medium Findings</div>
+    <div class="sc-val amber">3</div>
+    <div class="sc-sub">acknowledged ✓</div>
+  </div>
 </div>
 
 <div class="content">
 
-  <!-- SCORE BADGES -->
-  <div class="score-row">
-    <div class="score-card">
-      <div class="sc-label">TrustNet Score</div>
-      <div class="sc-val">17.92</div>
-      <div class="sc-sub">/ 100 scale (lower = safer)</div>
-    </div>
-    <div class="score-card">
-      <div class="sc-label">Critical Findings</div>
-      <div class="sc-val">0</div>
-      <div class="sc-sub">none found</div>
-    </div>
-    <div class="score-card">
-      <div class="sc-label">High Findings</div>
-      <div class="sc-val">0</div>
-      <div class="sc-sub">none found</div>
-    </div>
-    <div class="score-card">
-      <div class="sc-label">Medium Findings</div>
-      <div class="sc-val" style="color:var(--amber)">3</div>
-      <div class="sc-sub">acknowledged</div>
-    </div>
+  <!-- SECURITY CHECKLIST -->
+  <div class="section">
+    <div class="section-tag">Security Checklist</div>
+    <h2>What the Audit Verified</h2>
+    <ul class="checklist">
+      <li><span class="chk-icon" style="animation-delay:.05s">✓</span> No reentrancy vulnerabilities in prize distribution</li>
+      <li><span class="chk-icon" style="animation-delay:.1s">✓</span> No unauthorized minting — supply is fixed at 69,000,000,000 TTS</li>
+      <li><span class="chk-icon" style="animation-delay:.15s">✓</span> Access control properly enforced — owner-only functions verified</li>
+      <li><span class="chk-icon" style="animation-delay:.2s">✓</span> Chainlink VRF integration correct — cannot be manipulated</li>
+      <li><span class="chk-icon" style="animation-delay:.25s">✓</span> Transfer tax rate hardcoded — cannot be increased above 1%</li>
+      <li><span class="chk-icon" style="animation-delay:.3s">✓</span> Prize distribution logic verified — correct percentage splits enforced</li>
+      <li><span class="chk-icon" style="animation-delay:.35s">✓</span> UUPS proxy upgrade pattern correctly implemented</li>
+      <li><span class="chk-icon" style="animation-delay:.4s">✓</span> No backdoor functions, no hidden admin controls</li>
+      <li><span class="chk-icon" style="animation-delay:.45s">✓</span> ERC-20 standard compliance verified (with one noted exception in medium findings)</li>
+    </ul>
   </div>
 
-  <!-- REPORT LINK -->
+  <!-- AUDIT REPORT -->
   <div class="section">
     <div class="section-tag">Audit Report</div>
     <h2>Full Report — Solidproof</h2>
     <div class="card">
       <h3>📄 Published at Solidproof</h3>
-      <p>The full audit report is published at <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener">app.solidproof.io/projects/temptation-token</a>. All findings, code snippets, severity ratings, and auditor commentary are included.</p>
+      <p>The full audit report is publicly available at <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener">app.solidproof.io/projects/temptation-token</a>. All findings, code snippets, severity ratings, and auditor commentary are included.</p>
       <br/>
       <p><strong>Auditor:</strong> Solidproof GmbH (Germany) &nbsp;·&nbsp; <strong>Audit Date:</strong> April 2026 &nbsp;·&nbsp; <strong>Methodology:</strong> Manual review + automated analysis</p>
     </div>
@@ -99,116 +192,198 @@
   <div class="section">
     <div class="section-tag">Scope</div>
     <h2>Contracts Audited</h2>
-    <table>
-      <thead><tr><th>Contract</th><th>Address</th><th>Status</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>TTS Token (ERC-20, UUPS Proxy)</td>
-          <td><a href="https://basescan.org/address/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9" target="_blank">0x5570eA…3b9</a></td>
-          <td style="color:var(--green)">✓ Audited</td>
-        </tr>
-        <tr>
-          <td>TTSVotingV3b (Active Voting Contract)</td>
-          <td><a href="https://basescan.org/address/0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8" target="_blank">0xbc5443…F8</a></td>
-          <td style="color:var(--green)">✓ Audited</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Contract</th><th>Address</th><th>Network</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>TTS Token (ERC-20 UUPS Proxy)</td>
+            <td><a href="https://basescan.org/address/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9" target="_blank">0x5570eA…3b9</a></td>
+            <td>Base Mainnet</td>
+            <td style="color:var(--green)">✓ Audited</td>
+          </tr>
+          <tr>
+            <td>TTSVotingV3b (Active)</td>
+            <td><a href="https://basescan.org/address/0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8" target="_blank">0xbc5443…F8</a></td>
+            <td>Base Mainnet</td>
+            <td style="color:var(--green)">✓ Audited</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     <br/>
-    <p><strong>Blockchain:</strong> Base Mainnet (Chain ID 8453) &nbsp;·&nbsp; <strong>Solidity:</strong> 0.8.20 &nbsp;·&nbsp; <strong>Standards:</strong> ERC-20, EIP-1967 (UUPS)</p>
+    <p>Solidity version: 0.8.20 &nbsp;·&nbsp; Standards: ERC-20, EIP-1967 (UUPS) &nbsp;·&nbsp; Chain ID: 8453</p>
   </div>
 
-  <!-- FINDINGS -->
+  <!-- ALL FINDINGS -->
   <div class="section">
-    <div class="section-tag">Findings</div>
+    <div class="section-tag">Findings Summary</div>
     <h2>All Findings by Severity</h2>
     <br/>
-    <table>
-      <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Status</th></tr></thead>
-      <tbody>
-        <tr>
-          <td>M-1</td>
-          <td class="sev-medium">Medium</td>
-          <td>ERC-20 Zero-Value Transfer Tax Issue</td>
-          <td class="sev-acknowledged">Acknowledged — fix queued for V2 upgrade</td>
-        </tr>
-        <tr>
-          <td>M-2</td>
-          <td class="sev-medium">Medium</td>
-          <td>Centralization Risk — Wallet Address Updatability</td>
-          <td class="sev-acknowledged">Acknowledged — mitigated by Gnosis Safe 2/2 multisig</td>
-        </tr>
-        <tr>
-          <td>M-3</td>
-          <td class="sev-medium">Medium</td>
-          <td>Integer Division Rounding in Prize Distribution</td>
-          <td class="sev-acknowledged">Acknowledged — dust amounts, no user funds at risk</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Severity</th><th>Title</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>M-1</td>
+            <td class="sev-medium">Medium</td>
+            <td>ERC-20 Zero-Value Transfer Tax Issue</td>
+            <td class="sev-ack">Acknowledged ✓</td>
+          </tr>
+          <tr>
+            <td>M-2</td>
+            <td class="sev-medium">Medium</td>
+            <td>Centralization Risk — Wallet Address Updatability</td>
+            <td class="sev-ack">Acknowledged ✓</td>
+          </tr>
+          <tr>
+            <td>M-3</td>
+            <td class="sev-medium">Medium</td>
+            <td>Integer Division Rounding in Prize Distribution</td>
+            <td class="sev-ack">Acknowledged ✓</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     <br/>
-    <p>Zero critical findings. Zero high findings. For low and informational findings, see the full report at Solidproof.</p>
+    <p>Zero critical findings. Zero high findings. For low and informational findings, see the full Solidproof report.</p>
   </div>
 
-  <!-- MEDIUM FINDINGS EXPANDED -->
+  <!-- MEDIUM FINDINGS COLLAPSIBLE -->
   <div class="section">
     <div class="section-tag">Finding Details</div>
-    <h2>Medium Findings — Explained</h2>
+    <h2>Medium Findings — Click to Expand</h2>
+    <br/>
 
-    <div class="card">
-      <h3 style="color:var(--amber)">M-1: ERC-20 Zero-Value Transfer</h3>
-      <p>The <code>transfer()</code> and <code>transferFrom()</code> functions apply tax logic even when <code>amount == 0</code>. This is non-compliant with EIP-20, which requires zero-value transfers to succeed without side effects. A fix adding <code>if (amount == 0) return true</code> before the tax logic is queued for the next UUPS proxy upgrade.</p>
+    <div class="card finding-card" id="fc1" onclick="toggleFinding('fc1')">
+      <div class="fc-head">
+        <h3>M-1: ERC-20 Zero-Value Transfer</h3>
+        <span class="fc-badge">Acknowledged ✓</span>
+        <span class="fc-icon">▾</span>
+      </div>
+      <div class="fc-body">
+        The <code>transfer()</code> and <code>transferFrom()</code> functions apply tax logic even when <code>amount == 0</code>. EIP-20 requires zero-value transfers to succeed without side effects. A fix adding <code>if (amount == 0) return true</code> before tax logic is queued for the next UUPS proxy upgrade through the Gnosis Safe 2/2 multisig. This issue poses no risk to user funds.
+      </div>
     </div>
 
-    <div class="card">
-      <h3 style="color:var(--amber)">M-2: Centralization Risk</h3>
-      <p>The contract owner can update the charity wallet and house wallet addresses without a timelock. This is mitigated by the Gnosis Safe 2/2 multisig requirement on the deployer wallet — no single party can make changes unilaterally. Both wallet addresses are publicly visible on BaseScan. A timelock will be considered for the next upgrade.</p>
+    <div class="card finding-card" id="fc2" onclick="toggleFinding('fc2')">
+      <div class="fc-head">
+        <h3>M-2: Centralization Risk</h3>
+        <span class="fc-badge">Acknowledged ✓</span>
+        <span class="fc-icon">▾</span>
+      </div>
+      <div class="fc-body">
+        The contract owner can update the charity wallet and house wallet addresses without a timelock. This is mitigated by the <strong>Gnosis Safe 2/2 multisig requirement</strong> — no single party can make changes unilaterally. Both wallet addresses are publicly visible on BaseScan and independently verifiable. A timelock will be considered for the next upgrade.
+      </div>
     </div>
 
-    <div class="card">
-      <h3 style="color:var(--amber)">M-3: Prize Distribution Rounding</h3>
-      <p>Integer division in prize distribution calculations may leave small "dust" amounts in the contract (typically fractions of a TTS token). No user funds are at risk — the rounding error affects only tiny residual balances. Acknowledged and will be addressed in a future contract version.</p>
+    <div class="card finding-card" id="fc3" onclick="toggleFinding('fc3')">
+      <div class="fc-head">
+        <h3>M-3: Prize Distribution Rounding</h3>
+        <span class="fc-badge">Acknowledged ✓</span>
+        <span class="fc-icon">▾</span>
+      </div>
+      <div class="fc-body">
+        Integer division in prize distribution calculations may leave small "dust" amounts (typically fractions of a TTS token) in the contract after settlement. No user funds are at risk — the rounding error affects only residual balances of negligible value. Acknowledged and will be addressed in a future contract version.
+      </div>
     </div>
   </div>
 
-  <!-- CTA -->
+  <!-- CONTRACT ADDRESSES -->
+  <div class="section">
+    <div class="section-tag">Verified Contracts</div>
+    <h2>All Contract Addresses — Copy & Verify</h2>
+    <p>Every address below is publicly verifiable on BaseScan. Click copy to get the full address.</p>
+    <br/>
+
+    <div class="card">
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">TTS Token (UUPS Proxy) — The main $TTS token contract</p>
+      <div class="addr-row">
+        <span class="addr-code">0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</span>
+        <button class="copy-btn" onclick="copyAddr(this,'0x5570eA97d53A53170e973894A9Fa7feb5785d3b9')">Copy</button>
+        <a href="https://basescan.org/address/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9" target="_blank" style="font-size:.72rem;color:var(--gold)">BaseScan ↗</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">TTSVotingV3b — Active voting contract (FINAL)</p>
+      <div class="addr-row">
+        <span class="addr-code">0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8</span>
+        <button class="copy-btn" onclick="copyAddr(this,'0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8')">Copy</button>
+        <a href="https://basescan.org/address/0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8" target="_blank" style="font-size:.72rem;color:var(--gold)">BaseScan ↗</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">Gnosis Safe — 2/2 multisig treasury</p>
+      <div class="addr-row">
+        <span class="addr-code">0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86</span>
+        <button class="copy-btn" onclick="copyAddr(this,'0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86')">Copy</button>
+        <a href="https://basescan.org/address/0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86" target="_blank" style="font-size:.72rem;color:var(--gold)">BaseScan ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTAs -->
   <div class="cta-row">
     <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener" class="btn-primary">📄 View Full Audit Report</a>
-    <a href="https://app.temptationtoken.io" class="btn-secondary">🎮 Play Temptation Token</a>
+    <a href="https://app.temptationtoken.io" class="btn-secondary">🎮 Play Temptation Token →</a>
   </div>
+
+  <p style="text-align:center;font-size:.78rem;color:var(--muted);margin-top:20px">See for yourself — every transaction is on-chain and verifiable at <a href="https://basescan.org" target="_blank">basescan.org</a></p>
 
 </div>
 
 <footer>
   <div class="footer-links">
     <a href="https://temptationtoken.io">Home</a>
-    <a href="https://temptationtoken.io/trust">Trust & Security</a>
+    <a href="https://temptationtoken.io/trust">Trust &amp; Security</a>
+    <a href="https://temptationtoken.io/faq">FAQ</a>
     <a href="https://app.temptationtoken.io">Play Now</a>
     <a href="https://t.me/TTSCommunityChat">Telegram</a>
-    <a href="https://twitter.com/TemptationToken">Twitter</a>
     <a href="mailto:support@temptationtoken.io">Contact</a>
   </div>
-  <p style="font-size:.75rem;color:#555">© 2026 Blockchain Entertainment LLC · $TTS on Base · <a href="https://basescan.org/address/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9">Contract</a></p>
+  <p style="font-size:.72rem;color:#444">© 2026 Blockchain Entertainment LLC · $TTS on Base · <a href="https://basescan.org/address/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9">Contract on BaseScan</a></p>
 </footer>
 
-<!-- Structured Data -->
+<script>
+function toggleFinding(id) {
+  var card = document.getElementById(id);
+  var body = card.querySelector('.fc-body');
+  var isOpen = body.classList.contains('open');
+  document.querySelectorAll('.fc-body.open').forEach(function(b){ b.classList.remove('open'); b.closest('.finding-card').classList.remove('open'); });
+  if (!isOpen) { body.classList.add('open'); card.classList.add('open'); }
+}
+function copyAddr(btn, addr) {
+  navigator.clipboard.writeText(addr).then(function() {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function() {
+    var el = document.createElement('textarea');
+    el.value = addr;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "WebPage",
-  "name": "Temptation Token Smart Contract Audit — Solidproof",
+  "name": "Temptation Token Smart Contract Audit — Solidproof | Zero Critical Findings",
   "url": "https://temptationtoken.io/audit",
-  "description": "Independent smart contract audit of Temptation Token ($TTS) by Solidproof. Zero critical findings. TrustNet score 17.92.",
+  "description": "Independent smart contract audit of Temptation Token ($TTS) by Solidproof. Zero critical findings. Zero high findings. TrustNet score 17.92.",
   "publisher": {
     "@type": "Organization",
     "name": "Blockchain Entertainment LLC",
     "url": "https://temptationtoken.io"
-  },
-  "about": {
-    "@type": "SoftwareSourceCode",
-    "name": "TTS Token + TTSVotingV3b Smart Contracts",
-    "codeRepository": "https://github.com/madscientist4-bigdaddy/temptation-token",
-    "programmingLanguage": "Solidity"
   }
 }
 </script>

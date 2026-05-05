@@ -1,0 +1,681 @@
+<!--
+  Temptation Token — FAQ Page v3 (Complete)
+  WordPress: Add as Custom HTML block, replace entire page content
+  Focus keyword: temptation token FAQ
+  Updated: May 2026 · Base Blockchain · 15 Questions
+-->
+
+<style>
+/* ── LIVE ROUND CARD ── */
+.tts-live-card {
+  background: linear-gradient(135deg, rgba(13,13,13,0.95), rgba(26,26,26,0.95));
+  border: 1.5px solid #c9a84c;
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin: 0 0 32px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.tts-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: .72em;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #e8405a;
+  margin-bottom: 5px;
+}
+.tts-live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #e8405a;
+  animation: tts-pulse 1.4s infinite;
+  flex-shrink: 0;
+}
+@keyframes tts-pulse {
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(232,64,90,.5);}
+  50%{opacity:.7;box-shadow:0 0 0 5px rgba(232,64,90,0);}
+}
+.tts-live-title { font-size: 1.1em; font-weight: 800; color: #f5f5f5; margin-bottom: 3px; }
+.tts-live-sub { font-size: .82em; color: #c9a84c; }
+.tts-live-cta {
+  display: inline-block;
+  background: linear-gradient(135deg, #c9a84c, #a07020);
+  color: #0d0d0d;
+  font-weight: 800;
+  font-size: .9em;
+  padding: 14px 28px;
+  border-radius: 50px;
+  text-decoration: none;
+  letter-spacing: .06em;
+  white-space: nowrap;
+  min-height: 48px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+}
+.tts-live-cta:hover { opacity: .9; text-decoration: none; }
+
+/* ── WRAP ── */
+.tts-faq-v3 {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 0 60px;
+  font-family: var(--e-global-typography-text-font-family, inherit);
+  color: #e8e8e8;
+  line-height: 1.7;
+}
+.tts-faq-v3 h1 {
+  font-family: var(--e-global-typography-primary-font-family, inherit);
+  font-size: clamp(1.6em, 4vw, 2.2em);
+  font-weight: 800;
+  margin-bottom: 6px;
+  color: #ffffff;
+  line-height: 1.2;
+}
+.tts-faq-v3 .tts-meta {
+  font-size: .85em;
+  color: #888;
+  margin-bottom: 28px;
+}
+.tts-faq-v3 a { color: #c9a84c; }
+.tts-faq-v3 a:hover { text-decoration: underline; }
+
+/* ── ACCORDION ── */
+.tts-acc-item {
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+.tts-acc-item:first-of-type { border-top: 1px solid rgba(255,255,255,0.07); }
+
+.tts-acc-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 18px 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  text-align: left;
+  transition: padding-left .25s;
+}
+.tts-acc-btn:hover { padding-left: 6px; }
+.tts-acc-item.open .tts-acc-btn {
+  padding-left: 12px;
+  border-left: 3px solid #c9a84c;
+  background: rgba(201,168,76,0.04);
+}
+
+.tts-acc-q {
+  font-family: var(--e-global-typography-text-font-family, inherit);
+  font-size: 1em;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.45;
+  flex: 1;
+}
+.tts-acc-icon {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(201,168,76,0.5);
+  display: flex; align-items: center; justify-content: center;
+  color: #c9a84c;
+  font-size: 1.1em;
+  font-weight: 400;
+  transition: transform .3s, background .2s;
+  background: rgba(201,168,76,0.06);
+  line-height: 1;
+}
+.tts-acc-item.open .tts-acc-icon {
+  transform: rotate(45deg);
+  background: rgba(201,168,76,0.14);
+}
+
+.tts-acc-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .38s cubic-bezier(0,.8,.3,1), padding .25s;
+  padding: 0 4px;
+}
+.tts-acc-item.open .tts-acc-body {
+  max-height: 1200px;
+  padding: 0 12px 20px;
+}
+.tts-acc-a {
+  font-size: .95em;
+  color: #cccccc;
+  line-height: 1.78;
+  padding-top: 2px;
+}
+.tts-acc-a strong { color: #ffffff; }
+.tts-acc-a code {
+  font-size: .82em;
+  color: #c9a84c;
+  background: rgba(201,168,76,0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+/* ── TABLES ── */
+.tts-tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 12px 0; border-radius: 8px; }
+.tts-tbl {
+  width: 100%;
+  min-width: 440px;
+  border-collapse: collapse;
+  font-size: .88em;
+}
+.tts-tbl th {
+  text-align: left;
+  border-bottom: 2px solid rgba(201,168,76,0.3);
+  padding: 9px 10px;
+  color: #c9a84c;
+  font-size: .72em;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.tts-tbl td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  color: #cccccc;
+}
+.tts-tbl td:first-child { color: #f0f0f0; font-weight: 600; }
+.tts-tbl td.tts-gold { font-weight: 700; color: #c9a84c; }
+
+/* ── BADGES ── */
+.tts-badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.tts-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(46,204,113,0.08);
+  border: 1px solid rgba(46,204,113,0.3);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: .78em;
+  font-weight: 700;
+  color: #2ecc71;
+}
+
+/* ── BOTTOM CTA ── */
+.tts-cta-block {
+  background: linear-gradient(135deg, rgba(13,13,13,0.9), rgba(26,20,5,0.9));
+  border: 1.5px solid rgba(201,168,76,0.4);
+  border-radius: 14px;
+  padding: 32px 24px;
+  text-align: center;
+  margin-top: 40px;
+}
+.tts-cta-block h3 {
+  font-family: var(--e-global-typography-primary-font-family, inherit);
+  font-size: 1.4em;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+.tts-cta-block p { font-size: .9em; color: #999; margin-bottom: 20px; }
+.tts-cta-btn {
+  display: inline-block;
+  width: 100%;
+  max-width: 400px;
+  background: linear-gradient(135deg, #c9a84c, #a07020);
+  color: #0d0d0d;
+  font-weight: 800;
+  font-size: 1em;
+  padding: 18px 32px;
+  border-radius: 50px;
+  text-decoration: none;
+  letter-spacing: .06em;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  box-shadow: 0 6px 24px rgba(201,168,76,0.3);
+  transition: opacity .2s, transform .2s;
+}
+.tts-cta-btn:hover { opacity: .9; transform: translateY(-1px); text-decoration: none; }
+.tts-trust-line { font-size: .78em; color: #666; margin-top: 12px; }
+
+@media (max-width: 600px) {
+  .tts-live-card { flex-direction: column; align-items: flex-start; }
+  .tts-live-cta { width: 100%; justify-content: center; }
+  .tts-acc-q { font-size: .95em; }
+}
+</style>
+
+<div class="tts-faq-v3">
+
+  <!-- LIVE ROUND CARD -->
+  <div class="tts-live-card">
+    <div>
+      <div class="tts-live-badge">
+        <span class="tts-live-dot"></span> Round 1 Live
+      </div>
+      <div class="tts-live-title">🏆 Weekly Prize Pool Growing in $TTS</div>
+      <div class="tts-live-sub">Round closes Sunday 11:59 PM EDT</div>
+    </div>
+    <a href="https://app.temptationtoken.io" class="tts-live-cta" target="_blank" rel="noopener">
+      Vote Now →
+    </a>
+  </div>
+
+  <h1>Temptation Token — Frequently Asked Questions</h1>
+  <p class="tts-meta">Updated May 2026 · Base Blockchain · $TTS · 15 Questions</p>
+
+  <!-- Q1 -->
+  <div class="tts-acc-item" id="tts-q1">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q1')" aria-expanded="false">
+      <span class="tts-acc-q">What is Temptation Token?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        <strong>Temptation Token ($TTS)</strong> is the first vote-to-earn cryptocurrency game on <strong>Base blockchain</strong> (Coinbase's Ethereum Layer 2). Launched in April 2026, it combines social voting with real on-chain stakes.
+        <br/><br/>
+        Each week, approved profiles compete in a voting round. Players spend $TTS tokens to vote on the profile they think will win. At round close, <strong>Chainlink VRF</strong> — a provably fair random function — selects the winning profile, weighted by votes. The smart contract automatically distributes the prize pool with no human involvement.
+        <br/><br/>
+        <strong>Play at <a href="https://app.temptationtoken.io" target="_blank" rel="noopener">app.temptationtoken.io</a></strong> — connect a wallet and you're in within 60 seconds.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="tts-acc-item" id="tts-q2">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q2')" aria-expanded="false">
+      <span class="tts-acc-q">How does voting work? What are the prize splits?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Connect your wallet at <a href="https://app.temptationtoken.io" target="_blank">app.temptationtoken.io</a>, hold $TTS, and place a minimum of <strong>5 $TTS</strong> on any approved profile. Votes are final — they cannot be removed or refunded.
+        <br/><br/>
+        When the round ends Sunday 11:59 PM EDT, Chainlink VRF selects the winning profile. The smart contract then automatically distributes the prize pool:
+        <br/><br/>
+        <div class="tts-tbl-wrap">
+          <table class="tts-tbl">
+            <thead><tr><th>Recipient</th><th>Share</th><th>Who</th></tr></thead>
+            <tbody>
+              <tr><td>🏆 Top Voter</td><td class="tts-gold">35%</td><td>Wallet that voted the most $TTS on the winning profile</td></tr>
+              <tr><td>📸 Winning Profile</td><td class="tts-gold">35%</td><td>The profile's registered wallet</td></tr>
+              <tr><td>💙 Polaris Project</td><td class="tts-gold">10%</td><td>Anti-trafficking charity — hardcoded, automatic</td></tr>
+              <tr><td>🏢 Blockchain Entertainment LLC</td><td class="tts-gold">20%</td><td>House cut</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <strong>Club partner split:</strong> When the winning profile was submitted through a registered club, the house split shifts to 10% club + 10% house. Player and charity shares are unchanged (35/35/10/10/10).
+      </div>
+    </div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="tts-acc-item" id="tts-q3">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q3')" aria-expanded="false">
+      <span class="tts-acc-q">What blockchain is Temptation Token on? Is it still on Polygon?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Temptation Token is on <strong>Base mainnet</strong> (Chain ID: 8453) — Coinbase's Ethereum Layer 2. It is <strong>not on Polygon</strong>. Any previous references to Polygon are outdated and incorrect.
+        <br/><br/>
+        Base offers ultra-low fees (typically under $0.01 per transaction) and fast finality. You need a small amount of ETH on Base for gas fees, and $TTS on Base to play.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q4 -->
+  <div class="tts-acc-item" id="tts-q4">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q4')" aria-expanded="false">
+      <span class="tts-acc-q">How do I buy $TTS on Base?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        $TTS trades on Uniswap V2 on Base. Here's how to buy:
+        <br/><br/>
+        1. Install <strong>MetaMask</strong> or use <strong>Coinbase Wallet</strong><br/>
+        2. Add Base network (Chain ID: 8453)<br/>
+        3. Bridge ETH to Base via <a href="https://bridge.base.org" target="_blank" rel="noopener">bridge.base.org</a><br/>
+        4. Go to <a href="https://app.uniswap.org" target="_blank" rel="noopener">app.uniswap.org</a>, select Base network<br/>
+        5. Paste the contract: <code>0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</code><br/>
+        6. Set slippage to <strong>2%+</strong> (required for the 1% transfer tax)<br/>
+        7. Swap ETH → TTS<br/><br/>
+        <strong>Only buy from this exact contract address.</strong> There are copycat tokens — the real $TTS contract is <code>0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</code>. Verify on <a href="https://basescan.org/address/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9" target="_blank" rel="noopener">BaseScan</a>.
+        <br/><br/>
+        <a href="https://app.temptationtoken.io" target="_blank" rel="noopener"><strong>→ Or connect your wallet at app.temptationtoken.io to get a free signup bonus</strong></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q5 -->
+  <div class="tts-acc-item" id="tts-q5">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q5')" aria-expanded="false">
+      <span class="tts-acc-q">How do I submit a profile?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        1. Connect your wallet at <a href="https://app.temptationtoken.io" target="_blank" rel="noopener">app.temptationtoken.io</a><br/>
+        2. Go to the <strong>Submit</strong> tab<br/>
+        3. Upload a photo and enter your display name<br/>
+        4. Pay the <strong>5 $TTS submission fee</strong><br/>
+        5. Your submission goes to admin review — SFW content only<br/>
+        6. Once approved, you'll appear in the current or next round<br/><br/>
+        <strong>Rules:</strong> Photos must be safe for work. No nudity, explicit content, or minors. Blockchain Entertainment LLC reserves the right to reject any submission without explanation. Submission fees are non-refundable whether approved or rejected.
+        <br/><br/>
+        If your profile wins: <strong>35% of the entire prize pool goes directly to your wallet, automatically, within minutes of round close.</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q6 -->
+  <div class="tts-acc-item" id="tts-q6">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q6')" aria-expanded="false">
+      <span class="tts-acc-q">What is the staking system? What APR can I earn?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Stake $TTS to earn yield <strong>and</strong> multiply your voting power. Five tiers based on USD value staked (calculated live from the Uniswap price):
+        <br/><br/>
+        <div class="tts-tbl-wrap">
+          <table class="tts-tbl">
+            <thead><tr><th>Tier</th><th>Min Stake (USD)</th><th>APR</th><th>Vote Multiplier</th></tr></thead>
+            <tbody>
+              <tr><td>🥉 Bronze</td><td>$50+</td><td class="tts-gold">8%</td><td class="tts-gold">1.1×</td></tr>
+              <tr><td>🥈 Silver</td><td>$100+</td><td class="tts-gold">12%</td><td class="tts-gold">1.25×</td></tr>
+              <tr><td>🥇 Gold</td><td>$250+</td><td class="tts-gold">18%</td><td class="tts-gold">1.5×</td></tr>
+              <tr><td>💎 Diamond</td><td>$1,000+</td><td class="tts-gold">32%</td><td class="tts-gold">2×</td></tr>
+              <tr><td>👑 VIP</td><td>$5,000+</td><td class="tts-gold">45%</td><td class="tts-gold">3×</td></tr>
+            </tbody>
+          </table>
+        </div>
+        Tier multipliers are hardcoded in the smart contract. APR is paid in $TTS. A 3× VIP staker's 1,000 $TTS vote counts as 3,000 $TTS toward their winning odds. <strong>There is no "Platinum" tier</strong> — the 5 tiers above are the complete, final tier structure.
+        <br/><br/>
+        <a href="https://app.temptationtoken.io" target="_blank" rel="noopener"><strong>→ Stake $TTS now at app.temptationtoken.io</strong></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q7 -->
+  <div class="tts-acc-item" id="tts-q7">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q7')" aria-expanded="false">
+      <span class="tts-acc-q">Is Temptation Token provably fair? Can the team rig it?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Yes — winner selection is <strong>provably fair via Chainlink VRF V2.5</strong> on Base. When a round closes, the voting contract requests a verifiable random number from Chainlink's decentralized oracle network. The random number comes with a cryptographic proof, published on-chain.
+        <br/><br/>
+        <strong>Not even the developers can predict or change the outcome.</strong> The selection algorithm is immutable in the deployed contract. Anyone can verify the proof on BaseScan.
+        <br/><br/>
+        VRF Subscription: verifiable at <a href="https://vrf.chain.link/base" target="_blank" rel="noopener">vrf.chain.link/base</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q8 -->
+  <div class="tts-acc-item" id="tts-q8">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q8')" aria-expanded="false">
+      <span class="tts-acc-q">Has the smart contract been audited?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Yes. The $TTS smart contracts were independently audited by <strong>Solidproof</strong>, a professional blockchain security firm based in Germany.
+        <br/><br/>
+        <div class="tts-badge-row">
+          <span class="tts-badge">✓ Zero Critical Findings</span>
+          <span class="tts-badge">✓ Zero High Findings</span>
+          <span class="tts-badge">✓ Audit Complete</span>
+        </div>
+        <br/>
+        TrustNet Score: <strong>17.92</strong> (scale 0–100; lower = safer). Three medium-severity findings were identified and acknowledged — fixes are queued for the next contract upgrade through the Gnosis Safe 2/2 multisig.
+        <br/><br/>
+        📄 Full report: <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener">app.solidproof.io/projects/temptation-token</a> | <a href="https://temptationtoken.io/audit">View our audit page →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q9 -->
+  <div class="tts-acc-item" id="tts-q9">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q9')" aria-expanded="false">
+      <span class="tts-acc-q">What is Polaris Project? Why does 10% go to charity?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        <a href="https://www.polarisproject.org" target="_blank" rel="noopener"><strong>Polaris Project</strong></a> is a US-based nonprofit that operates the National Human Trafficking Hotline and provides survivor support. Temptation Token donates <strong>10% of every prize pool</strong> to Polaris Project automatically.
+        <br/><br/>
+        This donation is <strong>hardcoded in the smart contract</strong> — it cannot be turned off, redirected, or skipped by anyone, including the team. Every round, every settlement, automatic. Polaris Project's wallet address is public on BaseScan: <code>0xf7dd429d679cb61231e73785fd1737e60138aba3</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q10 -->
+  <div class="tts-acc-item" id="tts-q10">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q10')" aria-expanded="false">
+      <span class="tts-acc-q">How does the club referral program work?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Registered club partners can refer profiles to the game using a club code. When a club-referred profile wins a round, the prize distribution shifts:
+        <br/><br/>
+        <div class="tts-tbl-wrap">
+          <table class="tts-tbl">
+            <thead><tr><th>Recipient</th><th>Standard</th><th>With Club Partner</th></tr></thead>
+            <tbody>
+              <tr><td>Top Voter</td><td class="tts-gold">35%</td><td class="tts-gold">35%</td></tr>
+              <tr><td>Winning Profile</td><td class="tts-gold">35%</td><td class="tts-gold">35%</td></tr>
+              <tr><td>Polaris Project</td><td class="tts-gold">10%</td><td class="tts-gold">10%</td></tr>
+              <tr><td>Club Partner</td><td>—</td><td class="tts-gold">10%</td></tr>
+              <tr><td>Blockchain Entertainment LLC</td><td class="tts-gold">20%</td><td class="tts-gold">10%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        The club's 10% comes from the house allocation — it does not reduce payouts to players or charity. To register as a club partner, contact <a href="mailto:support@temptationtoken.io">support@temptationtoken.io</a>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q11 -->
+  <div class="tts-acc-item" id="tts-q11">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q11')" aria-expanded="false">
+      <span class="tts-acc-q">When do rounds start and end?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Rounds run <strong>Monday 12:00 AM EDT to Sunday 11:59 PM EDT</strong> — exactly one week. Settlement (Chainlink VRF winner selection + automatic prize distribution) happens within minutes of round close. A new round begins immediately after settlement.
+        <br/><br/>
+        <strong>Note on EST vs EDT:</strong> The schedule is canonical EDT (UTC−4). During winter months (November–March), when clocks shift to EST (UTC−5), rounds close one hour later in UTC terms. This is an unavoidable limitation of Chainlink's UTC-only cron system.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q12 -->
+  <div class="tts-acc-item" id="tts-q12">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q12')" aria-expanded="false">
+      <span class="tts-acc-q">Is there a transfer tax on $TTS?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Yes. $TTS has a <strong>1% transfer tax</strong> on all buys, sells, and wallet-to-wallet transfers. This is hardcoded in the smart contract and <strong>cannot be increased or removed by anyone</strong>, including the team.
+        <br/><br/>
+        When buying on Uniswap, set slippage to 2%+ to account for this tax. Collected tax accumulates in the contract and contributes to prize pool growth and ecosystem development.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q13 NEW -->
+  <div class="tts-acc-item" id="tts-q13">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q13')" aria-expanded="false">
+      <span class="tts-acc-q">Is there a mobile app?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        The web app at <a href="https://app.temptationtoken.io" target="_blank" rel="noopener">app.temptationtoken.io</a> works perfectly on any mobile browser — no download required. Open it in Safari or Chrome on your phone and it works like a native app. iOS and Android apps are in development for Q3 2026.
+        <br/><br/>
+        For now, tap the link, connect your wallet, and you're playing in under 60 seconds. Mobile wallets like MetaMask Mobile, Trust Wallet, and Coinbase Wallet all connect instantly.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q14 NEW -->
+  <div class="tts-acc-item" id="tts-q14">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q14')" aria-expanded="false">
+      <span class="tts-acc-q">What happens if I win? How do I receive my prize?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        The moment a round closes, the Chainlink VRF smart contract <strong>automatically transfers your prize directly to your connected wallet</strong> — no claiming, no request, no delay. You'll see the $TTS arrive in your MetaMask or Coinbase Wallet within minutes of round settlement.
+        <br/><br/>
+        You can then:
+        <br/>• <strong>Hold it</strong> and stake it for APR
+        <br/>• <strong>Vote with it</strong> in the next round
+        <br/>• <strong>Sell it on Uniswap</strong> for ETH
+        <br/>• <strong>Cash out</strong> by transferring ETH to Coinbase or another exchange and withdrawing to your bank
+        <br/><br/>
+        <a href="https://app.temptationtoken.io" target="_blank" rel="noopener"><strong>→ Start playing now at app.temptationtoken.io</strong></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q15 NEW -->
+  <div class="tts-acc-item" id="tts-q15">
+    <button class="tts-acc-btn" onclick="ttsToggle('tts-q15')" aria-expanded="false">
+      <span class="tts-acc-q">How is this different from gambling?</span>
+      <span class="tts-acc-icon">+</span>
+    </button>
+    <div class="tts-acc-body">
+      <div class="tts-acc-a">
+        Temptation Token is a <strong>skill-influenced voting game</strong>, not pure chance. Your vote strategy, which profiles you support, how much you stake, and your staking multiplier all influence your outcome.
+        <br/><br/>
+        Chainlink VRF ensures the winner selection is cryptographically fair — <strong>weighted by votes, not purely random</strong>. The more $TTS voted on a profile, the higher that profile's odds of winning. Think of it like fantasy sports with crypto prizes — strategy and engagement matter.
+        <br/><br/>
+        Additionally: players vote on profiles and earn from their voting strategy. Stakers earn APR regardless of round outcomes. There is no "house" taking money from players — the prize pool is built from the votes themselves, and 70% goes back to players and profiles.
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CTA -->
+  <div class="tts-cta-block">
+    <h3>Ready? You're already qualified.</h3>
+    <p>Connect your wallet → get a free bonus → vote in under 60 seconds</p>
+    <a href="https://app.temptationtoken.io" class="tts-cta-btn" target="_blank" rel="noopener">
+      🔥 Start Playing Free →
+    </a>
+    <p class="tts-trust-line">✓ Audited &nbsp;·&nbsp; ✓ LP Locked &nbsp;·&nbsp; ✓ Chainlink VRF &nbsp;·&nbsp; ✓ No KYC Required</p>
+  </div>
+
+</div>
+
+<!-- ACCORDION JS -->
+<script>
+function ttsToggle(id) {
+  var item = document.getElementById(id);
+  var btn = item.querySelector('.tts-acc-btn');
+  var isOpen = item.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.tts-acc-item.open').forEach(function(el) {
+    el.classList.remove('open');
+    el.querySelector('.tts-acc-btn').setAttribute('aria-expanded', 'false');
+  });
+  // Open clicked if was closed
+  if (!isOpen) {
+    item.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+}
+// Open first item by default
+document.addEventListener('DOMContentLoaded', function() {
+  ttsToggle('tts-q1');
+});
+</script>
+
+<!-- FAQ SCHEMA JSON-LD -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "name": "Temptation Token FAQ — $TTS on Base Blockchain",
+  "description": "Complete FAQ for Temptation Token ($TTS). How voting works, prize splits, staking tiers, Chainlink VRF fairness, and how to buy $TTS on Base blockchain.",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is Temptation Token?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Temptation Token ($TTS) is the first vote-to-earn cryptocurrency game on Base blockchain (Coinbase's Ethereum Layer 2), launched April 2026. Players vote $TTS tokens on weekly profiles. Chainlink VRF selects the winning profile, and the smart contract automatically pays 35% to the top voter and 35% to the winning profile."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does voting work and what are the prize splits?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Vote a minimum of 5 $TTS on any approved profile at app.temptationtoken.io. Prize pool split: 35% top voter, 35% winning profile, 10% Polaris Project charity (hardcoded), 20% Blockchain Entertainment LLC. With a club partner referral, house split is 10% club + 10% house."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I buy $TTS on Base?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Buy $TTS on Uniswap V2 on Base. Contract address: 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9. Set slippage to 2%+ due to the 1% transfer tax. Bridge ETH to Base first via bridge.base.org."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the staking tiers and APR?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Five tiers: Bronze ($50+ / 8% APR / 1.1x vote multiplier), Silver ($100+ / 12% / 1.25x), Gold ($250+ / 18% / 1.5x), Diamond ($1,000+ / 32% / 2x), VIP ($5,000+ / 45% / 3x). Staking also multiplies your voting power."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Temptation Token provably fair?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Winner selection uses Chainlink VRF V2.5 on Base — a cryptographically verifiable random number that even the developers cannot predict or manipulate. Every result is published on-chain and verifiable by anyone on BaseScan."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Has the smart contract been audited?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Audited by Solidproof (April 2026). Zero critical findings. Zero high findings. TrustNet score 17.92. Full report at app.solidproof.io/projects/temptation-token."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a mobile app?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The web app at app.temptationtoken.io works perfectly on any mobile browser — no download required. iOS and Android apps are in development for Q3 2026."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How is this different from gambling?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Temptation Token is a skill-influenced voting game. Winner selection is weighted by votes via Chainlink VRF — not purely random. Your vote strategy, staking tier, and which profiles you support all influence your outcome. Think fantasy sports with crypto prizes."
+      }
+    }
+  ]
+}
+</script>

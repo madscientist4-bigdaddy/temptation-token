@@ -226,7 +226,7 @@ const injectStyles = () => {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 12px;
+      padding: 11px 12px;
       border-radius: 8px;
       border: none;
       background: transparent;
@@ -238,6 +238,7 @@ const injectStyles = () => {
       transition: all 0.18s;
       text-align: left;
       width: 100%;
+      min-height: 44px;
     }
     .nav-btn:hover { background: var(--surface); color: var(--text); }
     .nav-btn.active { background: var(--surface); color: var(--gold); }
@@ -365,7 +366,8 @@ const injectStyles = () => {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      overflow: hidden;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       margin-bottom: 20px;
       animation: fadeUp 0.4s ease forwards;
       opacity: 0;
@@ -667,7 +669,31 @@ const injectStyles = () => {
       .adm-main { margin-left: 0; }
       .adm-page { padding: 16px; }
       .stat-grid { grid-template-columns: 1fr 1fr; }
+      .hamburger-btn { display: flex !important; }
+      .adm-table th, .adm-table td { padding: 10px 12px; white-space: nowrap; }
     }
+    .hamburger-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      min-width: 44px;
+      min-height: 44px;
+      margin-right: 8px;
+    }
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 49;
+    }
+    .sidebar-overlay.open { display: block; }
 
     .dot-live {
       display: inline-block;
@@ -3634,6 +3660,7 @@ export default function AdminApp() {
   useEffect(() => { injectStyles(); }, []);
   const [loggedIn, setLoggedIn] = useState(false);
   const [active, setActive] = useState("command");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const clock = useLiveClock();
   const weekLabel = useCurrentWeek();
   const [toast, showToast] = useToast();
@@ -3671,8 +3698,11 @@ export default function AdminApp() {
   return (
     <div className="adm-app">
       <div className="adm-layout">
+        {/* SIDEBAR OVERLAY (mobile) */}
+        <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
+
         {/* SIDEBAR */}
-        <div className="sidebar">
+        <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sidebar-logo">
             <div className="sidebar-logo-text">✦ Temptation Token</div>
             <span className="sidebar-badge">Admin Portal</span>
@@ -3685,7 +3715,7 @@ export default function AdminApp() {
                   <button
                     key={item.key}
                     className={`nav-btn${active === item.key ? " active" : ""}`}
-                    onClick={() => setActive(item.key)}
+                    onClick={() => { setActive(item.key); setSidebarOpen(false); }}
                   >
                     <span className="icon">{item.icon}</span>
                     {item.label}
@@ -3705,7 +3735,10 @@ export default function AdminApp() {
         {/* MAIN CONTENT */}
         <div className="adm-main">
           <div className="topbar">
-            <div className="topbar-title">{titles[active]}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <button className="hamburger-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle menu">☰</button>
+              <div className="topbar-title">{titles[active]}</div>
+            </div>
             <div className="topbar-right">
               <span className="topbar-week"><span className="dot-live" />Week of {weekLabel}</span>
               <span className="topbar-week" style={{ fontFamily:'monospace', fontSize:'.65rem', color:'var(--muted)', letterSpacing:'.04em' }}>{clock}</span>
