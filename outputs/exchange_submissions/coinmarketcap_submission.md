@@ -37,7 +37,7 @@ TTS is audited by Solidproof (zero critical findings), with liquidity locked 12 
 
 ## Security Documentation
 
-- Audit firm: Solidproof (solidproof.io)
+- Audit firm: Solidproof (app.solidproof.io/projects/temptation-token)
 - Audit result: Complete — zero critical findings
 - Audit PDF: https://app.solidproof.io/projects/temptation-token
 - LP lock: Team.Finance — 12 months from liquidity provision date

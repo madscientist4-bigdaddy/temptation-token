@@ -23,7 +23,7 @@
   <!-- Vote indicator -->
   <rect x="320" y="665" width="440" height="50" rx="25" fill="#0d0d0d" stroke="#c9a84c" stroke-width="1"/>
   <text x="540" y="697" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#c9a84c" text-anchor="middle">🗳️ VOTE ON THIS PROFILE</text>
-  <text x="540" y="800" font-family="Arial, sans-serif" font-size="28" fill="#aaa" text-anchor="middle">Top voter wins 40% of the prize pool</text>
+  <text x="540" y="800" font-family="Arial, sans-serif" font-size="28" fill="#aaa" text-anchor="middle">Top voter wins 35% of the prize pool</text>
   <rect x="290" y="860" width="500" height="72" rx="36" fill="#c9a84c"/>
   <text x="540" y="904" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#0d0d0d" text-anchor="middle">VOTE NOW →</text>
   <text x="540" y="1010" font-family="Arial, sans-serif" font-size="24" fill="#c9a84c" text-anchor="middle" letter-spacing="2">app.temptationtoken.io</text>

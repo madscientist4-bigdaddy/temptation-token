@@ -4,12 +4,14 @@
  * for @temptationtoken and updates Vercel production env automatically.
  *
  * Usage: node scripts/get_tts_tokens.js
- * Requires: .env.local with X_API_KEY and X_API_SECRET (run: vercel env pull --environment production)
+ * Requires: .env.local with X_API_KEY and X_API_SECRET
+ *           (run: vercel env pull .env.local --environment production)
  */
 
+import OAuth from 'oauth-1.0a';
 import crypto from 'crypto';
 import readline from 'readline';
-import { execSync, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,15 +19,13 @@ import { fileURLToPath } from 'url';
 const __dir = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dir, '..');
 
-// ── Load env from .env.local ────────────────────────────────────────────────
+// ── Load .env.local ──────────────────────────────────────────────────────────
 function loadDotEnv() {
   const p = resolve(ROOT, '.env.local');
   if (!existsSync(p)) return;
   for (const line of readFileSync(p, 'utf8').split('\n')) {
     const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (m && !process.env[m[1]]) {
-      process.env[m[1]] = m[2].replace(/^"(.*)"$/, '$1');
-    }
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"(.*)"$/, '$1');
   }
 }
 loadDotEnv();
@@ -39,39 +39,25 @@ if (!API_KEY || !API_SECRET) {
   process.exit(1);
 }
 
-// ── OAuth 1.0a helpers ───────────────────────────────────────────────────────
-function pct(s) { return encodeURIComponent(String(s)); }
-
-function sign(method, url, params, consumerSecret, tokenSecret = '') {
-  const base = Object.keys(params).sort()
-    .map(k => `${pct(k)}=${pct(params[k])}`).join('&');
-  const sigBase = `${method.toUpperCase()}&${pct(url)}&${pct(base)}`;
-  const key = `${pct(consumerSecret)}&${pct(tokenSecret)}`;
-  return crypto.createHmac('sha1', key).update(sigBase).digest('base64');
-}
-
-function authHeader(method, url, extra = {}, tokenSecret = '', token = '') {
-  const p = {
-    oauth_consumer_key:     API_KEY,
-    oauth_nonce:            crypto.randomBytes(16).toString('hex'),
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp:        String(Math.floor(Date.now() / 1000)),
-    oauth_version:          '1.0',
-    ...extra,
-  };
-  if (token) p.oauth_token = token;
-  p.oauth_signature = sign(method, url, p, API_SECRET, tokenSecret);
-  return 'OAuth ' + Object.keys(p).sort()
-    .map(k => `${pct(k)}="${pct(p[k])}"`)
-    .join(', ');
-}
+// ── OAuth 1.0a client ────────────────────────────────────────────────────────
+const oauth = new OAuth({
+  consumer: { key: API_KEY, secret: API_SECRET },
+  signature_method: 'HMAC-SHA1',
+  hash_function(base, key) {
+    return crypto.createHmac('sha1', key).update(base).digest('base64');
+  },
+});
 
 // ── Twitter API calls ────────────────────────────────────────────────────────
 async function getRequestToken() {
   const url = 'https://api.twitter.com/oauth/request_token';
+  const authHeader = oauth.toHeader(oauth.authorize({ url, method: 'POST' }, { key: '', secret: '' }));
+  // oauth_callback=oob must be in the Authorization header
+  const headerVal = authHeader.Authorization + ', oauth_callback="oob"';
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: authHeader('POST', url, { oauth_callback: 'oob' }) },
+    headers: { Authorization: headerVal },
   });
   const body = await res.text();
   if (!res.ok) throw new Error(`${res.status}: ${body}`);
@@ -80,22 +66,16 @@ async function getRequestToken() {
 
 async function exchangePin(reqToken, pin) {
   const url = 'https://api.twitter.com/oauth/access_token';
-  const p = {
-    oauth_consumer_key:     API_KEY,
-    oauth_nonce:            crypto.randomBytes(16).toString('hex'),
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp:        String(Math.floor(Date.now() / 1000)),
-    oauth_token:            reqToken,
-    oauth_verifier:         pin,
-    oauth_version:          '1.0',
-  };
-  p.oauth_signature = sign('POST', url, p, API_SECRET, '');
-  const header = 'OAuth ' + Object.keys(p).sort()
-    .map(k => `${pct(k)}="${pct(p[k])}"`)
-    .join(', ');
+  const token = { key: reqToken, secret: '' };
+  const authHeader = oauth.toHeader(oauth.authorize(
+    { url, method: 'POST', data: { oauth_verifier: pin } },
+    token
+  ));
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: header, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { ...authHeader, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `oauth_verifier=${encodeURIComponent(pin)}&oauth_token=${encodeURIComponent(reqToken)}`,
   });
   const body = await res.text();
   if (!res.ok) throw new Error(`${res.status}: ${body}`);
@@ -104,20 +84,17 @@ async function exchangePin(reqToken, pin) {
 
 async function verifyCredentials(token, secret) {
   const url = 'https://api.twitter.com/2/users/me';
-  const res = await fetch(url, {
-    headers: { Authorization: authHeader('GET', url, {}, secret, token) },
-  });
+  const authHeader = oauth.toHeader(oauth.authorize({ url, method: 'GET' }, { key: token, secret }));
+  const res = await fetch(url, { headers: authHeader });
   return { status: res.status, body: await res.json() };
 }
 
 async function postTweet(token, secret, text) {
   const url = 'https://api.twitter.com/2/tweets';
+  const authHeader = oauth.toHeader(oauth.authorize({ url, method: 'POST' }, { key: token, secret }));
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      Authorization: authHeader('POST', url, {}, secret, token),
-      'Content-Type': 'application/json',
-    },
+    headers: { ...authHeader, 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
   return { status: res.status, body: await res.json() };
@@ -125,15 +102,12 @@ async function postTweet(token, secret, text) {
 
 // ── Vercel env update ────────────────────────────────────────────────────────
 function vercelSet(key, value) {
-  // Remove existing, then add
   spawnSync('vercel', ['env', 'rm', key, 'production', '--yes'], {
     stdio: 'pipe', cwd: ROOT,
   });
   const r = spawnSync('vercel', ['env', 'add', key, 'production'], {
-    input: value + '\n',
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    cwd: ROOT,
+    input: value + '\n', encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'], cwd: ROOT,
   });
   if (r.status !== 0) throw new Error(r.stderr || 'vercel env add failed');
 }
@@ -165,8 +139,8 @@ async function main() {
   const authUrl = `https://twitter.com/oauth/authorize?oauth_token=${reqToken}`;
   console.log('\n╔═══════════════════════════════════════════════╗');
   console.log('║  Step 2/6  Open this URL in your browser      ║');
-  console.log('║  (make sure you are logged in as              ║');
-  console.log('║   @temptationtoken before clicking)           ║');
+  console.log('║  Make sure you are logged in as               ║');
+  console.log('║  @temptationtoken before clicking             ║');
   console.log('╚═══════════════════════════════════════════════╝');
   console.log(`\n  ${authUrl}\n`);
   console.log('  Approve the app, then copy the 7-digit PIN.\n');
@@ -182,7 +156,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 4 — exchange for access token
+  // Step 4 — exchange PIN for access token
   process.stdout.write('\nStep 4/6  Exchanging PIN for access token... ');
   let tokens;
   try {
@@ -198,10 +172,10 @@ async function main() {
   const newSecret = tokens.oauth_token_secret;
 
   console.log('\n╔═══════════════════════════════════════════════╗');
-  console.log('║  New tokens (saved to Vercel in next step)    ║');
+  console.log('║  New tokens                                   ║');
   console.log('╠═══════════════════════════════════════════════╣');
-  console.log(`║  TTS_X_ACCESS_TOKEN:  ${newToken.slice(0, 30)}...`);
-  console.log(`║  TTS_X_ACCESS_SECRET: ${newSecret.slice(0, 30)}...`);
+  console.log(`║  TTS_X_ACCESS_TOKEN:  ${newToken}`);
+  console.log(`║  TTS_X_ACCESS_SECRET: ${newSecret}`);
   console.log('╚═══════════════════════════════════════════════╝\n');
 
   // Step 5 — update Vercel
@@ -226,7 +200,7 @@ async function main() {
     console.log(`⚠️   ${verify.status}: ${JSON.stringify(verify.body)}`);
   }
 
-  // Optional test post prompt
+  // Optional test post
   const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
   const doPost = await new Promise(resolve => {
     rl2.question('\nSend a test tweet as @temptationtoken? (y/N) → ', ans => {
@@ -238,7 +212,7 @@ async function main() {
     process.stdout.write('Posting... ');
     const result = await postTweet(
       newToken, newSecret,
-      `🎰 $TTS is live on Base — vote-to-earn with real crypto prizes. Round 1 ending soon. temptationtoken.io #TTS #Base #Web3`
+      `🎰 $TTS is live on Base — vote-to-earn with real crypto prizes. Round ending soon. temptationtoken.io #TTS #Base #Web3`
     );
     if (result.status === 201) {
       console.log(`✅  Posted! Tweet ID: ${result.body.data?.id}`);
@@ -250,7 +224,7 @@ async function main() {
   console.log('\n╔═══════════════════════════════════════════════╗');
   console.log('║  COMPLETE — @temptationtoken tokens updated   ║');
   console.log('╚═══════════════════════════════════════════════╝');
-  console.log('\n  Next: redeploy Vercel so the new tokens take effect:');
+  console.log('\n  Next: redeploy Vercel so new tokens take effect:');
   console.log('  npm run build && npx vercel --prod\n');
 }
 
