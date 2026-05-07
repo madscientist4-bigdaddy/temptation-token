@@ -104,9 +104,9 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 **EDT is the canonical timezone for display.** Any UI, dashboard, documentation, or generated content must use EDT.
 
-**CHAINLINK CRONS NEED UPDATE by Jim at automation.chain.link/base:**
-- TTS Start Round: change `0 0 * * 1` → `0 4 * * 1`
-- TTS Settle Or Rollover: change `59 23 * * 0` → `59 3 * * 1`
+**✅ Chainlink crons confirmed correct (May 2026):**
+- TTS Start Round: `0 4 * * 1` — Monday 04:00 UTC (12:00 AM EDT)
+- TTS Settle Or Rollover: `59 3 * * 1` — Monday 03:59 UTC (Sunday 11:59 PM EDT)
 
 Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chainlink is UTC-only.
 

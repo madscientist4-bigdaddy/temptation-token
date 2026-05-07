@@ -1982,8 +1982,8 @@ function SettingsScreen() {
           title: "Weekly Round",
           fields: [
             { label: "Round Schedule", value: "Monday 12:00 AM EDT → Sunday 11:59 PM EDT (04:00–03:59 UTC)" },
-            { label: "Round Start Keeper", value: "Monday 04:00 UTC (cron: 0 4 * * 1) — UPDATE REQUIRED" },
-            { label: "Round End Keeper", value: "Monday 03:59 UTC (cron: 59 3 * * 1) — UPDATE REQUIRED" },
+            { label: "Round Start Keeper", value: "Monday 04:00 UTC (cron: 0 4 * * 1) ✅ Confirmed" },
+            { label: "Round End Keeper", value: "Monday 03:59 UTC (cron: 59 3 * * 1) ✅ Confirmed" },
             { label: "Round Duration", value: "604800 seconds (7 days exactly)" },
             { label: "Max Profiles Per Week", value: "50" },
             { label: "Max Submissions Per Wallet", value: "3 per week" },
@@ -2285,8 +2285,9 @@ function SystemScreen() {
           </tbody>
         </table>
         <div style={{padding:'10px 16px',fontSize:'.62rem',color:'var(--muted)',lineHeight:1.7}}>
-          ⚠️ TTSVotingV3b does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper fires Monday 04:00 UTC (12:00 AM EDT). If it misses, use Manual Round Control below to start manually. <strong style={{color:'var(--rose)'}}>ACTION REQUIRED: Update Chainlink crons at automation.chain.link/base — see Chainlink Cron Update instructions in Jim's daily ops.</strong>
-          {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify schedules at automation.chain.link →</a>
+          ✅ <strong style={{color:'var(--green)'}}>Chainlink crons confirmed</strong> — Round starts Monday 12:00 AM EDT, settles Sunday 11:59 PM EDT automatically.
+          {' '}TTSVotingV3b does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper fires Monday 04:00 UTC (12:00 AM EDT). If it misses, use Manual Round Control below to start manually.
+          {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify at automation.chain.link →</a>
         </div>
       </div>
 
@@ -2938,6 +2939,7 @@ function CommandScreen({ setActive }) {
 
   const health = [
     { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
+    { label: 'Chainlink Crons', ok: true, warn: false, text: '✅ Confirmed — starts Mon 12AM EDT · settles Sun 11:59PM EDT', href: null, nav: null },
     { label: 'Railway Bot', ok: true, warn: false, text: `${RAILWAY_PLAN} Plan · Online`, href: 'https://railway.app', nav: null },
     { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting`, href: null, nav: 'review' },
     { label: 'Content Queue', ok: pendingContent === 0, warn: pendingContent > 0, text: pendingContent === 0 ? 'All approved' : `${pendingContent} to approve`, href: null, nav: 'content' },
@@ -3239,7 +3241,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Start Checklist', emoji: '🚀',
     steps: [
-      'TTSKeeper2 fires automatically at Monday 04:00 UTC (12:00 AM EDT) via Chainlink Automation — verify on BaseScan. Cron must be 0 4 * * 1 — update at automation.chain.link/base if currently 0 0 * * 1',
+      'TTSKeeper2 fires automatically at Monday 04:00 UTC (12:00 AM EDT) via Chainlink Automation (cron: 0 4 * * 1 ✅ confirmed) — verify on BaseScan if round does not start.',
       'If automation fails: BaseScan → TTSKeeper2 (0xB17b…C61A48) → Write → manualExecute(1)',
       'Approve pending profiles: Photo Review tab → Approve (updates Supabase; on-chain approval requires batchApproveProfiles via BaseScan)',
       'Generate + approve content calendar: Content Calendar tab → Generate This Week → approve posts',
@@ -3249,7 +3251,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Settlement', emoji: '🏆',
     steps: [
-      'Keeper fires automatically at Monday 03:59 UTC (Sunday 11:59 PM EDT) — calls settleRound → requests VRF. Cron must be 59 3 * * 1 — update at automation.chain.link/base if currently 59 23 * * 0',
+      'Keeper fires automatically at Monday 03:59 UTC (Sunday 11:59 PM EDT) — calls settleRound → requests VRF (cron: 59 3 * * 1 ✅ confirmed).',
       'Chainlink VRF V2.5 fulfills within ~30s (3 confirmations) — winner selected proportionally to tickets',
       'Payout split: 35% winner profile · 35% top voter · 20% house · 10% charity (Polaris Project)',
       'If keeper misses: BaseScan → TTSKeeper2 → Write → manualExecute(3)',
