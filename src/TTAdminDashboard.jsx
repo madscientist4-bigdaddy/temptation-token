@@ -2598,6 +2598,9 @@ function SocialScreen({ showToast }) {
     try { return JSON.parse(localStorage.getItem('tt_social_stats') || '{}'); } catch { return {}; }
   });
   const [tgMembers, setTgMembers] = useState('—');
+  const [liveStats, setLiveStats] = useState({});
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [lastStatsRefresh, setLastStatsRefresh] = useState(null);
   const [dmLog, setDmLog] = useState(() => {
     try { return JSON.parse(localStorage.getItem('tt_dm_log') || '[]'); } catch { return []; }
   });
@@ -2610,11 +2613,31 @@ function SocialScreen({ showToast }) {
   // Calendar preview
   const [calPosts, setCalPosts] = useState([]);
 
+  const fetchTg = async () => {
+    try {
+      const d = await fetch('/api/community-stats?quick=true').then(r => r.json());
+      if (d.members) setTgMembers(d.members.toLocaleString());
+    } catch {}
+  };
+
+  const fetchSocialStats = async () => {
+    setStatsLoading(true);
+    try {
+      const d = await fetch('/api/community-stats').then(r => r.json());
+      if (d.ok) {
+        if (d.members) setTgMembers(d.members.toLocaleString());
+        setLiveStats(d);
+        setLastStatsRefresh(new Date().toLocaleTimeString());
+      }
+    } catch {}
+    setStatsLoading(false);
+  };
+
+  const handleRefreshStats = () => { fetchTg(); fetchSocialStats(); };
+
   useEffect(() => {
-    // Fetch Telegram member count via community-stats API
-    fetch('/api/community-stats').then(r=>r.json()).then(d=>{
-      if(d.members) setTgMembers(d.members.toLocaleString());
-    }).catch(()=>{});
+    fetchTg();
+    fetchSocialStats();
     // Round info for templates
     getRoundInfo().then(setRoundInfo).catch(()=>{});
     // Calendar posts this week
@@ -2622,7 +2645,10 @@ function SocialScreen({ showToast }) {
     sb.get('scheduled_posts', `week_start=eq.${ws}&status=in.(pending,approved)&order=scheduled_at.asc&select=*`).then(d => {
       if(Array.isArray(d)) setCalPosts(d.slice(0,6));
     }).catch(()=>{});
-  }, []);
+    const tgTimer    = setInterval(fetchTg, 60_000);
+    const statsTimer = setInterval(fetchSocialStats, 300_000);
+    return () => { clearInterval(tgTimer); clearInterval(statsTimer); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveStats = (newStats) => { setStats(newStats); localStorage.setItem('tt_social_stats', JSON.stringify(newStats)); };
   const saveDmLog = (log) => { setDmLog(log); localStorage.setItem('tt_dm_log', JSON.stringify(log)); };
@@ -2680,27 +2706,102 @@ function SocialScreen({ showToast }) {
 
       {/* LIVE STATS */}
       <div className="table-card" style={{ marginBottom:20 }}>
-        <div className="table-head"><div className="table-head-title">📊 Platform Stats</div><span style={{fontSize:'.6rem',color:'var(--muted)'}}>Manual fields save to localStorage</span></div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:0 }}>
-          {[
-            { label:'Instagram Followers', key:'ig_followers', placeholder:'e.g. 1200', auto:null },
-            { label:'X Followers', key:'x_followers', placeholder:'e.g. 840', auto:null },
-            { label:'Telegram Members', key:'tg_members', placeholder:'Auto-fetched', auto:tgMembers },
-            { label:'Engagement Rate', key:'engagement', placeholder:'e.g. 4.2%', auto:null },
-            { label:'Last IG Post', key:'last_ig', placeholder:'e.g. Apr 26', auto:null },
-            { label:'Last X Post', key:'last_x', placeholder:'e.g. Apr 25', auto:null },
-          ].map(f => (
-            <div key={f.key} style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
-              <div style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>{f.label}</div>
-              {f.auto ? (
-                <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>{f.auto}</div>
-              ) : (
-                <input value={stats[f.key]||''} onChange={e=>saveStats({...stats,[f.key]:e.target.value})}
-                  placeholder={f.placeholder}
-                  style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }} />
+        <div className="table-head">
+          <div className="table-head-title">📊 Platform Stats</div>
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            {lastStatsRefresh && <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>Updated {lastStatsRefresh}</span>}
+            <button onClick={handleRefreshStats} disabled={statsLoading}
+              style={{ background:'var(--surface2)', border:'1px solid var(--border)', color:'var(--text)', padding:'5px 12px', borderRadius:5, cursor:statsLoading?'not-allowed':'pointer', fontSize:'.6rem', fontWeight:600, fontFamily:'var(--font-body)', opacity:statsLoading?.7:1 }}>
+              {statsLoading ? '⟳ Refreshing…' : '⟳ Refresh Stats'}
+            </button>
+          </div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))', gap:0 }}>
+
+          {/* Telegram — LIVE */}
+          <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+              <span style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)' }}>Telegram Members</span>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+                <span style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e', display:'inline-block', flexShrink:0 }} />
+                <span style={{ fontSize:'.5rem', color:'#22c55e', fontWeight:700 }}>LIVE</span>
+              </span>
+            </div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>{tgMembers}</div>
+            <div style={{ fontSize:'.55rem', color:'var(--muted)', marginTop:3 }}>auto-refresh 60s</div>
+          </div>
+
+          {/* X Followers — LIVE */}
+          <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+              <span style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)' }}>𝕏 @temptationtoken</span>
+              {liveStats.x_followers != null && (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e', display:'inline-block', flexShrink:0 }} />
+                  <span style={{ fontSize:'.5rem', color:'#22c55e', fontWeight:700 }}>LIVE</span>
+                </span>
               )}
             </div>
-          ))}
+            <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>
+              {liveStats.x_followers != null ? Number(liveStats.x_followers).toLocaleString() : '—'}
+            </div>
+            {liveStats.x_tweet_count != null
+              ? <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:2 }}>{Number(liveStats.x_tweet_count).toLocaleString()} tweets · auto-refresh 5m</div>
+              : liveStats.x_error
+                ? <div style={{ fontSize:'.55rem', color:'var(--rose)', marginTop:2 }}>{liveStats.x_error}</div>
+                : null
+            }
+          </div>
+
+          {/* Engagement — Supabase */}
+          <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>
+              Engagement · Round {liveStats.round_id || '—'}
+            </div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>
+              {liveStats.unique_voters != null ? Number(liveStats.unique_voters).toLocaleString() : '—'}
+            </div>
+            {liveStats.votes_this_round != null && (
+              <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:2 }}>
+                {liveStats.votes_this_round} votes · {liveStats.unique_voters} unique voters
+              </div>
+            )}
+          </div>
+
+          {/* Instagram — manual */}
+          <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>Instagram Followers</div>
+            <input value={stats.ig_followers||''} onChange={e=>saveStats({...stats,ig_followers:e.target.value})}
+              placeholder="e.g. 1200"
+              style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }} />
+            <div style={{ fontSize:'.5rem', color:'var(--muted)', marginTop:4, lineHeight:1.4 }}>Manual — Instagram API requires OAuth app review</div>
+          </div>
+
+          {/* Last X post — Supabase */}
+          <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>Last 𝕏 Post</div>
+            {liveStats.last_x_post ? (
+              <div>
+                <div style={{ fontSize:'.68rem', color:'var(--text)', lineHeight:1.5, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+                  {(liveStats.last_x_post.content || '').slice(0, 100)}{(liveStats.last_x_post.content?.length > 100) ? '…' : ''}
+                </div>
+                <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:3 }}>
+                  {new Date(liveStats.last_x_post.scheduled_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>—</div>
+            )}
+          </div>
+
+          {/* Last IG post — manual */}
+          <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }}>Last IG Post</div>
+            <input value={stats.last_ig||''} onChange={e=>saveStats({...stats,last_ig:e.target.value})}
+              placeholder="e.g. Apr 26"
+              style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }} />
+          </div>
+
         </div>
       </div>
 
