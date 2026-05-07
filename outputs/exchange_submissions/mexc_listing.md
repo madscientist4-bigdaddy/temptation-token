@@ -26,7 +26,7 @@ $TTS has direct in-game utility — it is both the betting currency and the priz
 **Security:**
 - Solidproof audit: complete — zero critical findings (report at app.solidproof.io/projects/temptation-token)
 - Chainlink VRF V2.5: provably fair winner selection
-- LP lock: In progress — Team.Finance lock pending
+- LP lock: ✅ Locked — Team.Finance (231.3 LP tokens locked until May 5 2027, TX: 0xd98b2bb4c3cfbc57...)
 - Treasury: Gnosis Safe 2/2 multisig
 - All contracts verified on BaseScan
 

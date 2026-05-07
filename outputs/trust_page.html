@@ -131,7 +131,7 @@
 <div class="badge-row">
   <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener" class="badge" style="text-decoration:none">🔒 Solidproof Audited</a>
   <div class="badge">⛓ Chainlink VRF</div>
-  <div class="badge" style="border-color:rgba(240,165,0,0.4);color:#f0a500">⏳ LP Lock Pending</div>
+  <div class="badge" style="border-color:rgba(0,200,100,0.5);color:#00c864">✅ LP Locked May 2027</div>
   <div class="badge">🛡 Gnosis Safe 2/2</div>
   <div class="badge">✅ BaseScan Verified</div>
   <div class="badge">🪙 Fixed Supply</div>
@@ -162,12 +162,12 @@
         <a href="https://vrf.chain.link/base" target="_blank" rel="noopener" class="sec-card-link">Verify VRF subscription ↗</a>
       </div>
 
-      <div class="sec-card" style="border-color:rgba(240,165,0,0.35)">
+      <div class="sec-card">
         <div class="sec-card-icon">🔐</div>
-        <div class="sec-card-title">LP Lock — In Progress</div>
-        <div class="sec-card-status" style="background:rgba(240,165,0,0.1);border-color:rgba(240,165,0,0.35);color:#f0a500">⏳ Team.Finance Lock Pending</div>
-        <div class="sec-card-desc">The Uniswap V2 liquidity pool LP lock on Team.Finance is currently being set up. 231.3 LP tokens are held by the deployer wallet. Once locked, no liquidity can be removed for 12 months. This page will be updated with the lock proof URL when complete.</div>
-        <a href="https://app.team.finance/liquidity-locks" target="_blank" rel="noopener" class="sec-card-link">app.team.finance ↗</a>
+        <div class="sec-card-title">LP Lock — Confirmed</div>
+        <div class="sec-card-status">✓ Locked Until May 5, 2027</div>
+        <div class="sec-card-desc">231.3 Uniswap V2 LP tokens locked 12 months on Team.Finance. No liquidity can be removed until May 5, 2027. Lock verified on-chain — TX: 0xd98b2bb4c3cfbc57e988ab9898843fab4df20fd87dc216aa1b588f65576779da</div>
+        <a href="https://basescan.org/tx/0xd98b2bb4c3cfbc57e988ab9898843fab4df20fd87dc216aa1b588f65576779da" target="_blank" rel="noopener" class="sec-card-link">View lock TX on BaseScan ↗</a>
       </div>
 
       <div class="sec-card">
@@ -266,7 +266,7 @@
         <div class="cannot-item"><span>✗</span> Change who wins — Chainlink VRF is immutable</div>
         <div class="cannot-item"><span>✗</span> Steal votes — funds locked in contract until settlement</div>
         <div class="cannot-item"><span>✗</span> Modify prize percentages — hardcoded in contract</div>
-        <div class="cannot-item"><span>✗</span> Remove LP — Team.Finance lock being set up (231.3 LP tokens in deployer wallet, lock in progress)</div>
+        <div class="cannot-item"><span>✗</span> Remove LP — 231.3 LP tokens locked on Team.Finance until May 5, 2027</div>
         <div class="cannot-item"><span>✗</span> Mint additional tokens — no mint function exists</div>
         <div class="cannot-item"><span>✗</span> Increase transfer tax — hardcoded at 1%</div>
         <div class="cannot-item"><span>✗</span> Access user funds directly</div>
@@ -288,9 +288,9 @@
     </div>
 
     <div class="addr-row">
-      <span class="addr-code">TTSVotingV3b (Active): 0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8</span>
-      <button class="copy-btn" onclick="copyAddr(this,'0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8')">Copy</button>
-      <a href="https://basescan.org/address/0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8" target="_blank" style="font-size:.72rem">BaseScan ↗</a>
+      <span class="addr-code">TTSVotingV3b (Active, all audit fixes): 0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6</span>
+      <button class="copy-btn" onclick="copyAddr(this,'0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6')">Copy</button>
+      <a href="https://basescan.org/address/0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6" target="_blank" style="font-size:.72rem">BaseScan ↗</a>
     </div>
 
     <div class="addr-row">
@@ -378,7 +378,7 @@ function copyAddr(btn, addr) {
   "@type": "WebPage",
   "name": "Trust & Security — Temptation Token ($TTS)",
   "url": "https://temptationtoken.io/trust",
-  "description": "Temptation Token security: Solidproof audited, Chainlink VRF fair play, Gnosis Safe 2/2 multisig, LP lock in progress. Every claim is verifiable on-chain.",
+  "description": "Temptation Token security: Solidproof audited, Chainlink VRF fair play, Gnosis Safe 2/2 multisig, LP locked 12 months on Team.Finance. Every claim is verifiable on-chain.",
   "publisher": {
     "@type": "Organization",
     "name": "Blockchain Entertainment LLC",

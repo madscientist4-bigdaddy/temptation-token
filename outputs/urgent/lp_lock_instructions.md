@@ -1,7 +1,17 @@
-# LP Lock — Step-by-Step Instructions
-**URGENT — Complete before any exchange submissions or trust page goes live**
+# LP Lock — COMPLETED ✅
 
-Verified on-chain (May 6 2026): 231,300,670,124,407,550,401 LP tokens are held by the deployer wallet (0xb1e991bf617459b58964eef7756b350e675c53b5). Zero LP tokens are locked on Team.Finance. The Uniswap pool has 1 LP holder (the deployer).
+**Locked May 6 2026 — 231.3 LP tokens locked until May 5 2027**
+Lock TX: `0xd98b2bb4c3cfbc57e988ab9898843fab4df20fd87dc216aa1b588f65576779da`
+Platform: Team.Finance
+Pool: `0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68` (TTS/WETH Uniswap V2 on Base)
+
+All exchange files and trust_page.html updated. CLAUDE.md LP Lock Status section updated.
+This file is archived — no further action needed.
+
+---
+**Original instructions (archived for reference):**
+
+Verified on-chain (May 6 2026): 231,300,670,124,407,550,401 LP tokens were held by the deployer wallet (0xb1e991bf617459b58964eef7756b350e675c53b5). Now locked on Team.Finance until May 5 2027.
 
 ---
 

@@ -7,7 +7,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
-const VOTING_ADDRESS = '0xbc54432BB2D1Ef95e940e024dA604dbb9e9846F8'
+const VOTING_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'
 const ADMIN_CHAT_ID  = process.env.ADMIN_CHAT_ID || '-5273368658'
 
 async function sbGet(table, query = '') {

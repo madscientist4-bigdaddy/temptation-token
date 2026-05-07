@@ -35,7 +35,7 @@ Staking system: Bronze (8% APR, 1.1x) through VIP (45% APR, 3x). Fixed supply, n
 | Item | Status | Link |
 |------|--------|------|
 | Smart Contract Audit | ✅ Solidproof — zero critical | app.solidproof.io/projects/temptation-token |
-| LP Lock | ⏳ In progress | team.finance (lock pending — do not submit until complete) |
+| LP Lock | ✅ Locked 12 months | team.finance — 231.3 LP locked until May 5 2027 · TX: 0xd98b2bb4c3cfbc57e988ab9898843fab4df20fd87dc216aa1b588f65576779da |
 | Verified Contract | ✅ BaseScan | basescan.org/address/0x5570eA... |
 | Chainlink VRF | ✅ Active on Base | vrf.chain.link/base |
 
