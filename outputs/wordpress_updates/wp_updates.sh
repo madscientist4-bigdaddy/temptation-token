@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================
-# TTS WordPress Updates — run after generating Application Password
+# TTS WordPress Updates — Application Password method
+# ============================================================
+# ⚠️  DEPRECATED — Hostinger blocks Application Passwords.
+# Use tts_wp_update.sh + tts-api-auth.php plugin instead.
 # ============================================================
 #
 # Prerequisites:
