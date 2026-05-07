@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: TTS API Auth
- * Plugin URI:  https://temptationtoken.io
- * Description: Custom REST endpoint for Temptation Token WordPress management. Token-auth only — no Application Password needed.
- * Version:     1.0.0
- * Author:      Blockchain Entertainment LLC
+ * Plugin URI: https://temptationtoken.io
+ * Description: Custom REST API authentication for Temptation Token WordPress updates
+ * Version: 1.0.0
+ * Author: Blockchain Entertainment LLC
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
