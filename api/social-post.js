@@ -17,7 +17,17 @@
 
 import crypto from 'crypto'
 
-// ── OAuth ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Returns 0-6 (Sun-Sat) using America/New_York local time, not server UTC.
+// Matters for the 8pm EDT slot (00:00 UTC next day) — UTC getDay() pulls wrong image.
+function nyDayOfWeek() {
+  const d = new Date()
+  const day = d.toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+  return { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[day] ?? d.getDay()
+}
+
+// ── OAuth ─────────────────────────────────────────────────────────────────────
 
 function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret, token) {
   const oauthParams = {
@@ -56,7 +66,7 @@ async function uploadImageForDay(dayOfWeek, env) {
   const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = env
   if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
 
-  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : new Date().getDay()]
+  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : nyDayOfWeek()]
   if (!filename) return null
 
   // Fetch PNG from Vercel CDN (public/social_images/)
@@ -115,6 +125,20 @@ async function postTweet(text, env, mediaId = null) {
   const body = await r.json()
   if (!r.ok) {
     console.error(`X API ${r.status} (@temptationtoken):`, JSON.stringify(body))
+    // Telegram alert for every non-2xx so admin knows without checking logs
+    const adminToken  = process.env.BROADCAST_BOT_TOKEN
+    const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+    if (adminToken) {
+      const detail = body.errors?.[0]?.message || body.detail || body.title || JSON.stringify(body).slice(0, 200)
+      const hint = r.status === 401 ? ' — Fix X credentials in Vercel env.'
+        : r.status === 403 ? ' — Check X app permissions / API plan.'
+        : r.status === 402 ? ' — X API subscription issue.'
+        : ''
+      sendTelegram(adminChatId,
+        `🚨 X API ${r.status}${hint}\n${detail}`,
+        adminToken
+      ).catch(() => {})
+    }
     const err = new Error(`X API ${r.status}: ${JSON.stringify(body)}`)
     err.status = r.status
     err.xBody = body
@@ -163,6 +187,83 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const body = req.body || {}
+
+  // ── Full-pipeline image test: { _test_x_post_with_image: true } ─────────────
+  // Validates: PNG fetch → v1.1 media upload → v2 tweet with media_ids
+  if (body._test_x_post_with_image) {
+    const apiKey   = process.env.X_API_KEY
+    const apiSec   = process.env.X_API_SECRET
+    const tok      = process.env.TTS_X_ACCESS_TOKEN
+    const tokSec   = process.env.TTS_X_ACCESS_SECRET
+    if (!apiKey || !apiSec || !tok || !tokSec) {
+      return res.status(200).json({ ok: false, error: 'Missing TTS X credentials' })
+    }
+    const env = { X_API_KEY: apiKey, X_API_SECRET: apiSec, TTS_X_ACCESS_TOKEN: tok, TTS_X_ACCESS_SECRET: tokSec }
+    const report = {}
+
+    // Step 1 — determine NY day-of-week and image
+    const dow = nyDayOfWeek()
+    const filename = DAY_IMAGE[dow]
+    const imageUrl = `https://app.temptationtoken.io/social_images/${filename}.png`
+    report.day_of_week_ny   = dow
+    report.image_filename   = filename
+    report.image_fetch_url  = imageUrl
+
+    // Step 2 — fetch PNG from Vercel CDN
+    let imgBuffer
+    try {
+      const imgR = await fetch(imageUrl)
+      report.image_fetch_status = imgR.status
+      if (!imgR.ok) {
+        report.image_fetch_error = `HTTP ${imgR.status}`
+        return res.status(200).json({ ok: false, step_failed: 'image_fetch', ...report })
+      }
+      imgBuffer = Buffer.from(await imgR.arrayBuffer())
+      report.image_size_bytes = imgBuffer.length
+    } catch (e) {
+      report.image_fetch_error = e.message
+      return res.status(200).json({ ok: false, step_failed: 'image_fetch', ...report })
+    }
+
+    // Step 3 — upload to Twitter v1.1 media/upload.json
+    const mediaUrl = 'https://upload.twitter.com/1.1/media/upload.json'
+    report.media_upload_url = mediaUrl
+    let mediaId = null
+    try {
+      const auth = oauthSign('POST', mediaUrl, {}, apiKey, apiSec, tokSec, tok)
+      const form = new FormData()
+      form.append('media', new Blob([imgBuffer], { type: 'image/png' }), 'image.png')
+      const uploadR = await fetch(mediaUrl, { method: 'POST', headers: { Authorization: auth }, body: form })
+      const uploadBody = await uploadR.json()
+      report.media_upload_status   = uploadR.status
+      report.media_upload_response = uploadBody
+      if (!uploadR.ok) {
+        report.media_upload_error = `HTTP ${uploadR.status}`
+        return res.status(200).json({ ok: false, step_failed: 'media_upload', ...report })
+      }
+      mediaId = uploadBody.media_id_string
+      report.media_id = mediaId
+    } catch (e) {
+      report.media_upload_error = e.message
+      return res.status(200).json({ ok: false, step_failed: 'media_upload', ...report })
+    }
+
+    // Step 4 — post tweet with media_ids
+    const testText = `🧪 Image test @temptationtoken — ${filename} — ${new Date().toUTCString()} — app.temptationtoken.io $TTS`
+    try {
+      const tweet = await postTweet(testText, env, mediaId)
+      const tweetId = tweet?.data?.id
+      report.tweet_id  = tweetId
+      report.tweet_url = tweetId ? `https://twitter.com/TemptationToken/status/${tweetId}` : null
+      report.tweet_response = tweet
+      return res.status(200).json({ ok: true, ...report })
+    } catch (e) {
+      report.tweet_error        = e.message
+      report.tweet_error_status = e.status
+      report.tweet_x_body       = e.xBody
+      return res.status(200).json({ ok: false, step_failed: 'tweet_post', ...report })
+    }
+  }
 
   // ── Test post: { _test_x_post: true, account: 'temptationtoken' } ───────────
   if (body._test_x_post) {
@@ -339,7 +440,7 @@ export default async function handler(req, res) {
   // Post to @temptationtoken
   if (apiKey && apiSecret && ttsToken && ttsSecret) {
     const env = { X_API_KEY: apiKey, X_API_SECRET: apiSecret, TTS_X_ACCESS_TOKEN: ttsToken, TTS_X_ACCESS_SECRET: ttsSecret }
-    const dayOfWeek = new Date().getDay()
+    const dayOfWeek = nyDayOfWeek()
     const mediaId = await uploadImageForDay(dayOfWeek, env)
     try {
       results.twitter_tts = await postTweet(ttsText, env, mediaId)

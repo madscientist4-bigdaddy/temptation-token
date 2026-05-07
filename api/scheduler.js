@@ -108,6 +108,14 @@ function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret
 
 // ── X posting — @temptationtoken only ────────────────────────────────────────
 
+// America/New_York day-of-week (0=Sun…6=Sat). Prevents UTC midnight drift
+// where the 8pm EDT slot (00:00 UTC) would pull the next day's image.
+function nyDayOfWeek() {
+  const d = new Date()
+  const day = d.toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+  return { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[day] ?? d.getDay()
+}
+
 const DAY_IMAGE = {
   0: 'post1_monday', 1: 'post2_tuesday', 2: 'post3_wednesday',
   3: 'post4_thursday', 4: 'post5_friday', 5: 'post6_saturday', 6: 'post7_sunday',
@@ -116,7 +124,7 @@ const DAY_IMAGE = {
 async function uploadMediaForDay(dayOfWeek) {
   const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
   if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
-  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : new Date().getDay()]
+  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : nyDayOfWeek()]
   if (!filename) return null
   try {
     const imgUrl = `https://app.temptationtoken.io/social_images/${filename}.png`
@@ -204,25 +212,41 @@ async function firePost(post) {
           error: `Rate limited @ ${new Date().toISOString()} — retrying at ${reschedule}`
         })
         return { platform: post.platform, id: post.id, rescheduled: reschedule }
-      } else if (e.status === 401) {
-        // Auth failure — mark failed, alert admin
-        anyError = e.message
-        results.x_error = e.message
-        const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
-        const alertToken = process.env.BROADCAST_BOT_TOKEN
-        try { await sendTelegram(adminChatId, `🚨 X Auth 401 — post ${post.id} not sent. Fix X credentials in Vercel env.`, alertToken) } catch {}
-      } else if (e.status >= 500) {
-        // Server error — retry once after 2 seconds
+      }
+
+      let finalErr = e
+
+      if (e.status >= 500) {
+        // Server error — silent retry once after 2 seconds
         await new Promise(r => setTimeout(r, 2000))
         try {
           results.x = await postTweetTTS(content, post.day_of_week ?? null)
+          finalErr = null  // retry succeeded
         } catch (e2) {
-          anyError = e2.message
-          results.x_error = e2.message
+          finalErr = e2
         }
-      } else {
-        anyError = e.message
-        results.x_error = e.message
+      }
+
+      if (finalErr) {
+        anyError = finalErr.message
+        results.x_error = finalErr.message
+        // Alert admin on any non-2xx (401, 402, 403, 422, 5xx after retry, etc.)
+        const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+        const alertToken  = process.env.BROADCAST_BOT_TOKEN
+        if (alertToken) {
+          const status = finalErr.status ?? '?'
+          const hint = status === 401 ? ' — Fix X credentials in Vercel env.'
+            : status === 402 ? ' — X API subscription / payment issue.'
+            : status === 403 ? ' — Check X app permissions or API plan.'
+            : ''
+          try {
+            await sendTelegram(
+              adminChatId,
+              `🚨 X post failed (HTTP ${status})${hint}\nPost ID: ${post.id}\n${finalErr.message.slice(0, 200)}`,
+              alertToken
+            )
+          } catch {}
+        }
       }
     }
   }
