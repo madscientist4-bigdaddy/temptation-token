@@ -27,7 +27,7 @@ python tts_bot.py  # Run Telegram bot worker (separate process)
    - `/api/notify.js` — Sends Telegram admin notification on new submission
    - `/api/social-post.js` — Posts to X and/or Telegram; `{type,data}` template mode, `{platform:'telegram',content}` direct Telegram, `{platform:'x_tts',content}` direct @temptationtoken X post
    - `/api/scheduler.js` — Fires at 00, 13, 18, 19 UTC daily (4 Vercel crons): fires approved scheduled_posts + 19:00 Telegram round status + auto-correction alerts
-   - `/api/content-generator.js` — Monday 8am UTC: generates @CryptoFitJim week (Claude Haiku, status=pending) + @temptationtoken 21 posts (templates, status=approved). POST `{tts_bootstrap:true}` regenerates only TTS posts.
+   - `/api/content-generator.js` — Monday 8am UTC: generates @temptationtoken 21 posts for the week (templates, status=approved). POST `{force:true}` or `{tts_bootstrap:true}` to regenerate. @CryptoFitJim posts manually — no auto-generation.
    - `/api/referral-credit.js` — Credits referrer wallet on new user signup. Uses `referral_credits` table.
    - `/api/community-stats.js` — Returns Telegram community member count via bot API
    - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends $5 USD of TTS (min 500, max 50,000) from Marketing wallet on first connect. Live Uniswap price. 20/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY` in Vercel env.
@@ -96,7 +96,7 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 | Round ends | Sunday 11:59 PM EDT | Monday 03:59 UTC | `59 3 * * 1` |
 | VRF settlement | Within minutes of round end — automatic | | |
 | Confirm new round | Check Monday 04:05 UTC | | |
-| @CryptoFitJim posts | 2pm EST (19:00 UTC) | 19:00 UTC | Vercel cron `0 19 * * *` |
+| @CryptoFitJim posts | manual — Jim posts from content calendar or X directly | — | — |
 | @temptationtoken morning | 9am EDT (13:00 UTC) | 13:00 UTC | Vercel cron `0 13 * * *` |
 | @temptationtoken afternoon | 2pm EDT (18:00 UTC) | 18:00 UTC | Vercel cron `0 18 * * *` |
 | @temptationtoken evening | 8pm EDT (00:00 UTC next day) | 00:00 UTC | Vercel cron `0 0 * * *` |
@@ -230,25 +230,20 @@ Always `git add` + commit + push after every change.
 | `BROADCAST_BOT_TOKEN` | Telegram @TTSBroadcastBot | ✅ Set |
 | `X_API_KEY` | X app credential (shared) | ✅ Set |
 | `X_API_SECRET` | X app credential (shared) | ✅ Set |
-| `X_ACCESS_TOKEN` | @CryptoFitJim user token | ✅ Set (needs Read+Write) |
-| `X_ACCESS_SECRET` | @CryptoFitJim user secret | ✅ Set (needs Read+Write) |
-| `TTS_X_ACCESS_TOKEN` | @temptationtoken user token | ✅ Set — if 401 errors, regenerate after enabling Read+Write in dev portal |
-| `TTS_X_ACCESS_SECRET` | @temptationtoken user secret | ✅ Set — same as above |
+| `X_ACCESS_TOKEN` | @CryptoFitJim — not used by automation (Jim posts manually) | — |
+| `X_ACCESS_SECRET` | @CryptoFitJim — not used by automation | — |
+| `TTS_X_ACCESS_TOKEN` | @temptationtoken user token — all automated X posts | ✅ Set |
+| `TTS_X_ACCESS_SECRET` | @temptationtoken user secret | ✅ Set |
 | `SUPABASE_URL` | Supabase project URL | ✅ Set |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key | ✅ Set |
 
-**X credential status (diagnosed May 5 2026):**
-- All 6 X env vars are set in Vercel ✅
-- Current X_API_KEY prefix: `IbtlJxK5xF...`
-- GET /2/users/me returns 401 for BOTH accounts — this confirms the **app credentials (consumer key/secret) are invalid or mismatched**, not just the user tokens
-- Cause: X_API_KEY in Vercel belongs to an app that is either (a) deleted/suspended, or (b) using the wrong X_API_SECRET
-- Fix (Jim must do this in developer.twitter.com):
-  1. Go to developer.twitter.com → your project/app
-  2. Find the app whose API Key starts with `IbtlJxK5xF` — if it exists, regenerate the API Key & Secret and update `X_API_KEY` + `X_API_SECRET` in Vercel
-  3. If that app no longer exists: create a new app, enable Read+Write permissions, copy new API Key & Secret to Vercel
-  4. While logged in as @CryptoFitJim: Keys & Tokens → Generate Access Token & Secret → update `X_ACCESS_TOKEN` + `X_ACCESS_SECRET` in Vercel
-  5. While logged in as @temptationtoken: same app → Keys & Tokens → Generate Access Token & Secret → update `TTS_X_ACCESS_TOKEN` + `TTS_X_ACCESS_SECRET` in Vercel
-  6. After updating all 4 tokens, call `POST /api/social-post {"_diag":true}` to confirm 200 OK from /2/users/me
+**X posting: @temptationtoken only (automated). @CryptoFitJim posts manually.**
+- Only credentials needed: `X_API_KEY`, `X_API_SECRET`, `TTS_X_ACCESS_TOKEN`, `TTS_X_ACCESS_SECRET`
+- `X_ACCESS_TOKEN` / `X_ACCESS_SECRET` (Jim) are no longer used by any automation
+- Fix if 401 (Jim action — developer.twitter.com):
+  1. Regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` in Vercel
+  2. While logged in as @temptationtoken: Keys & Tokens → Access Token & Secret → update `TTS_X_ACCESS_TOKEN` + `TTS_X_ACCESS_SECRET` in Vercel
+  3. Verify: `POST /api/social-post {"_test_x_post":true,"account":"temptationtoken"}`
 
 ---
 

@@ -1,21 +1,23 @@
-// POST /api/social-post — posts to X (Twitter) and mirrors to Telegram channels
+// POST /api/social-post — posts to X (@temptationtoken only) and mirrors to Telegram
 //
 // Required env vars (set in Vercel):
-//   X_API_KEY, X_API_SECRET         — app credentials (shared by both X accounts)
-//   X_ACCESS_TOKEN, X_ACCESS_SECRET — @CryptoFitJim user credentials
-//   TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET — @temptationtoken user credentials (optional)
+//   X_API_KEY, X_API_SECRET         — app credentials
+//   TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET — @temptationtoken credentials
 //   BROADCAST_BOT_TOKEN   — @TTSBroadcastBot token
 //   MAIN_CHANNEL_ID       — @temptationtoken channel ID
 //   COMMUNITY_CHAT_ID     — @TTSCommunityChat chat ID
 //
 // Posting rules:
-//   @CryptoFitJim     — all template types + content calendar (personal voice)
-//   @temptationtoken  — round_start, round_settled, profile_approved only (brand voice)
+//   @temptationtoken — all template types + direct posts (brand voice)
+//   @CryptoFitJim    — posts manually; no automated X posting
 //
 // Body: { type: 'round_start'|'round_settled'|'profile_approved', data: { roundId, profileCount, pool } }
 //   OR: { platform: 'telegram', content: '...', chatId: '...' }  — direct Telegram mode
+//   OR: { platform: 'x_tts', content: '...', day_of_week: 0-6 } — direct @temptationtoken X post
 
 import crypto from 'crypto'
+
+// ── OAuth ────────────────────────────────────────────────────────────────────
 
 function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret, token) {
   const oauthParams = {
@@ -33,26 +35,86 @@ function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret
   const sigKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`
   const signature = crypto.createHmac('sha1', sigKey).update(sigBase).digest('base64')
   oauthParams.oauth_signature = signature
-  const header = 'OAuth ' + Object.keys(oauthParams)
+  return 'OAuth ' + Object.keys(oauthParams)
     .map(k => `${encodeURIComponent(k)}="${encodeURIComponent(oauthParams[k])}"`)
     .join(', ')
-  return header
 }
 
-async function postTweet(text, env) {
+// ── Image upload ─────────────────────────────────────────────────────────────
+
+const DAY_IMAGE = {
+  0: 'post1_monday',
+  1: 'post2_tuesday',
+  2: 'post3_wednesday',
+  3: 'post4_thursday',
+  4: 'post5_friday',
+  5: 'post6_saturday',
+  6: 'post7_sunday',
+}
+
+async function uploadImageForDay(dayOfWeek, env) {
+  const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = env
+  if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
+
+  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : new Date().getDay()]
+  if (!filename) return null
+
+  // Fetch PNG from Vercel CDN (public/social_images/)
+  let imgBuffer
+  try {
+    const imgUrl = `https://app.temptationtoken.io/social_images/${filename}.png`
+    const r = await fetch(imgUrl)
+    if (!r.ok) { console.error(`Image fetch ${r.status}: ${imgUrl}`); return null }
+    imgBuffer = Buffer.from(await r.arrayBuffer())
+  } catch (e) {
+    console.error('Image fetch error:', e.message)
+    return null
+  }
+
+  // Upload to Twitter v1.1 media/upload.json (multipart — OAuth signed without body params)
+  const mediaUrl = 'https://upload.twitter.com/1.1/media/upload.json'
+  const auth = oauthSign('POST', mediaUrl, {}, X_API_KEY, X_API_SECRET, TTS_X_ACCESS_SECRET, TTS_X_ACCESS_TOKEN)
+
+  try {
+    const form = new FormData()
+    form.append('media', new Blob([imgBuffer], { type: 'image/png' }), 'image.png')
+
+    const r = await fetch(mediaUrl, {
+      method: 'POST',
+      headers: { Authorization: auth },
+      body: form,
+    })
+    const body = await r.json()
+    if (!r.ok) {
+      console.error('Media upload failed:', r.status, JSON.stringify(body))
+      return null
+    }
+    return body.media_id_string
+  } catch (e) {
+    console.error('Media upload error:', e.message)
+    return null
+  }
+}
+
+// ── Tweet ────────────────────────────────────────────────────────────────────
+
+async function postTweet(text, env, mediaId = null) {
   const url = 'https://api.twitter.com/2/tweets'
   const authHeader = oauthSign(
     'POST', url, {},
-    env.X_API_KEY, env.X_API_SECRET, env.X_ACCESS_SECRET, env.X_ACCESS_TOKEN
+    env.X_API_KEY, env.X_API_SECRET, env.TTS_X_ACCESS_SECRET, env.TTS_X_ACCESS_TOKEN
   )
+  const tweetBody = { text }
+  if (mediaId) tweetBody.media = { media_ids: [mediaId] }
+
   const r = await fetch(url, {
     method: 'POST',
     headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
+    body: JSON.stringify(tweetBody)
   })
   const body = await r.json()
   if (!r.ok) {
-    console.error(`X API ${r.status} for ${env.X_ACCESS_TOKEN?.slice(0,8)}...:`, JSON.stringify(body))
+    console.error(`X API ${r.status} (@temptationtoken):`, JSON.stringify(body))
     const err = new Error(`X API ${r.status}: ${JSON.stringify(body)}`)
     err.status = r.status
     err.xBody = body
@@ -61,15 +123,15 @@ async function postTweet(text, env) {
   return body
 }
 
-async function verifyCredentials(env, label) {
+async function verifyCredentials(env) {
   const url = 'https://api.twitter.com/2/users/me'
   const authHeader = oauthSign(
     'GET', url, {},
-    env.X_API_KEY, env.X_API_SECRET, env.X_ACCESS_SECRET, env.X_ACCESS_TOKEN
+    env.X_API_KEY, env.X_API_SECRET, env.TTS_X_ACCESS_SECRET, env.TTS_X_ACCESS_TOKEN
   )
   const r = await fetch(url, { headers: { Authorization: authHeader } })
   const body = await r.json()
-  return { label, status: r.status, ok: r.ok, body, key_prefix: env.X_API_KEY?.slice(0,8)+'...', token_prefix: env.X_ACCESS_TOKEN?.slice(0,8)+'...' }
+  return { label: '@temptationtoken', status: r.status, ok: r.ok, body, key_prefix: env.X_API_KEY?.slice(0,8)+'...', token_prefix: env.TTS_X_ACCESS_TOKEN?.slice(0,8)+'...' }
 }
 
 async function sendTelegram(chatId, text, token) {
@@ -82,107 +144,90 @@ async function sendTelegram(chatId, text, token) {
   return r.json()
 }
 
-// @CryptoFitJim — personal voice, all event types
-const TEMPLATES = {
-  round_start: ({ roundId, profileCount, pool }) =>
-    `🔥 Round ${roundId} is LIVE on Temptation Token\n\n${profileCount} profiles competing for ${pool ? pool.toLocaleString() + ' $TTS' : '$TTS'}\n\nVote now → app.temptationtoken.io\n\n#TTS #Base #Crypto`,
+// ── @temptationtoken templates ────────────────────────────────────────────────
 
-  round_settled: ({ roundId }) =>
-    `🏆 Round ${roundId} SETTLED\n\nWinner paid automatically on Base\nChainlink VRF — provably fair\n\nRound ${roundId + 1} starts Monday 🔥\n\napp.temptationtoken.io`,
-
-  profile_approved: () =>
-    `🔥 New profile just approved\n\nVote $TTS to back your favorite\nWinner takes 35% of the pool\n\nt.me/TTSGameBot`,
-}
-
-// @temptationtoken — brand voice, event-driven announcements only
 const TTS_TEMPLATES = {
   round_start: ({ roundId, profileCount }) =>
-    `🎮 Round ${roundId} is now LIVE on Temptation Token. ${profileCount || 14} profiles competing. Vote now → app.temptationtoken.io $TTS #Base #Crypto`,
+    `🎮 Round ${roundId} is now LIVE on Temptation Token. ${profileCount || 14} profiles competing. Vote now → app.temptationtoken.io $TTS #Base #Crypto\n\nWho's your pick this week? 👇`,
 
   round_settled: ({ roundId, pool }) =>
-    `🏆 Round ${roundId} winner announced! ${pool ? pool.toLocaleString() + ' $TTS' : '$TTS'} paid automatically on-chain. Round ${Number(roundId) + 1} starts Monday. app.temptationtoken.io $TTS`,
+    `🏆 Round ${roundId} winner announced! ${pool ? pool.toLocaleString() + ' $TTS' : '$TTS'} paid automatically on-chain. Round ${Number(roundId) + 1} starts Monday. app.temptationtoken.io $TTS\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
 
   profile_approved: ({ roundId }) =>
-    `👑 New profile approved and live${roundId ? ` in Round ${roundId}` : ''}! Vote now → app.temptationtoken.io $TTS #TemptationToken`,
+    `👑 New profile approved and live${roundId ? ` in Round ${roundId}` : ''}! Vote now → app.temptationtoken.io $TTS #TemptationToken\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
 }
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const body = req.body || {}
 
-  // Test X post: { _test_x_post: true, account: 'cryptofitjim' | 'temptationtoken' }
-  // Makes a real test tweet and returns tweet URL or full error for debugging X credentials.
+  // ── Test post: { _test_x_post: true, account: 'temptationtoken' } ───────────
   if (body._test_x_post) {
-    const account  = body.account || 'cryptofitjim'
     const apiKey   = process.env.X_API_KEY
     const apiSec   = process.env.X_API_SECRET
-    const isTTS    = account === 'temptationtoken'
-    const tok      = isTTS ? process.env.TTS_X_ACCESS_TOKEN  : process.env.X_ACCESS_TOKEN
-    const tokSec   = isTTS ? process.env.TTS_X_ACCESS_SECRET : process.env.X_ACCESS_SECRET
-    const handle   = isTTS ? '@temptationtoken' : '@CryptoFitJim'
+    const tok      = process.env.TTS_X_ACCESS_TOKEN
+    const tokSec   = process.env.TTS_X_ACCESS_SECRET
     if (!apiKey || !apiSec || !tok || !tokSec) {
-      return res.status(200).json({ ok: false, error: `Missing credentials for ${handle}` })
+      return res.status(200).json({ ok: false, error: 'Missing TTS X credentials (X_API_KEY / X_API_SECRET / TTS_X_ACCESS_TOKEN / TTS_X_ACCESS_SECRET)' })
     }
-    const testText = `🧪 Test post from ${handle} — ${new Date().toUTCString()} — app.temptationtoken.io $TTS`
+    const testText = `🧪 Test post from @temptationtoken — ${new Date().toUTCString()} — app.temptationtoken.io $TTS`
     try {
-      const tweet = await postTweet(testText, { X_API_KEY: apiKey, X_API_SECRET: apiSec, X_ACCESS_TOKEN: tok, X_ACCESS_SECRET: tokSec })
-      const tweetId  = tweet?.data?.id
-      const twitterHandle = isTTS ? 'TemptationToken' : 'CryptoFitJim'
+      const tweet = await postTweet(testText, { X_API_KEY: apiKey, X_API_SECRET: apiSec, TTS_X_ACCESS_TOKEN: tok, TTS_X_ACCESS_SECRET: tokSec })
+      const tweetId = tweet?.data?.id
       return res.status(200).json({
-        ok: true, account: handle, tweetId,
-        tweetUrl: tweetId ? `https://twitter.com/${twitterHandle}/status/${tweetId}` : null,
+        ok: true, account: '@temptationtoken', tweetId,
+        tweetUrl: tweetId ? `https://twitter.com/TemptationToken/status/${tweetId}` : null,
         text: testText,
       })
     } catch (e) {
-      return res.status(200).json({ ok: false, account: handle, error: e.message, status: e.status, xBody: e.xBody })
+      return res.status(200).json({ ok: false, account: '@temptationtoken', error: e.message, status: e.status, xBody: e.xBody })
     }
   }
 
-  // Diagnostic mode: { _diag: true } — verifies credentials without posting
+  // ── Diagnostic: { _diag: true } ─────────────────────────────────────────────
   if (body._diag) {
     const apiKey    = process.env.X_API_KEY
     const apiSecret = process.env.X_API_SECRET
-    const jimToken  = process.env.X_ACCESS_TOKEN
-    const jimSecret = process.env.X_ACCESS_SECRET
     const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
     const ttsSecret = process.env.TTS_X_ACCESS_SECRET
     const results = {
       env_set: {
         X_API_KEY: !!apiKey,
         X_API_SECRET: !!apiSecret,
-        X_ACCESS_TOKEN: !!jimToken,
-        X_ACCESS_SECRET: !!jimSecret,
         TTS_X_ACCESS_TOKEN: !!ttsToken,
         TTS_X_ACCESS_SECRET: !!ttsSecret,
       },
       key_prefix: apiKey?.slice(0,10) + '...',
-      jim_token_prefix: jimToken?.slice(0,10) + '...',
       tts_token_prefix: ttsToken?.slice(0,10) + '...',
     }
-    try { results.jim_verify = await verifyCredentials({ X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: jimToken, X_ACCESS_SECRET: jimSecret }, '@CryptoFitJim') } catch(e) { results.jim_verify_err = e.message }
-    try { results.tts_verify = await verifyCredentials({ X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: ttsToken, X_ACCESS_SECRET: ttsSecret }, '@temptationtoken') } catch(e) { results.tts_verify_err = e.message }
+    try { results.tts_verify = await verifyCredentials({ X_API_KEY: apiKey, X_API_SECRET: apiSecret, TTS_X_ACCESS_TOKEN: ttsToken, TTS_X_ACCESS_SECRET: ttsSecret }) }
+    catch(e) { results.tts_verify_err = e.message }
     return res.status(200).json({ ok: true, diagnostic: results })
   }
 
-  // Direct X post to @temptationtoken: { platform: 'x_tts', content }
+  // ── Direct @temptationtoken X post: { platform: 'x_tts', content, day_of_week? } ──
   if (body.platform === 'x_tts' && body.content) {
-    const _apiKey   = process.env.X_API_KEY
-    const _apiSecret= process.env.X_API_SECRET
-    const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
-    const ttsSecret = process.env.TTS_X_ACCESS_SECRET
-    if (!_apiKey || !_apiSecret || !ttsToken || !ttsSecret) {
+    const apiKey   = process.env.X_API_KEY
+    const apiSec   = process.env.X_API_SECRET
+    const ttsToken = process.env.TTS_X_ACCESS_TOKEN
+    const ttsSecret= process.env.TTS_X_ACCESS_SECRET
+    if (!apiKey || !apiSec || !ttsToken || !ttsSecret) {
       return res.status(200).json({ ok: false, error: 'TTS X credentials not configured' })
     }
+    const env = { X_API_KEY: apiKey, X_API_SECRET: apiSec, TTS_X_ACCESS_TOKEN: ttsToken, TTS_X_ACCESS_SECRET: ttsSecret }
+    const mediaId = await uploadImageForDay(body.day_of_week ?? null, env)
     try {
-      const r = await postTweet(body.content, { X_API_KEY: _apiKey, X_API_SECRET: _apiSecret, X_ACCESS_TOKEN: ttsToken, X_ACCESS_SECRET: ttsSecret })
-      return res.status(200).json({ ok: true, tweet: r })
+      const r = await postTweet(body.content, env, mediaId)
+      return res.status(200).json({ ok: true, tweet: r, media_id: mediaId || null })
     } catch (e) {
       return res.status(500).json({ ok: false, error: e.message })
     }
   }
 
-  // Direct content mode: { platform, content, chatId }
+  // ── Direct Telegram: { platform: 'telegram', content, chatId? } ─────────────
   if (body.platform === 'telegram' && body.content) {
     const broadcastToken = process.env.BROADCAST_BOT_TOKEN
     const chatId = body.chatId || process.env.MAIN_CHANNEL_ID || '-1002207667493'
@@ -195,53 +240,42 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── Template mode: { type, data } ────────────────────────────────────────────
   const { type, data = {} } = body
-  if (!type || !TEMPLATES[type]) return res.status(400).json({ error: 'Unknown type' })
+  if (!type || !TTS_TEMPLATES[type]) return res.status(400).json({ error: 'Unknown type. Valid: round_start, round_settled, profile_approved' })
 
   const results = {}
-
   const apiKey    = process.env.X_API_KEY
   const apiSecret = process.env.X_API_SECRET
-
-  // Post to @CryptoFitJim (personal voice — all types)
-  const jimToken  = process.env.X_ACCESS_TOKEN
-  const jimSecret = process.env.X_ACCESS_SECRET
-  if (apiKey && apiSecret && jimToken && jimSecret) {
-    const jimText = TEMPLATES[type](data)
-    try {
-      results.twitter_jim = await postTweet(jimText, { X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: jimToken, X_ACCESS_SECRET: jimSecret })
-    } catch(e) {
-      results.twitter_jim_error = e.message
-    }
-  } else {
-    results.twitter_jim = 'skipped — @CryptoFitJim X credentials not configured'
-  }
-
-  // Post to @temptationtoken (brand voice — event types only)
   const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
   const ttsSecret = process.env.TTS_X_ACCESS_SECRET
-  if (apiKey && apiSecret && ttsToken && ttsSecret && TTS_TEMPLATES[type]) {
-    const ttsText = TTS_TEMPLATES[type](data)
+  const ttsText   = TTS_TEMPLATES[type](data)
+
+  // Post to @temptationtoken
+  if (apiKey && apiSecret && ttsToken && ttsSecret) {
+    const env = { X_API_KEY: apiKey, X_API_SECRET: apiSecret, TTS_X_ACCESS_TOKEN: ttsToken, TTS_X_ACCESS_SECRET: ttsSecret }
+    const dayOfWeek = new Date().getDay()
+    const mediaId = await uploadImageForDay(dayOfWeek, env)
     try {
-      results.twitter_tts = await postTweet(ttsText, { X_API_KEY: apiKey, X_API_SECRET: apiSecret, X_ACCESS_TOKEN: ttsToken, X_ACCESS_SECRET: ttsSecret })
-    } catch(e) {
+      results.twitter_tts = await postTweet(ttsText, env, mediaId)
+      results.media_id = mediaId || null
+    } catch (e) {
       results.twitter_tts_error = e.message
     }
-  } else if (!ttsToken || !ttsSecret) {
-    results.twitter_tts = 'skipped — TTS_X_ACCESS_TOKEN/SECRET not configured'
+  } else {
+    results.twitter_tts = 'skipped — TTS X credentials not configured'
   }
 
-  // Mirror to Telegram channels
+  // Mirror to Telegram
   const broadcastToken = process.env.BROADCAST_BOT_TOKEN
   const mainChannelId   = process.env.MAIN_CHANNEL_ID   || '-1002207667493'
   const communityChatId = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
   if (broadcastToken) {
-    const telegramText = TEMPLATES[type](data)
-    try { results.main_channel = await sendTelegram(mainChannelId, telegramText, broadcastToken) } catch(e) { results.main_channel_error = e.message }
-    try { results.community    = await sendTelegram(communityChatId, telegramText, broadcastToken) } catch(e) { results.community_error = e.message }
+    try { results.main_channel = await sendTelegram(mainChannelId, ttsText, broadcastToken) }   catch(e) { results.main_channel_error = e.message }
+    try { results.community    = await sendTelegram(communityChatId, ttsText, broadcastToken) } catch(e) { results.community_error = e.message }
   } else {
     results.telegram = 'skipped — BROADCAST_BOT_TOKEN not configured'
   }
 
-  return res.status(200).json({ ok: true, jim_text: TEMPLATES[type](data), tts_text: TTS_TEMPLATES[type]?.(data) || null, results })
+  return res.status(200).json({ ok: true, tts_text: ttsText, results })
 }

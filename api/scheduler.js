@@ -106,41 +106,59 @@ function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret
     .join(', ')
 }
 
-async function postTweetAs(text, accessToken, accessSecret) {
-  const { X_API_KEY, X_API_SECRET } = process.env
+// ── X posting — @temptationtoken only ────────────────────────────────────────
+
+const DAY_IMAGE = {
+  0: 'post1_monday', 1: 'post2_tuesday', 2: 'post3_wednesday',
+  3: 'post4_thursday', 4: 'post5_friday', 5: 'post6_saturday', 6: 'post7_sunday',
+}
+
+async function uploadMediaForDay(dayOfWeek) {
+  const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
+  if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
+  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : new Date().getDay()]
+  if (!filename) return null
+  try {
+    const imgUrl = `https://app.temptationtoken.io/social_images/${filename}.png`
+    const imgResp = await fetch(imgUrl)
+    if (!imgResp.ok) return null
+    const imgBuffer = Buffer.from(await imgResp.arrayBuffer())
+    const mediaUrl = 'https://upload.twitter.com/1.1/media/upload.json'
+    const auth = oauthSign('POST', mediaUrl, {}, X_API_KEY, X_API_SECRET, TTS_X_ACCESS_SECRET, TTS_X_ACCESS_TOKEN)
+    const form = new FormData()
+    form.append('media', new Blob([imgBuffer], { type: 'image/png' }), 'image.png')
+    const r = await fetch(mediaUrl, { method: 'POST', headers: { Authorization: auth }, body: form })
+    const body = await r.json()
+    if (!r.ok) { console.error('Media upload failed:', r.status, JSON.stringify(body)); return null }
+    return body.media_id_string
+  } catch (e) {
+    console.error('Media upload error:', e.message)
+    return null
+  }
+}
+
+async function postTweetTTS(text, dayOfWeek) {
+  const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
   if (!X_API_KEY || !X_API_SECRET) return { skipped: 'X app credentials not set' }
+  if (!TTS_X_ACCESS_TOKEN || !TTS_X_ACCESS_SECRET) return { skipped: 'TTS X credentials not set' }
+  const mediaId = await uploadMediaForDay(dayOfWeek)
   const url = 'https://api.twitter.com/2/tweets'
-  const auth = oauthSign('POST', url, {}, X_API_KEY, X_API_SECRET, accessSecret, accessToken)
+  const auth = oauthSign('POST', url, {}, X_API_KEY, X_API_SECRET, TTS_X_ACCESS_SECRET, TTS_X_ACCESS_TOKEN)
+  const tweetBody = { text }
+  if (mediaId) tweetBody.media = { media_ids: [mediaId] }
   const r = await fetch(url, {
     method: 'POST',
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
+    body: JSON.stringify(tweetBody)
   })
   const body = await r.json()
   if (!r.ok) {
-    console.error(`X API ${r.status}:`, JSON.stringify(body))
+    console.error(`X API ${r.status} (@temptationtoken):`, JSON.stringify(body))
     const err = new Error(`X API ${r.status}: ${JSON.stringify(body)}`)
     err.status = r.status
     throw err
   }
-  if (r.status !== 201) {
-    const err = new Error(`X API unexpected status ${r.status}: ${JSON.stringify(body)}`)
-    err.status = r.status
-    throw err
-  }
   return body
-}
-
-async function postTweet(text) {
-  const { X_ACCESS_TOKEN, X_ACCESS_SECRET } = process.env
-  if (!X_ACCESS_TOKEN || !X_ACCESS_SECRET) return { skipped: 'X_ACCESS credentials not set' }
-  return postTweetAs(text, X_ACCESS_TOKEN, X_ACCESS_SECRET)
-}
-
-async function postTweetTTS(text) {
-  const { TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
-  if (!TTS_X_ACCESS_TOKEN || !TTS_X_ACCESS_SECRET) return { skipped: 'TTS X credentials not set' }
-  return postTweetAs(text, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET)
 }
 
 // ── Fire a single scheduled post ─────────────────────────────────────────────
@@ -164,10 +182,19 @@ async function firePost(post) {
   const results = {}
   let anyError = null
 
-  if (post.platform === 'x' || post.platform === 'x_tts') {
-    const poster = post.platform === 'x_tts' ? postTweetTTS : postTweet
+  // platform 'x' (legacy Jim posts) — skip; Jim posts manually from content calendar
+  if (post.platform === 'x') {
+    await sbPatch('scheduled_posts', `id=eq.${post.id}`, {
+      status: 'posted',
+      posted_at: new Date().toISOString(),
+      error: 'manual — @CryptoFitJim posts manually'
+    })
+    return { platform: 'x', status: 'skipped (manual)', id: post.id }
+  }
+
+  if (post.platform === 'x_tts') {
     try {
-      results.x = await poster(content)
+      results.x = await postTweetTTS(content, post.day_of_week ?? null)
     } catch (e) {
       if (e.status === 429) {
         // Rate limited — reschedule 15 min later, leave status approved
@@ -188,7 +215,7 @@ async function firePost(post) {
         // Server error — retry once after 2 seconds
         await new Promise(r => setTimeout(r, 2000))
         try {
-          results.x = await poster(content)
+          results.x = await postTweetTTS(content, post.day_of_week ?? null)
         } catch (e2) {
           anyError = e2.message
           results.x_error = e2.message
