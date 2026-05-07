@@ -187,7 +187,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── Diagnostic: { _diag: true } ─────────────────────────────────────────────
+  // ── Diagnostic: { _diag: true } (legacy) ────────────────────────────────────
   if (body._diag) {
     const apiKey    = process.env.X_API_KEY
     const apiSecret = process.env.X_API_SECRET
@@ -206,6 +206,91 @@ export default async function handler(req, res) {
     try { results.tts_verify = await verifyCredentials({ X_API_KEY: apiKey, X_API_SECRET: apiSecret, TTS_X_ACCESS_TOKEN: ttsToken, TTS_X_ACCESS_SECRET: ttsSecret }) }
     catch(e) { results.tts_verify_err = e.message }
     return res.status(200).json({ ok: true, diagnostic: results })
+  }
+
+  // ── Deep diagnostic: { _diagnostic: true } ───────────────────────────────────
+  if (body._diagnostic) {
+    const apiKey    = process.env.X_API_KEY
+    const apiSecret = process.env.X_API_SECRET
+    const ttsToken  = process.env.TTS_X_ACCESS_TOKEN
+    const ttsSecret = process.env.TTS_X_ACCESS_SECRET
+
+    const describe = (val) => val
+      ? { present: true,  length: val.length, first_4: val.slice(0, 4), last_4: val.slice(-4) }
+      : { present: false, length: 0,          first_4: null,            last_4: null }
+
+    // Build a real OAuth header against the actual tweet endpoint so the signature is real
+    const tweetUrl = 'https://api.twitter.com/2/tweets'
+    let last_attempt_auth_header = null
+    let oauth_signing_base_string = null
+    let oauth_sig_key_shape = null
+    try {
+      // Reproduce exactly what postTweet() does — sign with empty body params (JSON body excluded per OAuth spec)
+      last_attempt_auth_header = oauthSign(
+        'POST', tweetUrl, {},
+        apiKey   || 'MISSING',
+        apiSecret || 'MISSING',
+        ttsSecret || 'MISSING',
+        ttsToken  || 'MISSING'
+      )
+      // Also capture the signing base string for inspection (re-run oauthSign internals manually)
+      const nonce = 'DIAG_NONCE_STATIC'
+      const ts    = Math.floor(Date.now() / 1000).toString()
+      const oauthP = {
+        oauth_consumer_key:     apiKey   || 'MISSING',
+        oauth_nonce:            nonce,
+        oauth_signature_method: 'HMAC-SHA1',
+        oauth_timestamp:        ts,
+        oauth_token:            ttsToken  || 'MISSING',
+        oauth_version:          '1.0',
+      }
+      const paramStr = Object.keys(oauthP).sort()
+        .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(oauthP[k])}`).join('&')
+      oauth_signing_base_string = `POST&${encodeURIComponent(tweetUrl)}&${encodeURIComponent(paramStr)}`
+      oauth_sig_key_shape = `<API_SECRET>&<ACCESS_TOKEN_SECRET>  (lengths: ${(apiSecret||'').length} & ${(ttsSecret||'').length})`
+    } catch (e) {
+      last_attempt_auth_header = `ERROR building header: ${e.message}`
+    }
+
+    // Also attempt a live call and capture the raw X response
+    let live_attempt = null
+    if (apiKey && apiSecret && ttsToken && ttsSecret) {
+      try {
+        const authHeader = oauthSign(
+          'POST', tweetUrl, {},
+          apiKey, apiSecret, ttsSecret, ttsToken
+        )
+        const xRes = await fetch(tweetUrl, {
+          method: 'POST',
+          headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: '🔇 diagnostic dry-run — this text is never sent if X rejects first' })
+        })
+        const xBody = await xRes.json()
+        live_attempt = { http_status: xRes.status, x_response: xBody }
+      } catch (e) {
+        live_attempt = { error: e.message }
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      env_vars_seen: {
+        X_API_KEY:            describe(apiKey),
+        X_API_SECRET:         describe(apiSecret),
+        TTS_X_ACCESS_TOKEN:   describe(ttsToken),
+        TTS_X_ACCESS_SECRET:  describe(ttsSecret),
+      },
+      var_names_in_code: ['X_API_KEY', 'X_API_SECRET', 'TTS_X_ACCESS_TOKEN', 'TTS_X_ACCESS_SECRET'],
+      oauth_endpoint:         tweetUrl,
+      oauth_library:          'custom HMAC-SHA1 (node:crypto — no third-party oauth library)',
+      signature_method:       'HMAC-SHA1',
+      last_attempt_auth_header,
+      oauth_signing_base_string,
+      oauth_sig_key_shape,
+      live_attempt,
+      deployment_id: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_GIT_COMMIT_SHA || 'not-set',
+      node_version:  process.version,
+    })
   }
 
   // ── Direct @temptationtoken X post: { platform: 'x_tts', content, day_of_week? } ──
