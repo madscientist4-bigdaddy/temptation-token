@@ -51,7 +51,13 @@ async function postTweet(text, env) {
     body: JSON.stringify({ text })
   })
   const body = await r.json()
-  if (!r.ok) body._http_status = r.status
+  if (!r.ok) {
+    console.error(`X API ${r.status} for ${env.X_ACCESS_TOKEN?.slice(0,8)}...:`, JSON.stringify(body))
+    const err = new Error(`X API ${r.status}: ${JSON.stringify(body)}`)
+    err.status = r.status
+    err.xBody = body
+    throw err
+  }
   return body
 }
 
@@ -104,6 +110,34 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const body = req.body || {}
+
+  // Test X post: { _test_x_post: true, account: 'cryptofitjim' | 'temptationtoken' }
+  // Makes a real test tweet and returns tweet URL or full error for debugging X credentials.
+  if (body._test_x_post) {
+    const account  = body.account || 'cryptofitjim'
+    const apiKey   = process.env.X_API_KEY
+    const apiSec   = process.env.X_API_SECRET
+    const isTTS    = account === 'temptationtoken'
+    const tok      = isTTS ? process.env.TTS_X_ACCESS_TOKEN  : process.env.X_ACCESS_TOKEN
+    const tokSec   = isTTS ? process.env.TTS_X_ACCESS_SECRET : process.env.X_ACCESS_SECRET
+    const handle   = isTTS ? '@temptationtoken' : '@CryptoFitJim'
+    if (!apiKey || !apiSec || !tok || !tokSec) {
+      return res.status(200).json({ ok: false, error: `Missing credentials for ${handle}` })
+    }
+    const testText = `🧪 Test post from ${handle} — ${new Date().toUTCString()} — app.temptationtoken.io $TTS`
+    try {
+      const tweet = await postTweet(testText, { X_API_KEY: apiKey, X_API_SECRET: apiSec, X_ACCESS_TOKEN: tok, X_ACCESS_SECRET: tokSec })
+      const tweetId  = tweet?.data?.id
+      const twitterHandle = isTTS ? 'TemptationToken' : 'CryptoFitJim'
+      return res.status(200).json({
+        ok: true, account: handle, tweetId,
+        tweetUrl: tweetId ? `https://twitter.com/${twitterHandle}/status/${tweetId}` : null,
+        text: testText,
+      })
+    } catch (e) {
+      return res.status(200).json({ ok: false, account: handle, error: e.message, status: e.status, xBody: e.xBody })
+    }
+  }
 
   // Diagnostic mode: { _diag: true } — verifies credentials without posting
   if (body._diag) {

@@ -116,7 +116,19 @@ async function postTweetAs(text, accessToken, accessSecret) {
     headers: { Authorization: auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({ text })
   })
-  return r.json()
+  const body = await r.json()
+  if (!r.ok) {
+    console.error(`X API ${r.status}:`, JSON.stringify(body))
+    const err = new Error(`X API ${r.status}: ${JSON.stringify(body)}`)
+    err.status = r.status
+    throw err
+  }
+  if (r.status !== 201) {
+    const err = new Error(`X API unexpected status ${r.status}: ${JSON.stringify(body)}`)
+    err.status = r.status
+    throw err
+  }
+  return body
 }
 
 async function postTweet(text) {
@@ -152,14 +164,40 @@ async function firePost(post) {
   const results = {}
   let anyError = null
 
-  if (post.platform === 'x') {
-    try { results.x = await postTweet(content) }
-    catch (e) { results.x_error = e.message; anyError = e.message }
-  }
-
-  if (post.platform === 'x_tts') {
-    try { results.x = await postTweetTTS(content) }
-    catch (e) { results.x_error = e.message; anyError = e.message }
+  if (post.platform === 'x' || post.platform === 'x_tts') {
+    const poster = post.platform === 'x_tts' ? postTweetTTS : postTweet
+    try {
+      results.x = await poster(content)
+    } catch (e) {
+      if (e.status === 429) {
+        // Rate limited — reschedule 15 min later, leave status approved
+        const reschedule = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+        await sbPatch('scheduled_posts', `id=eq.${post.id}`, {
+          scheduled_at: reschedule,
+          error: `Rate limited @ ${new Date().toISOString()} — retrying at ${reschedule}`
+        })
+        return { platform: post.platform, id: post.id, rescheduled: reschedule }
+      } else if (e.status === 401) {
+        // Auth failure — mark failed, alert admin
+        anyError = e.message
+        results.x_error = e.message
+        const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+        const alertToken = process.env.BROADCAST_BOT_TOKEN
+        try { await sendTelegram(adminChatId, `🚨 X Auth 401 — post ${post.id} not sent. Fix X credentials in Vercel env.`, alertToken) } catch {}
+      } else if (e.status >= 500) {
+        // Server error — retry once after 2 seconds
+        await new Promise(r => setTimeout(r, 2000))
+        try {
+          results.x = await poster(content)
+        } catch (e2) {
+          anyError = e2.message
+          results.x_error = e2.message
+        }
+      } else {
+        anyError = e.message
+        results.x_error = e.message
+      }
+    }
   }
 
   if (post.platform === 'telegram') {

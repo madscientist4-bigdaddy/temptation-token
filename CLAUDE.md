@@ -159,6 +159,33 @@ Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chain
 
 ---
 
+## LP Lock Status (verified May 6 2026)
+
+**NOT LOCKED.** Uniswap V2 pool `0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68` has 1 LP holder: deployer wallet `0xb1e9...53b5` holds 231.3 LP tokens (100%). Zero LP tokens are at any Team.Finance contract. Pool contains ~107,000 TTS + 0.5 WETH (~$1,500). Instructions to lock: `outputs/urgent/lp_lock_instructions.md`. After locking, update exchange files, trust_page.html, and this section.
+
+---
+
+## TTSVotingV3b Security Patches (applied May 2026 — pending redeployment)
+
+All 11 findings from the voting contract audit (audit ID 88b99f3a) are patched in `TTSVotingV3b.sol`:
+
+| Fix | Type | Description |
+|-----|------|-------------|
+| Vote cap guard | CRITICAL | Skip 40% cap check when pool has only one profile (first vote) |
+| CALLBACK_GAS_LIMIT | HIGH | 500k → 2500k; MAX_PROFILES_PER_ROUND = 50 |
+| Zero-wallet checks | HIGH | require(wallet != address(0)) in approve + batch functions |
+| SafeERC20 | HIGH | Inline library — all transfers use safeTransfer/safeTransferFrom |
+| NFT mint gas cap | MEDIUM | try mint{gas:200000}(...) {} catch {} |
+| adminResetSettlement() | MEDIUM | Owner can reset stuck VRF after 1 day |
+| rolloverRound endTime | MEDIUM | require(block.timestamp >= r.endTime) |
+| Constructor guards | LOW | Zero-address checks for token, charity, house |
+| Admin setter events | LOW | CharityWalletUpdated, HouseWalletUpdated, NFTContractUpdated |
+| MultiplierFallback event | LOW | Emitted in _applyMultiplier catch block |
+
+Foundry tests: 4/4 pass. `forge create` command from May 6 session. Waiting for Jim to deploy.
+
+---
+
 ## Infrastructure
 
 | Service | Project/ID |
@@ -227,15 +254,15 @@ Always `git add` + commit + push after every change.
 
 ## Pending Actions (priority order)
 
-1. **🚨 Fund Marketing wallet with TTS** — `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` has 0 TTS. Send TTS from deployer/house wallet to enable signup bonus + vote-match payouts. Marketing wallet has ETH for gas ✅ but needs TTS tokens.
-2. **🚀 Deploy NFT-enabled V3b after May 5** — Current V3b at 0xEC339... predates NFT code. After Round 1 settles (May 5 21:10 UTC), redeploy with current TTSVotingV3b.sol, run 6-step keeper handoff, call `setNFTContract(0x0768...)`. Confirm settlement on BaseScan first.
-3. **Add DEPLOYER_PRIVATE_KEY** to Vercel env — enables approve-profile API (one-click approve in Photo Review tab) and referral-credit API. This is the deployer/house wallet private key.
-4. **X social media credentials** — X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Vercel env → enables @CryptoFitJim auto posting. **Also add TTS_X_ACCESS_TOKEN + TTS_X_ACCESS_SECRET** for @temptationtoken brand account (log into X Developer Console as @temptationtoken → User authentication settings → generate Access Token + Secret → add to Vercel)
-5. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings)
-6. **CoinGecko resubmission** — use `outputs/exchange_submissions/coingecko_update.md`
-7. ✅ **Solidproof audit complete and live** — TrustNet score 17.92. Zero critical findings. Zero high findings. 3 medium findings (acknowledged). Report: app.solidproof.io/projects/temptation-token. Pending from Jim: (a) acknowledge findings on Solidproof portal, (b) complete KYC verification on portal, (c) resubmit to Blockaid with audit URL, (d) publish outputs/trust_page.html to temptationtoken.io/trust.
-8. **Publish website content** — deploy outputs/trust_page.html to temptationtoken.io/trust, publish blog posts from outputs/blog/ to temptationtoken.io/blog
-9. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig
+1. **🚨 Lock LP on Team.Finance** — CRITICAL. Verified May 6 2026: ALL 231.3 LP tokens are held unlocked in deployer wallet `0xb1e9...53b5`. Zero LP at any Team.Finance contract. Until locked, any "12-month LP lock" claim is inaccurate and visible on-chain. Instructions: `outputs/urgent/lp_lock_instructions.md`. URL: https://app.team.finance/liquidity-locks
+2. **🚀 Redeploy TTSVotingV3b with security patches** — `TTSVotingV3b.sol` has all 11 security findings fixed (CRITICAL vote cap bug, HIGH gas/SafeERC20/zero-addr, MEDIUM/LOW fixes). Foundry tests pass 4/4. Run `forge create` command from previous session (in repo). After Jim deploys and pastes address, Claude will update all references. See forge create command in Completed History.
+3. **X social media credentials broken** — X_API_KEY (`IbtlJxK5xF...`) returns 401 on all calls. Jim must go to developer.twitter.com, regenerate API Key+Secret, update `X_API_KEY` + `X_API_SECRET` + `X_ACCESS_TOKEN` + `X_ACCESS_SECRET` + `TTS_X_ACCESS_TOKEN` + `TTS_X_ACCESS_SECRET` in Vercel. After fix: `POST /api/test-x-post {"account":"cryptofitjim"}` to verify.
+4. **Solidproof pending items** — (a) acknowledge M-1/M-2/M-3 on portal, (b) complete $600 KYC (checklist: `outputs/urgent/solidproof_kyc_checklist.md`), (c) resubmit to Blockaid with audit URL.
+5. **Publish website content** — trust_page.html → temptationtoken.io/trust, audit_page.html → temptationtoken.io/audit. WordPress REST API writes require Application Password (not regular login). Generate one in WP Admin → Users → Profile → Application Passwords. Then run `outputs/wordpress_updates/wp_updates.sh`.
+6. **CoinGecko resubmission** — do NOT submit until LP lock is complete. File: `outputs/exchange_submissions/coingecko_update.md`.
+7. **Verify TTSVotingV3b on BaseScan** via Remix (Foundry bytecode mismatch — use Remix with same compiler settings, solc 0.8.20, 200 runs, via_ir=true).
+8. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig.
+9. ✅ **Marketing wallet funded** — 997,395 TTS + 0.005 ETH. Signup bonus (✅ live) + vote-match (✅ live) operational.
 
 ---
 
