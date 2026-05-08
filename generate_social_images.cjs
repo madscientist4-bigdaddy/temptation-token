@@ -177,7 +177,8 @@ const svgs = {
   <!-- Row 1 -->
   <rect x="120" y="460" width="840" height="70" rx="10" fill="#1a1a1a" stroke="#c9a84c" stroke-width="1"/>
   <text x="160" y="503" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#c9a84c">#1</text>
-  <text x="220" y="503" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#f5f5f5">◆ Leading Profile</text>
+  <polygon points="220,491 232,503 220,515 208,503" fill="#c9a84c"/>
+  <text x="243" y="503" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#f5f5f5">Leading Profile</text>
   <text x="900" y="503" font-family="Georgia, serif" font-size="24" font-weight="700" fill="#c9a84c" text-anchor="end">LEADING</text>
   <!-- Row 2 -->
   <rect x="120" y="545" width="840" height="70" rx="10" fill="#141414" stroke="#2a2a2a" stroke-width="1"/>
@@ -221,7 +222,8 @@ const svgs = {
   <text x="540" y="637" font-family="Arial, sans-serif" font-size="22" fill="#aaa" text-anchor="middle">Competing in Round 1  ·  Cast your vote</text>
   <!-- Vote indicator -->
   <rect x="320" y="665" width="440" height="50" rx="25" fill="#0d0d0d" stroke="#c9a84c" stroke-width="1"/>
-  <text x="540" y="697" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#c9a84c" text-anchor="middle">◆ VOTE ON THIS PROFILE</text>
+  <polygon points="365,682 377,690 365,698 353,690" fill="#c9a84c"/>
+  <text x="392" y="697" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#c9a84c">VOTE ON THIS PROFILE</text>
   <text x="540" y="800" font-family="Arial, sans-serif" font-size="28" fill="#aaa" text-anchor="middle">Top voter wins 35% of the prize pool</text>
   ${CTA_GOLD('VOTE NOW  →')}
   ${FOOTER}
@@ -234,7 +236,8 @@ const svgs = {
   ${HEADER}
   <!-- Urgent badge -->
   <rect x="380" y="150" width="320" height="56" rx="12" fill="#e8405a"/>
-  <text x="540" y="186" font-family="Arial, sans-serif" font-size="24" font-weight="800" fill="#fff" text-anchor="middle">▶ 48 HOURS LEFT</text>
+  <polygon points="458,164 474,178 458,192" fill="#fff"/>
+  <text x="484" y="186" font-family="Arial, sans-serif" font-size="24" font-weight="800" fill="#fff">48 HOURS LEFT</text>
   ${ALERT_SHAPE}
   <text x="540" y="450" font-family="Georgia, serif" font-size="80" font-weight="700" fill="#f5f5f5" text-anchor="middle">FINAL</text>
   <text x="540" y="548" font-family="Georgia, serif" font-size="80" font-weight="700" fill="#e8405a" text-anchor="middle">WEEKEND PUSH</text>
@@ -242,7 +245,8 @@ const svgs = {
   <text x="540" y="706" font-family="Arial, sans-serif" font-size="28" fill="#888" text-anchor="middle">Don't let someone else take the prize</text>
   <!-- Prize reminder -->
   <rect x="160" y="755" width="760" height="80" rx="12" fill="#1a1a1a" stroke="#e8405a" stroke-width="1"/>
-  <text x="540" y="802" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#f5f5f5" text-anchor="middle">★ Top voter wins 35% of the entire prize pool</text>
+  ${STAR_SVG(197, 795, 13, '#c9a84c')}
+  <text x="218" y="804" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#f5f5f5">Top voter wins 35% of the entire prize pool</text>
   ${CTA_RED('VOTE BEFORE IT CLOSES  →')}
   ${FOOTER}
 </svg>`,
@@ -296,7 +300,8 @@ const svgs = {
   <text x="540" y="726" font-family="Arial, sans-serif" font-size="30" fill="#888" text-anchor="middle">Settlement + winner payout in minutes after</text>
   <!-- Countdown box -->
   <rect x="160" y="762" width="760" height="75" rx="12" fill="#1a0000" stroke="#e8405a" stroke-width="2"/>
-  <text x="540" y="810" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#e8405a" text-anchor="middle">▶ ROUND CLOSES TONIGHT — GET YOUR VOTES IN</text>
+  <polygon points="190,793 208,809 190,825" fill="#e8405a"/>
+  <text x="218" y="812" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#e8405a">ROUND CLOSES TONIGHT — GET YOUR VOTES IN</text>
   ${CTA_RED('VOTE NOW — FINAL HOURS  →')}
   ${FOOTER}
 </svg>`,
@@ -306,7 +311,7 @@ const svgs = {
 
 for (const [name, svgStr] of Object.entries(svgs)) {
   const resvg = new Resvg(svgStr, {
-    fitTo: { mode: 'width', value: 1080 },
+    fitTo: { mode: 'width', value: 1200 },
     background: '#0d0d0d',
     font: { loadSystemFonts: true },
   })
