@@ -66,7 +66,10 @@ async function uploadImageForDay(dayOfWeek, env) {
   const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = env
   if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
 
-  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : nyDayOfWeek()]
+  // DAY_IMAGE is 0=Mon-indexed (matches content-generator). nyDayOfWeek() is 0=Sun JS convention.
+  // Convert with (dow+6)%7: Sun(0)→6, Mon(1)→0, Thu(4)→3, Sat(6)→5.
+  const imgKey = dayOfWeek != null ? dayOfWeek : (nyDayOfWeek() + 6) % 7
+  const filename = DAY_IMAGE[imgKey]
   if (!filename) return null
 
   // Fetch PNG from Vercel CDN (public/social_images/)
@@ -188,6 +191,27 @@ export default async function handler(req, res) {
 
   const body = req.body || {}
 
+  // ── Delete tweet: { _delete_tweet: "TWEET_ID" } ─────────────────────────────
+  if (body._delete_tweet) {
+    const tweetId = String(body._delete_tweet)
+    const apiKey  = process.env.X_API_KEY
+    const apiSec  = process.env.X_API_SECRET
+    const tok     = process.env.TTS_X_ACCESS_TOKEN
+    const tokSec  = process.env.TTS_X_ACCESS_SECRET
+    if (!apiKey || !apiSec || !tok || !tokSec) {
+      return res.status(200).json({ ok: false, error: 'Missing TTS X credentials' })
+    }
+    const url = `https://api.twitter.com/2/tweets/${tweetId}`
+    const auth = oauthSign('DELETE', url, {}, apiKey, apiSec, tokSec, tok)
+    try {
+      const r = await fetch(url, { method: 'DELETE', headers: { Authorization: auth } })
+      const b = await r.json()
+      return res.status(200).json({ ok: r.ok, http_status: r.status, tweet_id: tweetId, x_response: b })
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: e.message })
+    }
+  }
+
   // ── Full-pipeline image test: { _test_x_post_with_image: true } ─────────────
   // Validates: PNG fetch → v1.1 media upload → v2 tweet with media_ids
   if (body._test_x_post_with_image) {
@@ -202,12 +226,17 @@ export default async function handler(req, res) {
     const report = {}
 
     // Step 1 — determine NY day-of-week and image
-    const dow = nyDayOfWeek()
-    const filename = DAY_IMAGE[dow]
+    // nyDayOfWeek() → JS convention: 0=Sun, 1=Mon, 4=Thu, 6=Sat
+    // DAY_IMAGE is Mon-indexed (0=Mon): convert with (dow+6)%7 before lookup
+    const dow    = nyDayOfWeek()                // JS value shown in diagnostic (4 = Thursday)
+    const imgKey = (dow + 6) % 7               // Mon-indexed key: Thu(4)→3 → post4_thursday
+    const filename = DAY_IMAGE[imgKey]
     const imageUrl = `https://app.temptationtoken.io/social_images/${filename}.png`
-    report.day_of_week_ny   = dow
-    report.image_filename   = filename
+    report.day_of_week_ny   = dow              // 4 for Thursday (JS: 0=Sun…6=Sat)
+    report.image_key_used   = imgKey           // 3 for Thursday (DAY_IMAGE: 0=Mon…6=Sun)
+    report.image_filename   = filename         // post4_thursday
     report.image_fetch_url  = imageUrl
+    report.timezone_used    = 'America/New_York'
 
     // Step 2 — fetch PNG from Vercel CDN
     let imgBuffer
@@ -440,7 +469,7 @@ export default async function handler(req, res) {
   // Post to @temptationtoken
   if (apiKey && apiSecret && ttsToken && ttsSecret) {
     const env = { X_API_KEY: apiKey, X_API_SECRET: apiSecret, TTS_X_ACCESS_TOKEN: ttsToken, TTS_X_ACCESS_SECRET: ttsSecret }
-    const dayOfWeek = nyDayOfWeek()
+    const dayOfWeek = (nyDayOfWeek() + 6) % 7   // convert JS(0=Sun) → Mon-indexed for DAY_IMAGE
     const mediaId = await uploadImageForDay(dayOfWeek, env)
     try {
       results.twitter_tts = await postTweet(ttsText, env, mediaId)

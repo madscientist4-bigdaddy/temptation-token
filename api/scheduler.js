@@ -124,7 +124,9 @@ const DAY_IMAGE = {
 async function uploadMediaForDay(dayOfWeek) {
   const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
   if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
-  const filename = DAY_IMAGE[dayOfWeek != null ? dayOfWeek : nyDayOfWeek()]
+  // DAY_IMAGE is Mon-indexed (0=Mon). nyDayOfWeek() returns JS 0=Sun; convert with (dow+6)%7.
+  const imgKey = dayOfWeek != null ? dayOfWeek : (nyDayOfWeek() + 6) % 7
+  const filename = DAY_IMAGE[imgKey]
   if (!filename) return null
   try {
     const imgUrl = `https://app.temptationtoken.io/social_images/${filename}.png`
