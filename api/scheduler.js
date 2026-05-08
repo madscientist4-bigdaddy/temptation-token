@@ -184,19 +184,69 @@ async function postTweetTTS(text, dayOfWeek) {
   return body
 }
 
+// ── Instagram: send handoff DM to admin ──────────────────────────────────────
+// Sends 3 Telegram messages to ADMIN_CHAT_ID: photo, caption block, hashtags+button.
+// Sets posted_at=now() (used as "notification sent" flag — prevents re-firing).
+// Status stays 'approved' until admin confirms via button or "done" reply.
+
+async function sendInstagramHandoff(post, broadcastToken) {
+  const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+  if (!broadcastToken || !adminChatId) return
+
+  const filename = post.image_hint || 'post1_monday'
+  const imgUrl   = `https://app.temptationtoken.io/social_images/${filename}.png`
+  const caption  = post.content || ''
+  const DAYS     = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+  const dayName  = DAYS[post.day_of_week] || 'Today'
+  let   hashtags = ''
+  try { hashtags = JSON.parse(post.instagram_captions || '[]')[0] || '' } catch {}
+
+  const tg = (method, body) => fetch(`https://api.telegram.org/bot${broadcastToken}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).catch(() => {})
+
+  // 1 — Photo with short header
+  await tg('sendPhoto', {
+    chat_id: adminChatId,
+    photo:   imgUrl,
+    caption: `📸 Instagram · ${dayName} · ${filename}.png`,
+  })
+
+  // 2 — Caption in code block (copy-paste friendly)
+  await tg('sendMessage', {
+    chat_id: adminChatId,
+    text: `📝 <b>Caption — copy this:</b>\n\n<code>${caption.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code>`,
+    parse_mode: 'HTML',
+  })
+
+  // 3 — Hashtags + confirm button + post ID
+  const confirmUrl = `https://app.temptationtoken.io/api/scheduler?action=ig_confirm&id=${post.id}`
+  await tg('sendMessage', {
+    chat_id: adminChatId,
+    text: `#️⃣ <b>Hashtags — copy this:</b>\n\n<code>${hashtags}</code>\n\n<i>Post image + caption + hashtags to @temptationtoken Instagram.\nTap the button when posted, or reply <b>done</b> to this message.</i>\n\n<code>Post ID: ${post.id}</code>`,
+    parse_mode: 'HTML',
+    reply_markup: JSON.stringify({
+      inline_keyboard: [[{ text: '✅ Mark as Posted', url: confirmUrl }]]
+    }),
+  })
+}
+
 // ── Fire a single scheduled post ─────────────────────────────────────────────
 
 async function firePost(post) {
   const broadcastToken = process.env.BROADCAST_BOT_TOKEN
 
-  // For Instagram: just mark as ready (no auto-post)
+  // Instagram: send Telegram handoff. posted_at = notification timestamp (prevents re-fire).
+  // Status intentionally stays 'approved' until admin confirms — ig_confirm or "done" reply.
   if (post.platform === 'instagram') {
+    await sendInstagramHandoff(post, broadcastToken)
     await sbPatch('scheduled_posts', `id=eq.${post.id}`, {
-      status: 'posted',
-      posted_at: new Date().toISOString(),
-      error: null
+      posted_at: new Date().toISOString(),  // "notified at" — NOT "posted at"
+      error: `ig_notified:${new Date().toISOString()}`
     })
-    return { platform: 'instagram', status: 'ready (manual post)' }
+    return { platform: 'instagram', id: post.id, status: 'handoff_sent' }
   }
 
   // Resolve content — instagram uses selected_caption, others use content directly
@@ -288,6 +338,49 @@ async function firePost(post) {
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
+  // ── GET /api/scheduler?action=ig_confirm&id=UUID ──────────────────────────
+  // Called by the inline Telegram button. Marks IG post as posted, returns HTML.
+  if (req.method === 'GET' && req.query?.action === 'ig_confirm') {
+    const id = req.query.id
+    const HTML_OK = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f0f4f8}
+.box{text-align:center;padding:32px 24px;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.1);max-width:320px}
+.icon{font-size:52px;margin-bottom:12px}.title{font-size:20px;font-weight:700;margin:0 0 8px}.sub{color:#666;font-size:14px}</style></head>
+<body><div class="box"><div class="icon">✅</div><p class="title">Instagram post confirmed!</p><p class="sub">Marked as posted in the scheduler. You can close this.</p></div></body></html>`
+
+    const HTML_ERR = (msg) => `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fff8f0}.box{text-align:center;padding:24px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1)}</style></head><body><div class="box"><p style="font-size:36px">⚠️</p><p>${msg}</p></div></body></html>`
+
+    if (!id) {
+      res.setHeader('Content-Type', 'text/html')
+      return res.status(400).end(HTML_ERR('Missing post ID.'))
+    }
+
+    const posts = await sbGet('scheduled_posts', `id=eq.${id}&select=*`)
+    if (!Array.isArray(posts) || posts.length === 0) {
+      res.setHeader('Content-Type', 'text/html')
+      return res.status(404).end(HTML_ERR('Post not found.'))
+    }
+
+    const post = posts[0]
+    if (post.status === 'posted') {
+      res.setHeader('Content-Type', 'text/html')
+      return res.status(200).end(HTML_OK)  // idempotent — already confirmed
+    }
+
+    await sbPatch('scheduled_posts', `id=eq.${id}`, {
+      status: 'posted', posted_at: new Date().toISOString(), error: null
+    })
+
+    // Telegram confirmation ping
+    const broadcastToken = process.env.BROADCAST_BOT_TOKEN
+    const adminChatId    = process.env.ADMIN_CHAT_ID || '-5273368658'
+    if (broadcastToken) {
+      await sendTelegram(adminChatId, `✅ Instagram post confirmed as posted (ID: ${id.slice(0, 8)}…)`, broadcastToken)
+    }
+
+    res.setHeader('Content-Type', 'text/html')
+    return res.status(200).end(HTML_OK)
+  }
+
   // Manual fire: POST /api/scheduler?action=fire&id=UUID
   if (req.method === 'POST' && req.query?.action === 'fire') {
     const id = req.query.id || req.body?.id
@@ -307,6 +400,8 @@ export default async function handler(req, res) {
   const results  = { fired: [], roundStatus: null }
 
   // ── JOB 1: Fire approved posts that are due ──────────────────────────────
+  // Instagram posts stay status='approved' after handoff (posted_at set as notification marker).
+  // Skip them here if already notified (posted_at !== null) to prevent re-sending.
 
   try {
     const duePosts = await sbGet(
@@ -316,6 +411,8 @@ export default async function handler(req, res) {
 
     if (Array.isArray(duePosts) && duePosts.length > 0) {
       for (const post of duePosts) {
+        // Skip Instagram posts that have already been notified (posted_at set)
+        if (post.platform === 'instagram' && post.posted_at) continue
         try {
           const r = await firePost(post)
           results.fired.push(r)
@@ -329,6 +426,54 @@ export default async function handler(req, res) {
     }
   } catch (e) {
     results.fired_error = e.message
+  }
+
+  // ── JOB 1b: Instagram reminder (hour 15 UTC = 11am EDT) ──────────────────
+  // Fires for any IG post notified today but not yet confirmed.
+
+  if (nowHour === 15) {
+    const broadcastToken = process.env.BROADCAST_BOT_TOKEN
+    const adminChatId    = process.env.ADMIN_CHAT_ID || '-5273368658'
+    try {
+      const igApproved = await sbGet('scheduled_posts', 'platform=eq.instagram&status=eq.approved&select=*')
+      if (Array.isArray(igApproved)) {
+        const unconfirmed = igApproved.filter(p => p.error?.startsWith?.('ig_notified:') && p.posted_at)
+        if (unconfirmed.length > 0 && broadcastToken) {
+          for (const p of unconfirmed) {
+            const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+            const confirmUrl = `https://app.temptationtoken.io/api/scheduler?action=ig_confirm&id=${p.id}`
+            await sendTelegram(
+              adminChatId,
+              `⏰ <b>Instagram reminder — ${DAYS[p.day_of_week] || 'today'}</b>\n\nThis post was sent at 8am EDT and hasn't been confirmed yet.\n\nTap to confirm once posted: <a href="${confirmUrl}">Mark as Posted</a>\n\nor reply <b>done</b> to the original handoff message.\n\n<code>Post ID: ${p.id}</code>`,
+              broadcastToken
+            )
+          }
+          results.ig_reminders = unconfirmed.length
+        }
+      }
+    } catch (e) { results.ig_reminder_error = e.message }
+  }
+
+  // ── JOB 1c: Instagram skip (hour 17 UTC = 1pm EDT) ───────────────────────
+  // Marks unconfirmed IG posts as skipped 5 hours after handoff.
+
+  if (nowHour === 17) {
+    const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+    const skipToken   = process.env.BROADCAST_BOT_TOKEN
+    try {
+      const igApproved = await sbGet('scheduled_posts', 'platform=eq.instagram&status=eq.approved&select=*')
+      if (Array.isArray(igApproved)) {
+        const toSkip = igApproved.filter(p => p.error?.startsWith?.('ig_notified:') && p.posted_at)
+        for (const p of toSkip) {
+          await sbPatch('scheduled_posts', `id=eq.${p.id}`, { status: 'skipped', error: `skipped:not_confirmed_by_1pm_edt` })
+          if (skipToken) {
+            const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+            await sendTelegram(adminChatId, `⏭ Instagram post skipped — ${DAYS[p.day_of_week] || 'today'} (no confirmation by 1pm EDT). ID: ${p.id.slice(0, 8)}…`, skipToken)
+          }
+        }
+        results.ig_skipped = toSkip.length
+      }
+    } catch (e) { results.ig_skip_error = e.message }
   }
 
   // ── JOB 2: Daily 2pm EST (19:00 UTC) round status update to Telegram ────────

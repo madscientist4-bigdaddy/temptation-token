@@ -1,15 +1,36 @@
-import os, json, urllib.request, urllib.parse, hashlib, time, sqlite3, threading
+import os, re, json, urllib.request, urllib.parse, hashlib, time, sqlite3, threading
 from datetime import datetime, timezone
 
-TOKEN     = os.environ.get("BOT_TOKEN", "")
-BOT2_TOKEN = os.environ.get("BOT2_TOKEN", "")
-BASE      = f"https://api.telegram.org/bot{TOKEN}"
-BASE2     = f"https://api.telegram.org/bot{BOT2_TOKEN}"
-APP       = "https://app.temptationtoken.io"
-CHANNEL   = "@temptationtoken"
-COMMUNITY = "@TTSCommunityChat"
-VIP_LINK  = "https://t.me/+F2lyVRf92n4xMDRh"
-ADMIN_IDS = set()
+TOKEN        = os.environ.get("BOT_TOKEN", "")
+BOT2_TOKEN   = os.environ.get("BOT2_TOKEN", "")
+BASE         = f"https://api.telegram.org/bot{TOKEN}"
+BASE2        = f"https://api.telegram.org/bot{BOT2_TOKEN}"
+APP          = "https://app.temptationtoken.io"
+CHANNEL      = "@temptationtoken"
+COMMUNITY    = "@TTSCommunityChat"
+VIP_LINK     = "https://t.me/+F2lyVRf92n4xMDRh"
+ADMIN_IDS    = set()
+ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "-5273368658"))
+
+# Supabase (for Instagram "done" confirmation)
+_SB_URL = os.environ.get("SUPABASE_URL", "https://gmlikdxykgviyprqtqwz.supabase.co")
+_SB_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_KEY", "")
+
+def _sb_patch(table, filter_query, body):
+    if not _SB_KEY: return None
+    url  = f"{_SB_URL}/rest/v1/{table}?{filter_query}"
+    data = json.dumps(body).encode()
+    req  = urllib.request.Request(url, data, {
+        "Content-Type": "application/json",
+        "apikey": _SB_KEY,
+        "Authorization": f"Bearer {_SB_KEY}",
+        "Prefer": "return=minimal",
+    })
+    req.get_method = lambda: "PATCH"
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r: return r.status
+    except Exception as e:
+        print(f"Supabase PATCH error: {e}"); return None
 
 VIP_TIERS = {
     "bronze":  {"stars": 350,  "label": "Bronze",  "tts": 500,   "desc": "Early previews · 1.5x votes"},
@@ -275,6 +296,24 @@ def run():
                             on_payment(cid, uid, m["successful_payment"]["invoice_payload"]); continue
                         if txt.startswith("/start"):
                             on_start(cid, uid, name, uname, txt[7:].strip())
+                        elif cid == ADMIN_CHAT_ID and txt.lower().strip() == "done" and m.get("reply_to_message"):
+                            # Admin replied "done" to an IG handoff message — mark post as posted
+                            reply_text = (m["reply_to_message"].get("text") or
+                                          m["reply_to_message"].get("caption") or "")
+                            match = re.search(r"Post ID: `?([0-9a-f-]{36})`?", reply_text)
+                            if match:
+                                post_id = match.group(1)
+                                result  = _sb_patch("scheduled_posts", f"id=eq.{post_id}", {
+                                    "status":    "posted",
+                                    "posted_at": datetime.now(timezone.utc).isoformat(),
+                                    "error":     None,
+                                })
+                                if result in (200, 204):
+                                    send(cid, f"✅ Instagram post `{post_id[:8]}...` marked as posted.")
+                                else:
+                                    send(cid, f"⚠️ Supabase returned HTTP {result} — check manually.")
+                            else:
+                                send(cid, "⚠️ Couldn't find Post ID in the replied-to message. Reply to the handoff notification that contains `Post ID: ...`")
                         elif uid in ADMIN_IDS and txt.startswith("/adminstats"):
                             s = get_stats()
                             send(cid, '📊 *Admin Stats*\n\nUsers: ' + str(s['total']) + '\nVIP: ' + str(s['vip']) + '\nReferrals: ' + str(s['refs']) + '\nNew today: ' + str(s['new_today']))
