@@ -16,7 +16,11 @@ const sb = {
     method: 'POST',
     headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
     body: JSON.stringify(body)
-  })
+  }),
+  delete: (table, query) => fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+  }),
 };
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -2363,7 +2367,7 @@ function ContentCalendarScreen({ showToast }) {
 
   const fetchPosts = () => {
     setLoading(true)
-    sb.get('scheduled_posts', `week_start=eq.${weekStart}&order=scheduled_at.asc&select=*`)
+    sb.get('scheduled_posts', `week_start=eq.${weekStart}&status=neq.rejected&order=scheduled_at.asc&select=*`)
       .then(d => { if (Array.isArray(d)) setPosts(d) })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -2400,6 +2404,19 @@ function ContentCalendarScreen({ showToast }) {
   const unapprove = async (post) => {
     await sb.patch('scheduled_posts', `id=eq.${post.id}`, { status: 'pending' })
     setPosts(p => p.map(x => x.id === post.id ? { ...x, status: 'pending' } : x))
+  }
+
+  const reject = async (post) => {
+    await sb.patch('scheduled_posts', `id=eq.${post.id}`, { status: 'rejected' })
+    setPosts(p => p.filter(x => x.id !== post.id))
+    showToast('Post removed from queue', 'i')
+  }
+
+  const saveEdit = async (post, newContent) => {
+    const trimmed = newContent.slice(0, 280)
+    await sb.patch('scheduled_posts', `id=eq.${post.id}`, { content: trimmed })
+    setPosts(p => p.map(x => x.id === post.id ? { ...x, content: trimmed } : x))
+    showToast('Post updated', 's')
   }
 
   const selectCaption = async (post, idx) => {
@@ -2489,7 +2506,7 @@ function ContentCalendarScreen({ showToast }) {
             return (
               <div key={dayIdx} className="cal-day-group">
                 <div className="cal-day-label">{DAY_NAMES[dayIdx]}</div>
-                {dayPosts.map(post => <CalPostCard key={post.id} post={post} approving={approving} firing={firing} approve={approve} unapprove={unapprove} postNow={postNow} selectCaption={selectCaption} copyCaption={copyCaption} />)}
+                {dayPosts.map(post => <CalPostCard key={post.id} post={post} approving={approving} firing={firing} approve={approve} reject={reject} saveEdit={saveEdit} unapprove={unapprove} postNow={postNow} selectCaption={selectCaption} copyCaption={copyCaption} />)}
               </div>
             )
           })}
@@ -2509,7 +2526,7 @@ function ContentCalendarScreen({ showToast }) {
             return (
               <div key={dayIdx} className="cal-day-group">
                 <div className="cal-day-label">{DAY_NAMES[dayIdx]}</div>
-                {dayPosts.map(post => <CalPostCard key={post.id} post={post} approving={approving} firing={firing} approve={approve} unapprove={unapprove} postNow={postNow} selectCaption={selectCaption} copyCaption={copyCaption} />)}
+                {dayPosts.map(post => <CalPostCard key={post.id} post={post} approving={approving} firing={firing} approve={approve} reject={reject} saveEdit={saveEdit} unapprove={unapprove} postNow={postNow} selectCaption={selectCaption} copyCaption={copyCaption} />)}
               </div>
             )
           })}
@@ -2519,14 +2536,18 @@ function ContentCalendarScreen({ showToast }) {
   )
 }
 
-function CalPostCard({ post, approving, firing, approve, unapprove, postNow, selectCaption, copyCaption }) {
+function CalPostCard({ post, approving, firing, approve, reject, saveEdit, unapprove, postNow, selectCaption, copyCaption }) {
+  const [editMode, setEditMode]       = useState(false)
+  const [editContent, setEditContent] = useState(post.content)
+
+  const isPending  = post.status === 'pending'
   const isPosted   = post.status === 'posted'
   const isApproved = post.status === 'approved'
   const isFailed   = post.status === 'failed'
+  const isTTS      = post.platform === 'x_tts'
   const schedTime  = new Date(post.scheduled_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
   const captions   = post.instagram_captions || []
   const selIdx     = post.selected_caption ?? 0
-  const isTTS      = post.platform === 'x_tts'
 
   return (
     <div className={`cal-post-card${isPosted ? ' posted' : ''}`} style={isTTS ? { borderLeft: '3px solid var(--gold-dim)' } : {}}>
@@ -2541,7 +2562,7 @@ function CalPostCard({ post, approving, firing, approve, unapprove, postNow, sel
 
         {post.platform === 'instagram' && captions.length > 0 ? (
           <>
-            {post.image_hint && <div className="cal-image-hint">📷 Use: {post.image_hint}</div>}
+            {post.image_hint && <div className="cal-image-hint">Use: {post.image_hint}</div>}
             <div className="cal-captions">
               {captions.map((cap, ci) => (
                 <label key={ci} className="cal-caption-opt">
@@ -2552,15 +2573,47 @@ function CalPostCard({ post, approving, firing, approve, unapprove, postNow, sel
               ))}
             </div>
           </>
+        ) : isPending && editMode ? (
+          <>
+            <textarea
+              value={editContent}
+              onChange={e => setEditContent(e.target.value)}
+              maxLength={300}
+              rows={4}
+              style={{
+                width:'100%', marginTop:6, background:'var(--surface2)', color:'var(--text)',
+                border:'1px solid var(--border)', borderRadius:6, padding:'8px',
+                fontSize:'0.7rem', fontFamily:'var(--font-body)', resize:'vertical', boxSizing:'border-box'
+              }}
+            />
+            <div style={{ fontSize:'0.6rem', color: editContent.length > 280 ? 'var(--rose)' : 'var(--muted)', textAlign:'right', marginTop:2 }}>
+              {editContent.length}/280
+            </div>
+          </>
         ) : (
           <div className="cal-post-content">{post.content}</div>
         )}
 
         <div className="cal-actions">
-          {!isPosted && !isApproved && !isTTS && (
-            <button className="cal-approve-btn" disabled={!!approving[post.id]} onClick={() => approve(post)}>
-              {approving[post.id] ? '…' : '✓ Approve & Schedule'}
-            </button>
+          {/* Pending: approve / edit / reject — shown for ALL platforms including x_tts */}
+          {isPending && !editMode && (
+            <>
+              <button className="cal-approve-btn" disabled={!!approving[post.id]} onClick={() => approve(post)}>
+                {approving[post.id] ? '…' : '✓ Approve'}
+              </button>
+              <button className="cal-copy-btn" onClick={() => { setEditContent(post.content); setEditMode(true) }}>Edit</button>
+              <button className="cal-copy-btn" style={{ color:'var(--rose)' }} onClick={() => reject(post)}>✕ Reject</button>
+            </>
+          )}
+          {isPending && editMode && (
+            <>
+              <button className="cal-approve-btn"
+                disabled={editContent.length === 0 || editContent.length > 280}
+                onClick={() => { saveEdit(post, editContent); setEditMode(false) }}>
+                Save
+              </button>
+              <button className="cal-copy-btn" onClick={() => { setEditContent(post.content); setEditMode(false) }}>Cancel</button>
+            </>
           )}
           {isApproved && !isPosted && (
             <>
@@ -2569,13 +2622,13 @@ function CalPostCard({ post, approving, firing, approve, unapprove, postNow, sel
                 disabled={!!firing[post.id]} onClick={() => postNow(post)}>
                 {firing[post.id] ? 'Posting…' : '▶ Post Now'}
               </button>
-              {!isTTS && <button className="cal-copy-btn" onClick={() => unapprove(post)}>Unschedule</button>}
+              <button className="cal-copy-btn" onClick={() => unapprove(post)}>Unschedule</button>
             </>
           )}
           {isPosted && <span style={{ fontSize:'0.62rem', color:'var(--green)', fontWeight:700 }}>✓ Posted</span>}
           {isFailed && <button className="cal-approve-btn" onClick={() => approve(post)}>↺ Retry</button>}
-          {post.platform === 'instagram' && <button className="cal-copy-btn" onClick={() => copyCaption(post.content)}>📋 Copy Caption</button>}
-          {post.platform === 'instagram' && isPosted && <span className="cal-insta-note">📲 Post manually on Instagram</span>}
+          {post.platform === 'instagram' && <button className="cal-copy-btn" onClick={() => copyCaption(post.content)}>Copy Caption</button>}
+          {post.platform === 'instagram' && isPosted && <span className="cal-insta-note">Post manually on Instagram</span>}
         </div>
       </div>
     </div>

@@ -1,14 +1,22 @@
 // GET/POST /api/content-generator
 // Cron: every Monday 8am UTC — generates @temptationtoken posts for the week (3x/day, 21 total)
-// POST { force: true }         — regenerate all posts for this week
-// POST { tts_bootstrap: true } — same as force for @temptationtoken posts
-//
+// POST { force: true }      — regenerate: delete pending for this week, re-insert as pending
+// POST { dry_run: true }    — generate + return 21 posts in response WITHOUT inserting (for review)
 // @CryptoFitJim posts manually — no auto-generation for Jim.
+//
+// Generated posts inserted with status='pending'. Admin reviews + approves in Content Calendar.
 
-const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
+import Anthropic from '@anthropic-ai/sdk'
+
+const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
+const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 const VOTING_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'
 const ADMIN_CHAT_ID  = process.env.ADMIN_CHAT_ID || '-5273368658'
+
+// Solidproof audit publication date — for age calculation in prompt context
+const AUDIT_PUBLISHED = new Date('2026-05-06')
+
+// ── Supabase helpers ──────────────────────────────────────────────────────────
 
 async function sbGet(table, query = '') {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
@@ -35,6 +43,8 @@ async function sbDelete(table, query) {
   })
 }
 
+// ── On-chain RPC ──────────────────────────────────────────────────────────────
+
 async function rpc(data) {
   const r = await fetch('https://mainnet.base.org', {
     method: 'POST',
@@ -45,6 +55,8 @@ async function rpc(data) {
   return j.result
 }
 
+// ── Telegram ──────────────────────────────────────────────────────────────────
+
 async function sendTelegram(chatId, text, token) {
   if (!chatId || !token) return
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -53,6 +65,8 @@ async function sendTelegram(chatId, text, token) {
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
   }).catch(() => {})
 }
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function getWeekStart(from = new Date()) {
   const d = new Date(from)
@@ -63,6 +77,7 @@ function getWeekStart(from = new Date()) {
   return d
 }
 
+// dayOffset=0 → Monday of weekStart; slot=evening uses dayOffset=dayIdx+1 (00:00 UTC next day)
 function toISO(weekStart, dayOffset, hour) {
   const d = new Date(weekStart)
   d.setUTCDate(d.getUTCDate() + dayOffset)
@@ -70,144 +85,274 @@ function toISO(weekStart, dayOffset, hour) {
   return d.toISOString()
 }
 
-// ── @temptationtoken templates ────────────────────────────────────────────────
-// data: { roundId, pool, voters, profiles, topVote, topVoterPrize }
+// ── Live context from Supabase + on-chain ─────────────────────────────────────
 
-const TTS_MORNING = {
-  monday:    d => `🔥 Round ${d.roundId} is OFFICIALLY LIVE. ${d.profiles} profiles. ${d.pool} $TTS up for grabs. Vote NOW → app.temptationtoken.io $TTS #Base #Crypto #VoteToEarn\n\nWho's your pick this week? 👇`,
-  tuesday:   d => `📊 MIDWEEK CHECK: ${d.pool} $TTS already in the pool. ${d.voters} unique voters. The competition is HEATING UP. → app.temptationtoken.io $TTS\n\nWho's your pick this week? 👇`,
-  wednesday: d => `👑 Someone's about to win big $TTS this Sunday. Top voter takes 35% automatically — no middleman. Stack your votes → app.temptationtoken.io $TTS #Base\n\nWho's your pick this week? 👇`,
-  thursday:  d => `⏰ 3 days left in Round ${d.roundId}. Prize pool: ${d.pool} $TTS. Top voter wins 35% ON-CHAIN. No delays. Just code. → app.temptationtoken.io $TTS\n\nWho's your pick this week? 👇`,
-  friday:    d => `🚨 WEEKEND PUSH. Round ${d.roundId} ends Sunday night. Last chance to build your stack. → app.temptationtoken.io $TTS #Crypto\n\nWho's your pick this week? 👇`,
-  saturday:  _d => `💎 Staking $TTS = bigger votes. Up to 3x multiplier for VIP stakers. Play smarter → app.temptationtoken.io $TTS #DeFi #Staking\n\nWho's your pick this week? 👇`,
-  sunday:    d => `🏁 FINAL HOURS. Round ${d.roundId} closes TONIGHT. ${d.pool} $TTS on the line. Settlement is automatic via Chainlink VRF. → app.temptationtoken.io $TTS\n\nWho's your pick this week? 👇`,
+async function fetchLiveContext() {
+  const ctx = {
+    roundId:             1,
+    prizePoolTTS:        0,
+    settlementTimestamp: null,
+    lastWinnerPayoutTTS: 0,
+    approvedProfiles:    0,
+    totalStakers:        0,
+    stakersByTier:       {},
+  }
+
+  // Current round ID + settlement time from chain
+  try {
+    const r1 = await rpc({ method: 'eth_call', params: [{ to: VOTING_ADDRESS, data: '0x9cbe5efd' }, 'latest'] })
+    if (r1 && r1 !== '0x') {
+      ctx.roundId = parseInt(r1, 16)
+      const padded = ctx.roundId.toString(16).padStart(64, '0')
+      const r2 = await rpc({ method: 'eth_call', params: [{ to: VOTING_ADDRESS, data: '0x8f1327c0' + padded }, 'latest'] })
+      if (r2 && r2 !== '0x') {
+        const chunks = []
+        for (let i = 2; i < r2.length; i += 64) chunks.push(r2.slice(i, i + 64))
+        ctx.settlementTimestamp = parseInt(chunks[1], 16)
+      }
+    }
+  } catch {}
+
+  // Prize pool: sum of all votes this round from Supabase
+  try {
+    const votes = await sbGet('votes', `round_id=eq.${ctx.roundId}&select=tts_amount`)
+    if (Array.isArray(votes) && votes.length > 0) {
+      ctx.prizePoolTTS = Math.round(votes.reduce((s, v) => s + (Number(v.tts_amount) || 0), 0))
+    }
+  } catch {}
+
+  // Last round winner payout: 35% of previous round's pool
+  try {
+    if (ctx.roundId > 1) {
+      const prevVotes = await sbGet('votes', `round_id=eq.${ctx.roundId - 1}&select=tts_amount`)
+      if (Array.isArray(prevVotes) && prevVotes.length > 0) {
+        const prevPool = prevVotes.reduce((s, v) => s + (Number(v.tts_amount) || 0), 0)
+        ctx.lastWinnerPayoutTTS = Math.round(prevPool * 0.35)
+      }
+    }
+  } catch {}
+
+  // Approved profiles competing this round
+  try {
+    const subs = await sbGet('submissions', `status=eq.approved&round_id=eq.${ctx.roundId}&select=id`)
+    ctx.approvedProfiles = Array.isArray(subs) ? subs.length : 0
+  } catch {}
+
+  // Active stakers by tier
+  try {
+    const stakes = await sbGet('stakes', 'select=tier')
+    if (Array.isArray(stakes)) {
+      ctx.totalStakers = stakes.length
+      for (const s of stakes) {
+        const tier = s.tier || 'unknown'
+        ctx.stakersByTier[tier] = (ctx.stakersByTier[tier] || 0) + 1
+      }
+    }
+  } catch {}
+
+  return ctx
 }
 
-const TTS_AFTERNOON = {
-  monday:    _d => `New round, new chance. What's your voting strategy this week? Vote big on one profile or spread? 🤔 app.temptationtoken.io $TTS\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-  tuesday:   _d => `The profiles competing this week are 🔥🔥🔥 Vote before the pool gets too big for your budget → app.temptationtoken.io $TTS\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-  wednesday: _d => `Fun fact: every losing vote gets BURNED forever 🔥 That deflationary pressure is real. Stack $TTS before it's gone. #Base #Crypto $TTS\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-  thursday:  _d => `We partner with @PolarisProject — 10% of EVERY prize pool fights human trafficking. Vote and do good 💙 app.temptationtoken.io $TTS\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-  friday:    _d => `No signup. No email. No KYC. Connect wallet → vote. Web3 at its finest. app.temptationtoken.io $TTS #Base\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-  saturday:  _d => `Audited by @solidproof_io ✅ LP locked 12 months ✅ Chainlink VRF ✅ This is what a legit crypto project looks like. $TTS\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-  sunday:    _d => `Settlement happens automatically in minutes. Smart contract → Chainlink VRF → winners paid. Zero humans involved. That's DeFi. $TTS\n\nReply with your wallet — top commenter gets a vote match bonus 🎁`,
-}
+// ── Claude generation ─────────────────────────────────────────────────────────
 
-const TTS_EVENING = {
-  monday:    d => `The profiles in Round ${d.roundId} are absolutely wild. You need to see this → app.temptationtoken.io 👀 $TTS\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-  tuesday:   d => `Someone voted ${d.topVote} $TTS today alone. Who IS that? The competition is serious this week 👀 $TTS\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-  wednesday: d => `Halfway through Round ${d.roundId}. Leaderboard is TIGHT. One big vote swing could change everything 💥 app.temptationtoken.io $TTS\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-  thursday:  _d => `New profile just approved 👑 Competition just got harder. Check the leaderboard → app.temptationtoken.io $TTS\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-  friday:    _d => `Weekend is here. The grind doesn't stop. See you in the voting booth → app.temptationtoken.io 🔥 $TTS\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-  saturday:  _d => `The most beautiful thing about this game? Nobody can cheat. Chainlink VRF = provably fair. Forever. $TTS #Crypto\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-  sunday:    d => `Tomorrow someone wakes up with ${d.topVoterPrize} $TTS in their wallet. Tonight you decide if that's you. → app.temptationtoken.io $TTS 🏆\n\nLast chance to vote tonight — who's winning in your bracket? 🔥`,
-}
+async function generateTweets(ctx) {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set in Vercel env')
 
-const DAYS_STR = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+  const client = new Anthropic({ apiKey })
 
-function buildTTSRows(weekStart, weekStartStr, data) {
-  const rows = []
-  DAYS_STR.forEach((day, i) => {
-    // 9am EDT = 13:00 UTC (morning)
-    rows.push({
-      platform: 'x_tts', post_type: 'tts_morning', day_of_week: i,
-      scheduled_at: toISO(weekStart, i, 13),
-      content: TTS_MORNING[day](data).slice(0, 280),
-      instagram_captions: null, selected_caption: 0, image_hint: null,
-      status: 'approved', week_start: weekStartStr
-    })
-    // 2pm EDT = 18:00 UTC (afternoon)
-    rows.push({
-      platform: 'x_tts', post_type: 'tts_afternoon', day_of_week: i,
-      scheduled_at: toISO(weekStart, i, 18),
-      content: TTS_AFTERNOON[day](data).slice(0, 280),
-      instagram_captions: null, selected_caption: 0, image_hint: null,
-      status: 'approved', week_start: weekStartStr
-    })
-    // 8pm EDT = 00:00 UTC next calendar day
-    rows.push({
-      platform: 'x_tts', post_type: 'tts_evening', day_of_week: i,
-      scheduled_at: toISO(weekStart, i + 1, 0),
-      content: TTS_EVENING[day](data).slice(0, 280),
-      instagram_captions: null, selected_caption: 0, image_hint: null,
-      status: 'approved', week_start: weekStartStr
-    })
+  const settlementStr = ctx.settlementTimestamp
+    ? new Date(ctx.settlementTimestamp * 1000).toLocaleString('en-US', {
+        timeZone: 'America/New_York', weekday: 'long', month: 'short',
+        day: 'numeric', hour: 'numeric', minute: '2-digit'
+      }) + ' EDT'
+    : 'Sunday 11:59 PM EDT'
+
+  const auditAgeDays = Math.floor((Date.now() - AUDIT_PUBLISHED.getTime()) / 86400000)
+
+  const stakerSummary = Object.entries(ctx.stakersByTier).length > 0
+    ? Object.entries(ctx.stakersByTier).map(([tier, count]) => `${count} ${tier}`).join(', ')
+    : 'none yet'
+
+  const contextBlock = [
+    `Round: ${ctx.roundId}`,
+    `Prize pool this round: ${ctx.prizePoolTTS.toLocaleString()} $TTS`,
+    `Settlement / round close: ${settlementStr}`,
+    ctx.lastWinnerPayoutTTS
+      ? `Last round top voter won: ${ctx.lastWinnerPayoutTTS.toLocaleString()} $TTS (35% of pool)`
+      : null,
+    `Active profiles competing: ${ctx.approvedProfiles}`,
+    `Total stakers: ${ctx.totalStakers}${ctx.totalStakers > 0 ? ` (${stakerSummary})` : ''}`,
+    `Solidproof audit published: ${auditAgeDays} day${auditAgeDays !== 1 ? 's' : ''} ago`,
+    `Chain: Base mainnet`,
+    `Staking tiers: Bronze $50+ (8% APR, 1.1x vote boost) · Silver $100+ (12%, 1.25x) · Gold $250+ (18%, 1.5x) · Diamond $1k+ (32%, 2x) · VIP $5k+ (45%, 3x)`,
+    `Prize split: 35% top voter · 35% winning profile · 10% charity (@PolarisProject) · 20% house`,
+    `LP: 100% locked Team.Finance until May 2027`,
+    `Minimum vote: 5 $TTS`,
+  ].filter(Boolean).join('\n')
+
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4096,
+    messages: [{
+      role: 'user',
+      content: `Generate 21 tweets for the upcoming week for @temptationtoken brand account. 3 posts per day, Monday through Sunday.
+
+LIVE PROJECT STATE:
+${contextBlock}
+
+Return ONLY a valid JSON array with exactly 21 objects. No preamble, no explanation, no code fences — just the raw JSON array.
+
+Each object must have exactly these fields:
+{"day":"monday","slot":"morning","content":"tweet text here"}
+
+Days (in order): monday, tuesday, wednesday, thursday, friday, saturday, sunday
+Slots per day (in order): morning, afternoon, evening
+
+RULES:
+- Max 280 characters per tweet — count carefully, this is a hard limit
+- Every tweet must include a CTA: "app.temptationtoken.io" and/or "$TTS"
+- Brand voice: direct, confident, evidence-based, dopamine-driven urgency
+- Zero emoji preferred — max 1 per tweet if genuinely adds impact
+- Reference live data (round number, prize pool, profiles, staker count) where natural
+- Monday morning: announce the round is live and open for voting
+- Mid-week (Wed/Thu): momentum, leaderboard dynamics, mid-round FOMO
+- Fri/Sat/Sun: escalating urgency — round closes Sunday 11:59 PM EDT
+- Topic rotation across the week: voting mechanics, prize math (35% top voter), staking yield, audit trust, on-chain fairness (Chainlink VRF), charity angle, LP lock
+- Avoid repeating the same hook within the same day`
+    }]
   })
-  return rows
+
+  const raw = message.content[0]?.text || ''
+
+  // Strip code fences if Claude wrapped it
+  const jsonMatch = raw.match(/\[[\s\S]*\]/)
+  if (!jsonMatch) throw new Error(`Claude did not return a JSON array. Raw: ${raw.slice(0, 300)}`)
+
+  let tweets
+  try {
+    tweets = JSON.parse(jsonMatch[0])
+  } catch (e) {
+    throw new Error(`JSON parse failed: ${e.message}. Raw: ${raw.slice(0, 300)}`)
+  }
+
+  if (!Array.isArray(tweets) || tweets.length < 21) {
+    throw new Error(`Expected 21 tweets, got ${tweets?.length ?? 0}. Raw: ${raw.slice(0, 200)}`)
+  }
+
+  return tweets.slice(0, 21)
 }
+
+// ── Row builder ───────────────────────────────────────────────────────────────
+
+const SLOT_HOURS = { morning: 13, afternoon: 18, evening: 0 }
+const DAY_INDEX  = { monday:0, tuesday:1, wednesday:2, thursday:3, friday:4, saturday:5, sunday:6 }
+const POST_TYPES = { morning:'tts_morning', afternoon:'tts_afternoon', evening:'tts_evening' }
+
+function buildRows(tweets, weekStart, weekStartStr) {
+  return tweets.map(t => {
+    const dayIdx    = DAY_INDEX[t.day] ?? 0
+    const hour      = SLOT_HOURS[t.slot] ?? 13
+    // Evening posts fire at 00:00 UTC the NEXT calendar day (8pm EDT)
+    const dayOffset = t.slot === 'evening' ? dayIdx + 1 : dayIdx
+    return {
+      platform:           'x_tts',
+      post_type:          POST_TYPES[t.slot] || `tts_${t.slot}`,
+      day_of_week:        dayIdx,           // Mon-first: Mon=0..Sun=6
+      scheduled_at:       toISO(weekStart, dayOffset, hour),
+      content:            String(t.content).slice(0, 280),
+      instagram_captions: null,
+      selected_caption:   0,
+      image_hint:         null,
+      status:             'pending',        // admin must approve before scheduler fires
+      week_start:         weekStartStr,
+    }
+  })
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
-  const forceRegen   = req.method === 'POST' && (req.body?.force === true || req.body?.tts_bootstrap === true)
-
-  // --- Fetch round context from chain + Supabase ---
-  let roundId = 1, poolRaw = 0, profileCount = 14, voters = 0, topVoteTTS = 0
-  try {
-    const r1 = await rpc({ method: 'eth_call', params: [{ to: VOTING_ADDRESS, data: '0x9cbe5efd' }, 'latest'] })
-    if (r1 && r1 !== '0x') roundId = parseInt(r1, 16)
-
-    const padded = roundId.toString(16).padStart(64, '0')
-    const r2 = await rpc({ method: 'eth_call', params: [{ to: VOTING_ADDRESS, data: '0x8f1327c0' + padded }, 'latest'] })
-    if (r2 && r2 !== '0x') {
-      const hex = r2.slice(2)
-      const chunks = []
-      for (let i = 0; i < hex.length; i += 64) chunks.push(hex.slice(i, i + 64))
-      poolRaw = Number(BigInt('0x' + chunks[3])) / 1e18
-    }
-
-    const subs = await sbGet('submissions', `status=eq.approved&round_id=eq.${roundId}&select=display_name`)
-    if (Array.isArray(subs) && subs.length > 0) profileCount = subs.length
-
-    const votes = await sbGet('votes', `round_id=eq.${roundId}&select=voter_wallet,tts_amount`).catch(() => null)
-    if (Array.isArray(votes) && votes.length > 0) {
-      const wallets = new Set(votes.map(v => v.voter_wallet).filter(Boolean))
-      voters = wallets.size
-      topVoteTTS = Math.max(...votes.map(v => Number(v.tts_amount) || 0))
-    }
-  } catch {
-    // non-fatal — use defaults
-  }
-
-  const poolFormatted    = Math.round(poolRaw).toLocaleString()
-  const topVoteFormatted = topVoteTTS > 0 ? Math.round(topVoteTTS).toLocaleString() : 'thousands of'
-  const topVoterPrize    = Math.round(poolRaw * 0.35).toLocaleString()
-
-  const ttsData = {
-    roundId, pool: poolFormatted, voters: voters || '0',
-    profiles: profileCount, topVote: topVoteFormatted, topVoterPrize
-  }
+  const isDryRun   = req.method === 'POST' && req.body?.dry_run === true
+  const forceRegen = req.method === 'POST' && (req.body?.force === true || req.body?.tts_bootstrap === true)
 
   const weekStart    = getWeekStart()
   const weekStartStr = weekStart.toISOString().split('T')[0]
 
-  // Skip if already generated this week (unless forced)
-  if (!forceRegen) {
+  // Skip generation if already exists this week (unless force/dry_run)
+  if (!forceRegen && !isDryRun) {
     const existing = await sbGet('scheduled_posts', `week_start=eq.${weekStartStr}&platform=eq.x_tts&select=id&limit=1`)
     if (Array.isArray(existing) && existing.length > 0) {
-      return res.status(200).json({ ok: true, skipped: 'already generated', weekStart: weekStartStr })
+      return res.status(200).json({ ok: true, skipped: 'already generated this week', weekStart: weekStartStr })
     }
-  } else {
-    await sbDelete('scheduled_posts', `week_start=eq.${weekStartStr}&platform=eq.x_tts`)
   }
 
-  // Build and insert TTS rows
-  const ttsRows = buildTTSRows(weekStart, weekStartStr, ttsData)
-  const insertResp = await sbInsert('scheduled_posts', ttsRows)
+  // Pull live context from Supabase + on-chain
+  const ctx = await fetchLiveContext()
+
+  // Generate with Claude
+  let tweets
+  try {
+    tweets = await generateTweets(ctx)
+  } catch (e) {
+    console.error('content-generator: Claude generation failed:', e.message)
+    return res.status(500).json({ error: 'Claude generation failed', detail: e.message })
+  }
+
+  const rows = buildRows(tweets, weekStart, weekStartStr)
+
+  // ── Dry run: return posts for review without inserting ────────────────────
+  if (isDryRun) {
+    const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+    console.log('\n=== DRY RUN: 21 generated posts ===')
+    rows.forEach((r, i) => {
+      const day  = DAYS[r.day_of_week]
+      const slot = r.post_type.replace('tts_', '')
+      console.log(`\n[${i+1}] ${day} ${slot} (${r.scheduled_at}) [${r.content.length}ch]\n${r.content}`)
+    })
+    console.log('\n=== END DRY RUN ===\n')
+    return res.status(200).json({
+      ok: true, dry_run: true, generated: rows.length,
+      context: { roundId: ctx.roundId, prizePoolTTS: ctx.prizePoolTTS, approvedProfiles: ctx.approvedProfiles, totalStakers: ctx.totalStakers },
+      weekStart: weekStartStr,
+      posts: rows.map((r, i) => ({
+        n:            i + 1,
+        day:          DAYS[r.day_of_week],
+        slot:         r.post_type.replace('tts_', ''),
+        scheduled_at: r.scheduled_at,
+        chars:        r.content.length,
+        content:      r.content,
+      }))
+    })
+  }
+
+  // ── Delete existing pending posts if regenerating ─────────────────────────
+  if (forceRegen) {
+    await sbDelete('scheduled_posts', `week_start=eq.${weekStartStr}&platform=eq.x_tts&status=in.(pending,rejected)`)
+  }
+
+  // ── Insert all 21 posts as pending ────────────────────────────────────────
+  const insertResp = await sbInsert('scheduled_posts', rows)
   if (!insertResp.ok) {
     const errBody = await insertResp.text()
     return res.status(500).json({ error: 'Supabase insert failed', detail: errBody })
   }
 
-  const adminToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BROADCAST_BOT_TOKEN
+  // ── Telegram admin alert ──────────────────────────────────────────────────
+  const adminToken = process.env.BROADCAST_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN
   await sendTelegram(
     ADMIN_CHAT_ID,
-    `📅 Week of ${weekStartStr}: ${ttsRows.length} @temptationtoken posts scheduled (auto-approved). Round ${roundId} · Pool: ${poolFormatted} $TTS`,
+    `📅 <b>21 posts ready for review</b>\nWeek of ${weekStartStr} · Round ${ctx.roundId} · Pool: ${ctx.prizePoolTTS.toLocaleString()} $TTS\n\nApprove at <a href="https://app.temptationtoken.io/admin">app.temptationtoken.io/admin</a> → Content Calendar`,
     adminToken
   )
 
+  console.log(`content-generator: inserted ${rows.length} pending posts for week of ${weekStartStr}`)
+
   return res.status(200).json({
-    ok: true, tts_rows: ttsRows.length, weekStart: weekStartStr, roundId,
-    preview: ttsRows.slice(0, 3).map(r => ({ time: r.scheduled_at, type: r.post_type, content: r.content }))
+    ok: true, generated: rows.length, weekStart: weekStartStr,
+    roundId: ctx.roundId, prizePoolTTS: ctx.prizePoolTTS,
+    preview: rows.slice(0, 3).map(r => ({ time: r.scheduled_at, type: r.post_type, chars: r.content.length, content: r.content }))
   })
 }
