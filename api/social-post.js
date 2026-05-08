@@ -62,12 +62,24 @@ const DAY_IMAGE = {
   6: 'post7_sunday',
 }
 
+// Asserts the full 0-6 mapping at module load. Throws on any future regression.
+;(function assertDayMapping() {
+  const expected = [
+    'post1_monday','post2_tuesday','post3_wednesday','post4_thursday',
+    'post5_friday','post6_saturday','post7_sunday',
+  ]
+  for (let i = 0; i <= 6; i++) {
+    if (DAY_IMAGE[i] !== expected[i])
+      throw new Error(`DAY_IMAGE regression: index ${i} expected '${expected[i]}', got '${DAY_IMAGE[i]}'`)
+  }
+})()
+
 async function uploadImageForDay(dayOfWeek, env) {
   const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = env
   if (!X_API_KEY || !TTS_X_ACCESS_TOKEN) return null
 
-  // DAY_IMAGE is 0=Mon-indexed (matches content-generator). nyDayOfWeek() is 0=Sun JS convention.
-  // Convert with (dow+6)%7: Sun(0)→6, Mon(1)→0, Thu(4)→3, Sat(6)→5.
+  // DB path: post.day_of_week is Mon-first (Mon=0..Sun=6), matches DAY_IMAGE index directly — no shift needed
+  // Fallback path: nyDayOfWeek() returns JS-native (Sun=0..Sat=6), shift to Mon-first via (dow+6)%7
   const imgKey = dayOfWeek != null ? dayOfWeek : (nyDayOfWeek() + 6) % 7
   const filename = DAY_IMAGE[imgKey]
   if (!filename) return null
