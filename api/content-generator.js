@@ -93,6 +93,36 @@ function daysSince(date) {
   return Math.floor((Date.now() - date.getTime()) / 86400000)
 }
 
+// Computes "Sunday, May 10, 11:59 PM EDT" for the next upcoming round close
+function nextRoundCloseStr() {
+  const utcMs   = Date.now()
+  const edtMs   = utcMs - 4 * 3600000           // EDT = UTC-4
+  const edtDate = new Date(edtMs)
+  const edtDow  = edtDate.getUTCDay()            // 0=Sun … 6=Sat
+  const edtHour = edtDate.getUTCHours()
+  const edtMin  = edtDate.getUTCMinutes()
+
+  // Days until the next Sunday 11:59 PM EDT
+  let daysToSunday
+  if (edtDow === 0) {
+    // Today is Sunday — still open if before 11:59 PM, otherwise next week
+    daysToSunday = (edtHour < 23 || (edtHour === 23 && edtMin < 59)) ? 0 : 7
+  } else {
+    daysToSunday = 7 - edtDow
+  }
+
+  // Build Sunday 23:59 in EDT offset space, then convert back to UTC for formatting
+  const edtClose = new Date(edtMs)
+  edtClose.setUTCDate(edtClose.getUTCDate() + daysToSunday)
+  edtClose.setUTCHours(23, 59, 0, 0)
+  const utcClose = new Date(edtClose.getTime() + 4 * 3600000)
+
+  const datePart = utcClose.toLocaleString('en-US', {
+    timeZone: 'America/New_York', weekday: 'long', month: 'long', day: 'numeric',
+  })
+  return `${datePart}, 11:59 PM EDT`
+}
+
 // ── Live context ──────────────────────────────────────────────────────────────
 
 async function fetchLiveContext() {
@@ -169,25 +199,27 @@ async function generateAllPosts(ctx) {
 
   const client = new Anthropic({ apiKey })
 
-  const settlementStr = ctx.settlementTimestamp
-    ? new Date(ctx.settlementTimestamp * 1000).toLocaleString('en-US', {
-        timeZone: 'America/New_York', weekday: 'long', month: 'short',
-        day: 'numeric', hour: 'numeric', minute: '2-digit'
-      }) + ' EDT'
-    : 'Sunday 11:59 PM EDT'
+  const roundCloseStr = nextRoundCloseStr()
 
   const stakerSummary = Object.entries(ctx.stakersByTier).length > 0
     ? Object.entries(ctx.stakersByTier).map(([t, n]) => `${n} ${t}`).join(', ')
-    : 'none yet'
+    : null
+
+  const stakerLine = ctx.totalStakers > 0
+    ? `Total stakers: ${ctx.totalStakers} (${stakerSummary})`
+    : `Total stakers: 0 — staking slots are open; frame this as opportunity per RULES, never as a negative fact`
 
   const contextBlock = [
     `Round: ${ctx.roundId}`,
     `Prize pool this round: ${ctx.prizePoolTTS.toLocaleString()} $TTS`,
-    `Round closes / settlement: ${settlementStr}`,
+    `CANONICAL ROUND SCHEDULE (use ONLY these — never invent other times):`,
+    `  Round opens: Monday 12:00 AM EDT (every week)`,
+    `  Round closes: ${roundCloseStr}`,
+    `  Settlement: fires automatically via Chainlink within minutes of round close`,
     ctx.lastTopVoterPayoutTTS      ? `Last round — top voter won: ${ctx.lastTopVoterPayoutTTS.toLocaleString()} $TTS` : null,
     ctx.lastWinnerProfilePayoutTTS ? `Last round — winning profile won: ${ctx.lastWinnerProfilePayoutTTS.toLocaleString()} $TTS` : null,
     `Active profiles competing: ${ctx.approvedProfiles}`,
-    `Total stakers: ${ctx.totalStakers}${ctx.totalStakers > 0 ? ` (${stakerSummary})` : ''}`,
+    stakerLine,
     `Solidproof audit published: ${ctx.auditAgeDays} day${ctx.auditAgeDays !== 1 ? 's' : ''} ago`,
     `LP locked: ${ctx.lpLockDays} day${ctx.lpLockDays !== 1 ? 's' : ''} ago (Team.Finance, until May 2027)`,
     ctx.recentSettlement ? 'A round settled in the last 7 days' : null,
@@ -206,6 +238,19 @@ async function generateAllPosts(ctx) {
 
 LIVE PROJECT STATE:
 ${contextBlock}
+
+CRITICAL RULES — NEVER VIOLATE THESE:
+
+1. ROUND SCHEDULE — use ONLY the canonical values provided in LIVE PROJECT STATE above:
+   - Round opens: Monday 12:00 AM EDT
+   - Round closes: the specific date/time in "Round closes:" above (e.g. "Sunday, May 10, 11:59 PM EDT")
+   - Settlement fires automatically via Chainlink within minutes of round close
+   - NEVER invent or approximate settlement times. NEVER write "closes Wed", "closes at 11:23 PM", or any other time not in the canonical schedule. If a post references round timing, use ONLY the exact close date/time from the live context.
+
+2. ZERO STAKERS — if total stakers = 0, NEVER state this as a current fact or negative. Instead frame it as opportunity:
+   - Good: "Be the first Diamond staker — 32% APR and 2x vote weight from day one."
+   - Good: "Staking tiers are live and unclaimed. VIP earns 45% APR with 3x vote weight."
+   - Bad: "0 stakers" / "no stakers yet" / "staking has no participants"
 
 Return ONLY a valid JSON object — no preamble, no explanation, no code fences. Structure:
 {
