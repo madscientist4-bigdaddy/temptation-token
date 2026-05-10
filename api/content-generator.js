@@ -294,6 +294,12 @@ CRITICAL RULES — NEVER VIOLATE THESE:
 
 5. PRIZE SPLIT — the canonical prize split is 35% top voter / 35% winning profile / 10% charity (Polaris Project) / 20% house (no club referral), or 35/35/10/10/10 with a club referral. Any post that mentions prize percentages MUST use these exact numbers. Posts referencing 40%, 30%, or any other split are FORBIDDEN. The previously used 40/40/10/10 split was wrong and has been removed from all contracts — never use it.
 
+6. SIGNUP BONUS — the signup bonus is 500 TTS (admin-configurable but currently 500). NEVER write "100 TTS bonus", "100 $TTS", or any other amount. Posts that mention the signup bonus MUST use 500 TTS.
+
+7. VOTE MATCH — the first-vote match is 1:1 up to 1,000 TTS (admin-configurable). NEVER imply a different ratio or cap. Correct: "Your first vote matched 1:1 up to 1,000 $TTS from us."
+
+8. BURN MECHANIC — the prize pool is formed ONLY from votes on the WINNING profile. Votes on all other profiles are burned to 0x000...dEaD at settlement. NEVER write "all votes form the prize pool" or "total votes go to the winner." The correct framing: "Vote on the right profile — only the winner's vote pool pays out. Losing votes burn."
+
 2. ZERO STAKERS — if total stakers = 0, NEVER state this as a current fact or negative. Instead frame it as opportunity:
    - Good: "Be the first Diamond staker — 32% APR and 2x vote weight from day one."
    - Good: "Staking tiers are live and unclaimed. VIP earns 45% APR with 3x vote weight."

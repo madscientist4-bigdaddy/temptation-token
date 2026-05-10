@@ -12,8 +12,8 @@ const MARKETING_WALLET = '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB'
 const SUPABASE_URL     = process.env.SUPABASE_URL    || 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY     = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
-const MAX_MATCH        = 1000   // TTS cap on first-vote match
-const DAY_LIMIT        = 50     // max vote-match bonuses per day
+const DEFAULT_MAX_MATCH = 1000  // TTS — admin-configurable via admin_config table
+const DAY_LIMIT         = 50     // max vote-match bonuses per day
 
 const TTS_ABI = parseAbi([
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -30,6 +30,18 @@ function sb(path, opts = {}) {
       ...(opts.headers || {}),
     },
   })
+}
+
+async function getAdminConfig(key, defaultValue) {
+  try {
+    const r = await sb(`/admin_config?key=eq.${key}&select=value`)
+    const d = await r.json()
+    if (Array.isArray(d) && d.length > 0 && d[0].value) {
+      const parsed = parseFloat(d[0].value)
+      if (!isNaN(parsed) && parsed > 0) return parsed
+    }
+  } catch {}
+  return defaultValue
 }
 
 async function getDailyCount() {
@@ -75,9 +87,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: false, reason: 'Daily match limit reached — try again tomorrow' })
   }
 
-  // Match amount: min(voteAmount, MAX_MATCH)
+  // Match amount: min(voteAmount, admin-configurable cap)
+  const maxMatch      = await getAdminConfig('vote_match_cap_tts', DEFAULT_MAX_MATCH)
   const voteAmountNum = Math.max(0, Number(voteAmount))
-  const matchAmount   = Math.min(voteAmountNum, MAX_MATCH)
+  const matchAmount   = Math.min(voteAmountNum, maxMatch)
   const ttsAmount     = BigInt(Math.floor(matchAmount * 1e18))
 
   if (ttsAmount === 0n) {

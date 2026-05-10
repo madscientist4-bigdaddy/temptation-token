@@ -41,7 +41,7 @@ VIP_TIERS = {
 
 REF_REFERRER_BONUS = 100
 REF_NEW_USER_BONUS = 10
-SIGNUP_BONUS       = 100
+SIGNUP_BONUS       = 500
 DB_PATH = os.environ.get("DB_PATH", "/tmp/tts.db")
 
 def init_db():
@@ -60,7 +60,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS referral_settings (
             id INTEGER PRIMARY KEY DEFAULT 1, referrer_bonus INTEGER DEFAULT 100,
-            new_user_bonus INTEGER DEFAULT 10, signup_bonus INTEGER DEFAULT 100,
+            new_user_bonus INTEGER DEFAULT 10, signup_bonus INTEGER DEFAULT 500,
             program_active INTEGER DEFAULT 1
         );
         INSERT OR IGNORE INTO referral_settings (id) VALUES (1);

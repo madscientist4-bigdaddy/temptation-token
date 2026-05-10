@@ -1393,7 +1393,7 @@ function ReferScreen({ showToast, connected }) {
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           {[
             {icon:'🔗',title:'Share Your Link',body:'Copy your unique referral link and send it to anyone.'},
-            {icon:'👤',title:'Friend Signs Up',body:'They register, connect their wallet, and claim their 100 $TTS sign-up bonus.'},
+            {icon:'👤',title:'Friend Signs Up',body:'They register, connect their wallet, and claim their 500 $TTS sign-up bonus.'},
             {icon:'💰',title:'You Both Earn',body:'You receive 10 $TTS. Your friend gets an extra 10 $TTS on top of their sign-up bonus.'},
             {icon:'♾️',title:'No Limit',body:'Refer as many people as you want. Every successful referral pays.'},
           ].map((s,i) => (
@@ -1412,7 +1412,7 @@ function ReferScreen({ showToast, connected }) {
           {[
             ['You (referrer)','+10 $TTS per referral','var(--gold-light)'],
             ['Your friend (new user)','+10 $TTS on top of sign-up bonus','var(--gold-light)'],
-            ["Friend's sign-up bonus",'100 $TTS (all new users)','var(--muted)'],
+            ["Friend's sign-up bonus",'500 $TTS (all new users)','var(--muted)'],
             ['Total your friend receives','110 $TTS on day one','var(--green)'],
           ].map(([l,v,col]) => (
             <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'10px 0',borderBottom:'1px solid var(--border2)',gap:12}}>
@@ -1446,7 +1446,7 @@ function ReferScreen({ showToast, connected }) {
 
 function HowToWinScreen() {
   const steps = [
-    { icon:"🎟️", title:"Sign Up — Get 100 Free $TTS", body:"Every new user gets 100 $TTS automatically on signup. No purchase needed. Use them to vote right away." },
+    { icon:"🎟️", title:"Sign Up — Get 500 Free $TTS", body:"Every new user gets 500 $TTS automatically on signup. No purchase needed. Use them to vote right away." },
     { icon:"📸", title:"Browse the Photos", body:"Swipe left or right through this week's profiles. Photos are in random order so everyone gets a fair shot." },
     { icon:"🏆", title:"Pick Your Winner", body:"Find the profile you think will get the most votes by Sunday night. That is your bet." },
     { icon:"💰", title:"Vote $TTS on That Profile", body:"Minimum 5 $TTS per vote. No maximum. The more you put on the winning profile, the bigger your edge. Votes cannot be removed." },
@@ -1543,7 +1543,7 @@ function RulesScreen() {
 function FAQScreen() {
   const faqs = [
     { q:'What is Temptation Token ($TTS)?', a:'$TTS is the native cryptocurrency of the Temptation Token platform on the Base blockchain. Use it to vote on profiles, submit your own, stake for rewards, and win prizes.' },
-    { q:'How do I get $TTS?', a:'New users receive 100 $TTS as a sign-up bonus. You can also buy $TTS via Uniswap on Base. You need ETH on the Base network.' },
+    { q:'How do I get $TTS?', a:'New users receive 500 $TTS as a sign-up bonus. You can also buy $TTS via Uniswap on Base. You need ETH on the Base network.' },
     { q:'How do I connect my wallet?', a:'Tap Connect at the top of the app. We support MetaMask, WalletConnect, Trust Wallet, and Coinbase Wallet. Ensure you are on the Base network.' },
     { q:'Can I download the photos?', a:'No. All submitted photos are the exclusive property of Blockchain Entertainment LLC. Right-click saving, drag-saving, and downloading are prohibited by our Terms of Service.' },
     { q:'Can I remove my votes once placed?', a:'No. Votes are final and cannot be removed or reduced once placed. You may add additional votes to any profile at any time during the active round.' },

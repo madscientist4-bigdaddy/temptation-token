@@ -1983,7 +1983,138 @@ function ContractSettingsSection() {
   );
 }
 
+function BonusConfigSection({ showToast }) {
+  const DEFAULTS = { signup_bonus_tts: '500', vote_match_cap_tts: '1000', vote_match_ratio_numerator: '1', vote_match_ratio_denominator: '1' }
+  const [config, setConfig] = useState({ ...DEFAULTS })
+  const [original, setOriginal] = useState({ ...DEFAULTS })
+  const [auditLog, setAuditLog] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const loadConfig = () => {
+    sb.get('admin_config', 'select=key,value').then(d => {
+      if (Array.isArray(d)) {
+        const obj = {}
+        d.forEach(row => { obj[row.key] = row.value })
+        setConfig(prev => ({ ...prev, ...obj }))
+        setOriginal(prev => ({ ...prev, ...obj }))
+      }
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }
+
+  const loadAuditLog = () => {
+    sb.get('admin_audit_log', 'order=created_at.desc&limit=30&select=*').then(d => {
+      setAuditLog(Array.isArray(d) ? d : [])
+    }).catch(() => {})
+  }
+
+  useEffect(() => { loadConfig(); loadAuditLog() }, [])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const now = new Date().toISOString()
+      const upsertRows = Object.entries(config).map(([key, value]) => ({ key, value, updated_at: now }))
+      await fetch(`${SB_URL}/rest/v1/admin_config`, {
+        method: 'POST',
+        headers: {
+          apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal,resolution=merge-duplicates',
+        },
+        body: JSON.stringify(upsertRows),
+      })
+
+      // Audit log: one entry per changed key
+      const auditRows = Object.entries(config)
+        .filter(([key, value]) => value !== original[key])
+        .map(([key, value]) => ({
+          config_key: key, old_value: original[key], new_value: value,
+          changed_by: 'admin', created_at: now,
+        }))
+      if (auditRows.length > 0) {
+        await sb.post('admin_audit_log', auditRows)
+      }
+
+      setOriginal({ ...config })
+      loadAuditLog()
+      showToast('Bonus config saved — live immediately on next request', 'success')
+    } catch (e) {
+      showToast('Save failed: ' + e.message, 'error')
+    }
+    setSaving(false)
+  }
+
+  const FIELDS = [
+    { key: 'signup_bonus_tts', label: 'Signup Bonus (TTS)', desc: 'Fixed TTS sent on first wallet connect. Default: 500.' },
+    { key: 'vote_match_cap_tts', label: 'Vote Match Cap (TTS)', desc: 'Max TTS matched on first vote (1:1). Default: 1000.' },
+    { key: 'vote_match_ratio_numerator', label: 'Vote Match Ratio (numerator)', desc: 'Match ratio numerator. Default 1 = 1:1 match.' },
+    { key: 'vote_match_ratio_denominator', label: 'Vote Match Ratio (denominator)', desc: 'Match ratio denominator. Default 1 = 1:1 match.' },
+  ]
+
+  if (loading) return <div style={{ padding: '20px', color: 'var(--muted)', fontSize: '.7rem' }}>Loading bonus config…</div>
+
+  return (
+    <div>
+      <div className="table-card" style={{ marginBottom: 16 }}>
+        <div className="table-head" style={{ justifyContent: 'space-between' }}>
+          <span className="table-head-title">🎁 Bonus Configuration</span>
+          <span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>Live — changes apply instantly to next request</span>
+        </div>
+        <div style={{ padding: '8px 0' }}>
+          {FIELDS.map(f => (
+            <div key={f.key} style={{ padding: '14px 20px', borderBottom: '1px solid var(--border2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{f.label}</div>
+                  <div style={{ fontSize: '.6rem', color: 'var(--muted)' }}>{f.desc}</div>
+                </div>
+                <input
+                  type="number"
+                  value={config[f.key]}
+                  onChange={e => setConfig(c => ({ ...c, [f.key]: e.target.value }))}
+                  style={{ width: 100, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text)', fontSize: '.75rem', outline: 'none', textAlign: 'right', fontFamily: 'var(--font-mono, monospace)' }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: '12px 20px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={save}
+            disabled={saving}
+            style={{ background: 'var(--crimson)', color: '#fff', border: 'none', padding: '9px 22px', borderRadius: 6, cursor: 'pointer', fontSize: '.65rem', fontWeight: 700, fontFamily: 'var(--font-body)', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save Bonus Config'}
+          </button>
+        </div>
+      </div>
+
+      <div className="table-card" style={{ marginBottom: 16 }}>
+        <div className="table-head">
+          <span className="table-head-title">📋 Config Change Log</span>
+        </div>
+        {auditLog.length === 0 ? (
+          <div style={{ padding: '16px 20px', fontSize: '.68rem', color: 'var(--muted)' }}>No changes recorded yet.</div>
+        ) : (
+          <div style={{ padding: '4px 0' }}>
+            {auditLog.map((entry, i) => (
+              <div key={i} className="payout-row" style={{ padding: '10px 20px', fontSize: '.65rem', flexWrap: 'wrap', gap: 4 }}>
+                <span style={{ color: 'var(--muted)', minWidth: 140, flexShrink: 0 }}>{new Date(entry.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</span>
+                <span style={{ color: 'var(--gold)', fontWeight: 600 }}>{entry.config_key}</span>
+                <span style={{ color: 'var(--muted)' }}>{entry.old_value} → {entry.new_value}</span>
+                <span style={{ color: 'var(--muted)', marginLeft: 'auto', fontSize: '.6rem' }}>by {entry.changed_by}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SettingsScreen() {
+  const [, showToast] = useToast()
   return (
     <div>
       <div className="page-header">
@@ -2002,7 +2133,7 @@ function SettingsScreen() {
             { label: "Max Profiles Per Week", value: "50" },
             { label: "Max Submissions Per Wallet", value: "3 per week" },
             { label: "Minimum Vote Amount", value: "5 $TTS" },
-            { label: "Profile Submission Cost", value: "5 $TTS" },
+            { label: "Profile Submission Cost", value: "5 $TTS (sent to house wallet)" },
           ]
         },
         {
@@ -2010,14 +2141,18 @@ function SettingsScreen() {
           fields: [
             { label: "Current Nonprofit", value: "Polaris Project" },
             { label: "Contact Email", value: "photos@temptationtoken.io" },
-            { label: "Donation %", value: "10% of weekly prize pool" },
+            { label: "Donation %", value: "10% of winning-profile vote pool" },
+            { label: "Charity Wallet", value: "0xf7dd429d679cb61231e73785fd1737e60138aba3" },
           ]
         },
         {
-          title: "Sign-Up Bonus",
+          title: "Prize Split (on-chain, immutable without redeploy)",
           fields: [
-            { label: "Bonus Amount", value: "100 $TTS per new user" },
-            { label: "Funded From", value: "Sign-Up Bonus Wallet" },
+            { label: "Top Voter", value: "35% of winning-profile vote pool" },
+            { label: "Winning Profile", value: "35% of winning-profile vote pool" },
+            { label: "Polaris Project", value: "10% of winning-profile vote pool" },
+            { label: "House (no club)", value: "20% of winning-profile vote pool → 0xb1e991bf..." },
+            { label: "Losing-Profile Votes", value: "Burned to 0x000...dEaD at settlement" },
           ]
         },
       ].map((section, i) => (
@@ -2036,10 +2171,12 @@ function SettingsScreen() {
         </div>
       ))}
 
+      <BonusConfigSection showToast={showToast} />
+
       <ContractSettingsSection />
 
       <div style={{ background: "rgba(52,152,219,0.08)", border: "1px solid rgba(52,152,219,0.2)", borderRadius: 10, padding: "14px 18px", fontSize: "0.63rem", color: "var(--muted)", lineHeight: 1.8 }}>
-        ℹ Contract Settings above require the admin wallet (deployer) connected via MetaMask. All other settings are for reference only.
+        ℹ Contract Settings above require the admin wallet (deployer) connected via MetaMask. Bonus Configuration changes take effect immediately without MetaMask.
       </div>
     </div>
   );
