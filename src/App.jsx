@@ -1027,7 +1027,7 @@ function NFTScreen({ address, connected }) {
           <span className="nft-ei">💎</span>
             <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>NFT trophies are awarded to Round winners 🏆</div>
           <div style={{ fontSize:'.85rem', color:'var(--muted)', lineHeight:1.6 }}>
-            Win a round to earn yours. Minting begins Round 2 (after May 5).<br /><br />
+            Win a round to earn yours. Minting begins in Round 2 (after Round 1 settles).<br /><br />
             <strong style={{ color:'var(--gold)' }}>How to win:</strong> Vote on the winning profile and be the top voter — you earn 35% of the prize pool + an exclusive NFT trophy minted to your wallet on Base.
           </div>
         </div>

@@ -160,7 +160,24 @@ async function uploadMediaForDay(dayOfWeek) {
   }
 }
 
+function stripDuplicateCashtags(text) {
+  const tokens = text.split(/(\s+)/)
+  const seen = new Set()
+  const result = []
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const t = tokens[i]
+    if (/^\$[A-Z]+$/i.test(t.trim()) && t.trim().length > 1) {
+      const sym = t.trim().toUpperCase()
+      if (seen.has(sym)) continue
+      seen.add(sym)
+    }
+    result.unshift(t)
+  }
+  return result.join('').trim()
+}
+
 async function postTweetTTS(text, dayOfWeek) {
+  text = stripDuplicateCashtags(text)
   const { X_API_KEY, X_API_SECRET, TTS_X_ACCESS_TOKEN, TTS_X_ACCESS_SECRET } = process.env
   if (!X_API_KEY || !X_API_SECRET) return { skipped: 'X app credentials not set' }
   if (!TTS_X_ACCESS_TOKEN || !TTS_X_ACCESS_SECRET) return { skipped: 'TTS X credentials not set' }

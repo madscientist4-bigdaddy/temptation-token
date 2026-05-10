@@ -1497,7 +1497,17 @@ function PayoutsScreen({ showToast }) {
 
       <div style={{ background:'rgba(46,204,113,0.06)', border:'1px solid rgba(46,204,113,0.2)', borderRadius:10, padding:'14px 18px', fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8 }}>
         ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 35% to top voter, 35% to winning profile, 20% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.<br /><br />
-        🏆 <strong style={{ color:'var(--gold)' }}>Round 1 status:</strong> Active — ends May 5, 2026 at 5:10 PM EDT (21:10 UTC). NFT Champion Trophy will be minted to winner's wallet automatically at settlement starting Round 2 (after May 5). NFT minting requires V3b redeployment — see Daily Priorities.
+        {roundInfo && !roundInfo.error ? (() => {
+          const endDate = new Date(roundInfo.endTime * 1000)
+          const endStr = endDate.toLocaleString('en-US', { timeZone:'America/New_York', weekday:'long', month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short' })
+          // Canonical close is Monday 00:00–03:59 UTC (= Sunday 11:59 PM EDT window)
+          const offSchedule = !(endDate.getUTCDay() === 1 && endDate.getUTCHours() < 4)
+          return (<>
+            🏆 <strong style={{ color:'var(--gold)' }}>Round {roundInfo.roundId} status:</strong> Active — closes <strong>{endStr}</strong>.
+            {offSchedule && <span style={{ marginLeft:6, color:'#f39c12', fontWeight:700 }}>⚠ Off canonical schedule — expected Sunday 11:59 PM EDT. Round may have started mid-week instead of via Monday Chainlink keeper.</span>}
+            {' '}NFT Champion Trophy mints automatically at settlement starting Round 2. NFT minting requires V3b redeployment — see Daily Priorities.
+          </>)
+        })() : <span>🏆 <strong style={{ color:'var(--gold)' }}>Round status:</strong> {roundInfo?.error ? `Error reading chain: ${roundInfo.error}` : 'Loading from chain…'}</span>}
       </div>
     </div>
   );

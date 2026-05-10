@@ -150,7 +150,7 @@ def on_start(cid, uid, name, uname, args):
         f"🔥 *Welcome back, {name}!*\n\n"
         "The world\'s first crypto Hot or Not voting game on Base.\n\n"
         "🗳 Vote $TTS on profiles\n"
-        "🏆 Top voter wins 40% of weekly pot\n"
+        "🏆 Top voter wins 35% of weekly pot\n"
         "🔥 Losing votes burned\n"
         "💎 Stake for up to 3x vote power\n\n"
         f"*Your signup bonus:* {SIGNUP_BONUS} $TTS 🎁",
@@ -166,7 +166,7 @@ def on_callback(cid, mid, cbid, data, uid, name):
         edit(cid, mid,
             f"🔥 *Welcome to Temptation Token, {name}!*\n\n"
             "Vote $TTS on profiles every week.\n"
-            "Top voter wins 40% of the prize pool.\n\n"
+            "Top voter wins 35% of the prize pool.\n\n"
             f"*New user bonus:* {SIGNUP_BONUS} $TTS free!\n\n"
             "Tap *Play TTS Now* to start 👇", main_kb())
         send(cid, f"💬 Join our community: https://t.me/TTSCommunityChat")
@@ -175,7 +175,7 @@ def on_callback(cid, mid, cbid, data, uid, name):
     elif data == "earn":
         edit(cid, mid,
             "💰 *Ways to Earn $TTS*\n\n"
-            "*Vote & Win:* Put the most TTS on the winning profile → earn 40% of that profile\'s vote pool\n\n"
+            "*Vote & Win:* Put the most TTS on the winning profile → earn 35% of the prize pool (top voter prize)\n\n"
             "*Stake Your TTS:*\n"
             "• Bronze $50+ → 8% APR · 1.1x votes\n"
             "• Silver $100+ → 12% APR · 1.25x votes\n"
@@ -220,7 +220,7 @@ def on_callback(cid, mid, cbid, data, uid, name):
                 "prices": [{"label": f"VIP {tier['label']}", "amount": tier["stars"]}]})
     elif data == "lb":
         edit(cid, mid,
-            "🏆 *TTS Leaderboard*\n\nWeekly round is live!\nTop voter on the winning profile wins 40% of that profile\'s pool + wager returned.\n\nRound closes Sunday 23:59 UTC.",
+            "🏆 *TTS Leaderboard*\n\nWeekly round is live!\nTop voter on the winning profile wins 35% of the prize pool.\n\nRound closes Sunday 11:59 PM EDT.",
             {"inline_keyboard":[[{"text":"📊 View Live Leaderboard","web_app":{"url":APP}}],
                                  [{"text":"⬅️ Back","callback_data":"back"}]]})
     elif data == "ref":
@@ -256,7 +256,7 @@ def on_payment(cid, uid, payload):
                                      [{"text":"🎮 Play Now","web_app":{"url":APP}}]]})
 
 DAILY_POSTS = [
-    "🏆 *Weekly voting is LIVE!* Top voter wins 40% of the pot.\n\nVote now 👉 t.me/TTSGameBot",
+    "🏆 *Weekly voting is LIVE!* Top voter wins 35% of the prize pool.\n\nVote now 👉 t.me/TTSGameBot",
     "💰 Staking $TTS gives you up to 3x vote power AND 45% APR.\n\nStart staking 👉 t.me/TTSGameBot",
     "🔗 Refer a friend — earn *100 $TTS* per referral!\n\nGet your link 👉 t.me/TTSGameBot",
     "🔥 $TTS is deflationary — every losing vote gets BURNED forever.\n\nBuy $TTS 👉 t.me/TTSGameBot",
