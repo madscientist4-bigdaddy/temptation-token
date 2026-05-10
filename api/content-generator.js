@@ -135,6 +135,8 @@ async function fetchLiveContext() {
     recentSettlement: false,
     totalSupplyTTS: null,
     stakingLockBehavior: null,
+    transferTaxPct: 1,
+    transferTaxExemption: 'app.temptationtoken.io and Temptation Token protocol contracts (votes, staking, prize payouts, marketing wallet distributions)',
   }
 
   try {
@@ -264,7 +266,8 @@ async function generateAllPosts(ctx) {
     `Prize split: 35% top voter · 35% winning profile · 10% charity (@PolarisProject) · 20% house`,
     `Total supply (live on-chain): ${ctx.totalSupplyTTS != null ? ctx.totalSupplyTTS.toLocaleString() + ' TTS' : '69,000,000,000 TTS (fallback)'}`,
     `Staking lock behavior: ${ctx.stakingLockBehavior || 'available anytime, time-locked once staked'}`,
-    `Minimum vote: 5 $TTS · Transfer tax: 1% permanent`,
+    `Minimum vote: 5 $TTS`,
+    `Transfer tax: ${ctx.transferTaxPct}% — permanent, hardcoded, cannot be removed. Exempt: ${ctx.transferTaxExemption}.`,
   ].filter(Boolean).join('\n')
 
   const message = await client.messages.create({
@@ -286,6 +289,8 @@ CRITICAL RULES — NEVER VIOLATE THESE:
    - NEVER invent or approximate settlement times. NEVER write "closes Wed", "closes at 11:23 PM", or any other time not in the canonical schedule. If a post references round timing, use ONLY the exact close date/time from the live context.
 
 3. STAKING LOCK — staking is NOT tied to round open/close windows. Use the "Staking lock behavior" field above verbatim. NEVER say "staking closes with the round", "stake before the round ends", or imply any staking deadline tied to the round schedule. Staking can happen any day of the week.
+
+4. TRANSFER TAX — the TTS token has a permanent, mandatory 1% transfer tax on ALL transfers EXCEPT those originating from app.temptationtoken.io and the Temptation Token smart contract system itself (votes, staking, prize payouts, marketing wallet distributions). This 1% tax is hardcoded and cannot be removed. Any post that touches tokenomics MUST treat the 1% tax as fact. Posts that write "no tax", "zero tax", or that explain tokenomics without mentioning the 1% tax are FORBIDDEN. Use the "Transfer tax:" field in LIVE PROJECT STATE above — do not soften, omit, or contradict it.
 
 2. ZERO STAKERS — if total stakers = 0, NEVER state this as a current fact or negative. Instead frame it as opportunity:
    - Good: "Be the first Diamond staker — 32% APR and 2x vote weight from day one."
@@ -555,7 +560,7 @@ export default async function handler(req, res) {
       ok: true, dry_run: true,
       generated: { weekly: weeklyRows.length, instagram: igRows.length, total: allRows.length },
       used_fallback: usedFallback,
-      context: { roundId: ctx.roundId, prizePoolTTS: ctx.prizePoolTTS, approvedProfiles: ctx.approvedProfiles, totalStakers: ctx.totalStakers, lpLockDays: ctx.lpLockDays, auditAgeDays: ctx.auditAgeDays, totalSupplyTTS: ctx.totalSupplyTTS, stakingLockBehavior: ctx.stakingLockBehavior },
+      context: { roundId: ctx.roundId, prizePoolTTS: ctx.prizePoolTTS, approvedProfiles: ctx.approvedProfiles, totalStakers: ctx.totalStakers, lpLockDays: ctx.lpLockDays, auditAgeDays: ctx.auditAgeDays, totalSupplyTTS: ctx.totalSupplyTTS, stakingLockBehavior: ctx.stakingLockBehavior, transferTaxPct: ctx.transferTaxPct, transferTaxExemption: ctx.transferTaxExemption },
       weekStart: weekStartStr,
       weekly_posts: weeklyRows.map((r, i) => ({
         n: Math.floor(i / 2) + 1, platform: r.platform,
