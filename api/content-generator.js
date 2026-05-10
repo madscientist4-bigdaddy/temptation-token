@@ -133,6 +133,8 @@ async function fetchLiveContext() {
     auditAgeDays: daysSince(AUDIT_PUBLISHED),
     lpLockDays:   daysSince(LP_LOCKED_DATE),
     recentSettlement: false,
+    totalSupplyTTS: null,
+    stakingLockBehavior: null,
   }
 
   try {
@@ -188,6 +190,40 @@ async function fetchLiveContext() {
     ctx.recentSettlement = Array.isArray(settled) && settled.length > 0
   } catch {}
 
+  // Live totalSupply from TTS token contract (ERC-20 standard selector 0x18160ddd)
+  try {
+    const TOKEN_ADDRESS = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
+    const raw = await rpc({ method: 'eth_call', params: [{ to: TOKEN_ADDRESS, data: '0x18160ddd' }, 'latest'] })
+    if (raw && raw !== '0x') {
+      const divisor = BigInt('1000000000000000000')
+      ctx.totalSupplyTTS = Number(BigInt(raw) / divisor)
+    }
+  } catch {}
+
+  // Staking lock behavior — probe common selectors; fall back to codebase-derived description
+  // if the UUPS proxy's unverified implementation doesn't respond
+  try {
+    const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
+    const LOCK_SELECTORS = ['0x3fd8b02f', '0x4e71e0c8', '0x3c7cf0e1', '0x48f30e8c']
+    let lockSeconds = 0
+    for (const sel of LOCK_SELECTORS) {
+      const raw = await rpc({ method: 'eth_call', params: [{ to: STAKING_ADDRESS, data: sel }, 'latest'] })
+      if (raw && raw.length === 66) {
+        const val = parseInt(raw, 16)
+        if (val > 0) { lockSeconds = val; break }
+      }
+    }
+    if (lockSeconds > 0) {
+      const days = Math.round(lockSeconds / 86400)
+      ctx.stakingLockBehavior = `Time-locked: ${days} days once staked. Staking is available anytime — not tied to round windows.`
+    } else {
+      // Codebase evidence: lockPd initialized to '3 months'; FAQ says "cannot be accessed early"
+      ctx.stakingLockBehavior = 'Time-locked approximately 3 months once staked. Staking is available anytime — not tied to round open/close windows.'
+    }
+  } catch {
+    ctx.stakingLockBehavior = 'Time-locked once staked (duration stored on-chain). Staking is available anytime — not tied to round windows.'
+  }
+
   return ctx
 }
 
@@ -226,7 +262,9 @@ async function generateAllPosts(ctx) {
     `Chain: Base mainnet`,
     `Staking: Bronze $50+ (8% APR, 1.1x) · Silver $100+ (12%, 1.25x) · Gold $250+ (18%, 1.5x) · Diamond $1k+ (32%, 2x) · VIP $5k+ (45%, 3x)`,
     `Prize split: 35% top voter · 35% winning profile · 10% charity (@PolarisProject) · 20% house`,
-    `Minimum vote: 5 $TTS · Transfer tax: 1% permanent · Total supply: 69B fixed`,
+    `Total supply (live on-chain): ${ctx.totalSupplyTTS != null ? ctx.totalSupplyTTS.toLocaleString() + ' TTS' : '69,000,000,000 TTS (fallback)'}`,
+    `Staking lock behavior: ${ctx.stakingLockBehavior || 'available anytime, time-locked once staked'}`,
+    `Minimum vote: 5 $TTS · Transfer tax: 1% permanent`,
   ].filter(Boolean).join('\n')
 
   const message = await client.messages.create({
@@ -246,6 +284,8 @@ CRITICAL RULES — NEVER VIOLATE THESE:
    - Round closes: the specific date/time in "Round closes:" above (e.g. "Sunday, May 10, 11:59 PM EDT")
    - Settlement fires automatically via Chainlink within minutes of round close
    - NEVER invent or approximate settlement times. NEVER write "closes Wed", "closes at 11:23 PM", or any other time not in the canonical schedule. If a post references round timing, use ONLY the exact close date/time from the live context.
+
+3. STAKING LOCK — staking is NOT tied to round open/close windows. Use the "Staking lock behavior" field above verbatim. NEVER say "staking closes with the round", "stake before the round ends", or imply any staking deadline tied to the round schedule. Staking can happen any day of the week.
 
 2. ZERO STAKERS — if total stakers = 0, NEVER state this as a current fact or negative. Instead frame it as opportunity:
    - Good: "Be the first Diamond staker — 32% APR and 2x vote weight from day one."
@@ -515,7 +555,7 @@ export default async function handler(req, res) {
       ok: true, dry_run: true,
       generated: { weekly: weeklyRows.length, instagram: igRows.length, total: allRows.length },
       used_fallback: usedFallback,
-      context: { roundId: ctx.roundId, prizePoolTTS: ctx.prizePoolTTS, approvedProfiles: ctx.approvedProfiles, totalStakers: ctx.totalStakers, lpLockDays: ctx.lpLockDays, auditAgeDays: ctx.auditAgeDays },
+      context: { roundId: ctx.roundId, prizePoolTTS: ctx.prizePoolTTS, approvedProfiles: ctx.approvedProfiles, totalStakers: ctx.totalStakers, lpLockDays: ctx.lpLockDays, auditAgeDays: ctx.auditAgeDays, totalSupplyTTS: ctx.totalSupplyTTS, stakingLockBehavior: ctx.stakingLockBehavior },
       weekStart: weekStartStr,
       weekly_posts: weeklyRows.map((r, i) => ({
         n: Math.floor(i / 2) + 1, platform: r.platform,
