@@ -1,7 +1,7 @@
 // POST /api/approve-profile
-// Body: { submissionId: string, walletAddress: string }
+// Body: { submissionId: string }
 // 1. Updates Supabase submissions row to status=approved
-// 2. Calls batchApproveProfiles([submissionId], [walletAddress]) on TTSVotingV3b
+// 2. Reads wallet_address from Supabase row and calls batchApproveProfiles([submissionId], [wallet]) on TTSVotingV3b
 // 3. If submission has referral_code, calls setProfileClub(submissionId, referral_code) on contract
 // Requires env: DEPLOYER_PRIVATE_KEY
 
@@ -23,9 +23,9 @@ const ABI = parseAbi([
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { submissionId, walletAddress } = req.body || {}
-  if (!submissionId || !walletAddress) {
-    return res.status(400).json({ ok: false, error: 'Missing submissionId or walletAddress' })
+  const { submissionId } = req.body || {}
+  if (!submissionId) {
+    return res.status(400).json({ ok: false, error: 'Missing submissionId' })
   }
 
   const pk = process.env.DEPLOYER_PRIVATE_KEY
@@ -47,9 +47,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: `Supabase PATCH failed: ${text}` })
   }
   const updated = await supaRes.json().catch(() => [])
-  const referralCode = Array.isArray(updated) && updated[0]?.referral_code
-    ? updated[0].referral_code.trim().toLowerCase()
-    : null
+  const row = Array.isArray(updated) ? updated[0] : null
+  const referralCode = row?.referral_code ? row.referral_code.trim().toLowerCase() : null
+  const walletAddress = row?.wallet_address
+  if (!walletAddress) {
+    return res.status(500).json({ ok: false, error: 'No wallet_address stored in Supabase for this submission — cannot register on-chain' })
+  }
 
   // 2. On-chain calls
   const pkHex        = pk.startsWith('0x') ? pk : `0x${pk}`
