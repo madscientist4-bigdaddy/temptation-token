@@ -268,6 +268,8 @@ Note: Admin dashboard requires browser + password (`TTS2026Admin!`). All checks 
 | Google Search Console verified | ❓ UNKNOWN | Cannot verify without GSC access |
 | Sitemap | ⚠️ /sitemap_index.xml returns 200 | XML content returned but URL count needs browser parse |
 | Rank Math scores ≥80 | ❓ UNKNOWN | Requires WordPress admin access |
+| **WordPress programmatic automation** | ✅ PLUGIN READY | tts-api-auth plugin generated (2026-05-12). ZIP at `wp-plugins/tts-api-auth.zip`. Requires Jim to upload via wp-admin → activate → run one setup curl. Logo fix embedded in activation hook. Endpoint: `temptationtoken.io/wp-json/tts/v1/`. See CLAUDE.md "WordPress Programmatic Edits". |
+| Homepage hero logo size | ⚠️ PENDING PLUGIN INSTALL | Logo (data-id=e7cd5ae, page 52) renders at 800×800px on desktop — too large. Fix embedded in plugin activation: sets max-width 200px via Elementor widget settings + Additional CSS injection. Will apply automatically when plugin is activated. |
 
 ---
 
@@ -338,7 +340,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 2. **Staking contract: `getStakingTier(address)` interface mismatch with V3b** — V3b calls selector `0xa8a82fd7` which does not exist in the staking implementation's dispatch table (35 entries confirmed). The staking contract IS properly initialized (ttsToken=0x5570..., treasury=0xC3A3858A..., DEFAULT_ADMIN=BANK). The mismatch causes V3b's try/catch to fire for every voter → 1x multiplier for all. **Zero impact in Round 1 (no stakers yet).** Fix: UUPS upgrade to new implementation that adds `getStakingTier(address)` wrapper. BANK has upgrade authority (confirmed via eth_call simulation).
 
-3. **WordPress homepage has 40% prize split** — Two confirmed instances say "40%": "winning profile takes 40% of the weekly prize pool" and "Win — 40% prize pool split weekly". Visible to all visitors. Factual error affecting trust.
+3. **WordPress homepage has 40% prize split** — Two confirmed instances say "40%": "winning profile takes 40% of the weekly prize pool" and "Win — 40% prize pool split weekly". Visible to all visitors. Factual error affecting trust. Fix requires tts-api-auth plugin installed (ZIP at `wp-plugins/tts-api-auth.zip`).
 
 4. **Supabase `rounds` table stale (March 2026)** — Round data shows start_time=2026-03-23, not the current May 2026 round. Any dashboard that reads round timing from Supabase will show wrong dates.
 
