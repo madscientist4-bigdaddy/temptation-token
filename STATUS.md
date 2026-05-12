@@ -228,8 +228,7 @@ All 4 keys: signup_bonus_tts=500, vote_match_cap_tts=1000, ratio_numerator=1, ra
 | Signup bonus claim works | ⚠️ LIKELY PASS | 5 successful claims recorded in bonus_claims. API source reads admin_config = 500 TTS ✅. |
 | VOTING_ADDRESS = V3b in JS bundle | ✅ PASS | `6d6fF6A0` found in deployed JS bundle; old V3 address absent. |
 | 500 TTS bonus in JS bundle | ⚠️ UNCERTAIN | "500 TTS" string not found as-is; "100 TTS" found (likely referral line). Bundle may compress differently. |
-| getRound ABI — profileCount (wrong) | ❌ FAIL | "profileCount" found in deployed JS bundle. Bug: should be string[] profileIds. May silently decode offset as count=224. |
-| getRound ABI — profileIds also present | ⚠️ | "profileIds" also found in bundle — both strings present. Possible partial fix or dual definition. |
+| getRound ABI — profileCount | ✅ PASS | ABI is correct. Contract source (line 531–543) and on-chain call both confirm: returns 7 static uint256/bool values. word[6] = profileCount = 15 (not 224). Previous "bug" was a misdiagnosis — the 224 was the total return byte length (7×32), not the profileCount value. No fix needed. |
 
 ---
 
@@ -357,7 +356,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 ### 🟡 MEDIUM
 
-10. **getRound ABI mismatch in App.jsx** — Frontend ABI declares `uint256 profileCount` but contract returns `string[] profileIds`. Silently decodes as profileCount=224. Doesn't currently block voting but could cause issues on viem version updates.
+10. ~~**getRound ABI mismatch**~~ — **NOT A BUG (2026-05-12 confirmed).** Contract source (TTSVotingV3b.sol line 531–543) returns `uint256 profileCount = r.profileIds.length`. On-chain eth_call of getRound(1) returns 7 static words; word[6] = 15 (correct profile count). App.jsx ABI `uint256 profileCount` is correct. The "224" in the original diagnosis was the total return payload size (7×32=224 bytes), not the profileCount value.
 
 11. **Gnosis Safe signer 2 undocumented** — `0x95607dcf...` is not listed in CLAUDE.md. Confirm this is expected (Jim's second wallet?).
 
