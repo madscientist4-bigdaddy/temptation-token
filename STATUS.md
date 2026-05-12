@@ -91,17 +91,34 @@
 
 ### Staking (`0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc`)
 
+**Investigation updated 2026-05-12. Previous status "PARTIAL init / broken" was incorrect.**
+
+Root cause of `getStakingTier()` failures identified: **interface mismatch**, not broken init.
+The contract is properly initialized. Prior sequential-slot scan (slots 0–20) looked empty because
+OpenZeppelin UUPS/AccessControl uses namespaced (non-sequential) storage — state is at hashed slots.
+
 | Check | Status | Evidence |
 |-------|--------|----------|
 | UUPS proxy | ✅ PASS | 1,101-byte proxy; ERC-1967 impl slot → 0x370b8fd7... (16,416 bytes impl) |
-| `initialize()` called | ⚠️ PARTIAL | Storage slot 0 = 1 (_initialized flag). BUT slots 1–5 all zero = state vars unset. Owner reverts. |
-| `getStakingTier()` functional | ❌ FAIL | All calls revert. Affects all staking multipliers. Selector `0xa8a82fd7` confirmed; impl may have different name or owner-gated reads. |
-| TTS held in staking contract | ⚠️ 10B TTS | 10,000,000,000 TTS. Likely staking rewards pool pre-loaded. No user stakes recorded. |
-| Staking user count | ✅ 0 | `stakes` Supabase table: 0 rows. No users staked. |
-| Diamond APR = 32% | ❓ UNKNOWN | Source inaccessible. Displayed on website as 32%. |
-| VIP APR = 45% | ❓ UNKNOWN | Source inaccessible. Displayed on website as 45%. |
-| Vote multipliers correct | ❌ FAIL | Tier 3 = 1.75x (should be 2x); tier 4 = 2x (should be 3x). Moot while getStakingTier reverts. |
-| 3-month lock enforced | ❓ UNKNOWN | Source inaccessible |
+| `initialize()` already called | ✅ PASS | `initialize(BANK,TTS)` → "Initializable: contract is already initialized". Slot 0 = 1 confirmed. |
+| ttsToken set correctly | ✅ PASS | `ttsToken()` (0xf75edc8c) returns `0x5570ea97...` = TTS token address ✅ |
+| treasury address | ✅ PASS | `treasury()` (0x61d027b3) returns `0xC3A3858A3777E4C9b542e60298c3161086c5Faae` |
+| Paused | ✅ PASS | `paused()` returns false — contract is operational |
+| totalStaked | ✅ 0 | `totalStaked()` = 0 (no user stakes yet, correct) |
+| DEFAULT_ADMIN_ROLE = BANK | ✅ PASS | `hasRole(bytes32(0), BANK)` = true. BANK has full admin. |
+| UPGRADER_ROLE defined | ✅ PASS | `UPGRADER_ROLE()` = `0x189ab7a9...`; MANAGER_ROLE = `0x241ecf16...` |
+| BANK can call upgradeTo() | ✅ PASS | `upgradeTo(current_impl)` eth_call from BANK = success (`0x`) |
+| Lock period | ✅ 90 days | Selector `0xdd95386e()` returns 7,776,000 seconds = 90 days |
+| Year-lock constant | ✅ 365 days | Selector `0x452ab253()` returns 31,536,000 = 1 year |
+| Tier multipliers in contract | ⚠️ WRONG VALUES | Bronze=1.1 ✅, Silver=1.25 ✅, Gold=1.5 ✅, Diamond=1.75 ❌ (should be 2x), VIP=2.0 ❌ (should be 3x) — all stored as 1e18-scaled constants |
+| `getStakingTier(address)` exists | ❌ FAIL — INTERFACE MISMATCH | Selector `0xa8a82fd7` not in dispatch table (35 entries confirmed via PUSH4+EQ pattern scan). V3b calls this non-existent function → hits fallback → reverts → V3b try/catch fires → 1x for all voters. |
+| Actual tier/stake query function | ⚠️ UNCONFIRMED | `0x748e6856(address)` + `0x2def6620(address)` both revert for non-stakers ("no stake"). Cannot confirm return value for staked users — no users have staked yet. |
+| Stake deposit function | ⚠️ UNCONFIRMED | `0x6eb5adbe(uint256)` reverts with "ERC20: insufficient allowance" when called — confirms it IS the deposit/stake function. Exact name unknown (source unverified). |
+| TTS held in staking contract | ✅ 10B TTS | Pre-loaded rewards pool. Not user stakes. |
+| Staking user count | ✅ 0 | No users staked. V3b's 1x fallback is correct behavior for all current voters. |
+| 3-month lock enforced | ✅ 90 days | Lock period constant = 90 days confirmed on-chain. |
+| Impact on Round 1 | ✅ NONE | Zero stakers → 1x multiplier for all voters is correct. Issue only matters when users stake. |
+| Recovery path | ⚠️ REQUIRES ACTION | **UUPS upgrade** (BANK can execute solo): deploy new impl with `getStakingTier(address)` wrapper → `upgradeToAndCall(newImpl, '')` from BANK wallet. No proxy redeploy. Requires identifying exact internal tier function name first. |
 
 ---
 
@@ -320,7 +337,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 1. **Profile payout wallets = deployer** — 14/15 approved profiles have `payout_wallet = 0xb1e991bf...`. If Round 1 settles, 100% of winner's prize and top voter's prize go to the deployer, not real users. **Must re-approve profiles with correct wallet addresses before settlement (May 14 03:23 UTC deadline).**
 
-2. **Staking contract broken — getStakingTier always reverts** — All staking multipliers are non-functional. No voter receives any boost (1x for all). Root cause: staking implementation slots 1–5 all zero despite `_initialized=1`. Owner address null. Contract state corrupt/mis-initialized. Blocks Diamond/VIP selling proposition.
+2. **Staking contract: `getStakingTier(address)` interface mismatch with V3b** — V3b calls selector `0xa8a82fd7` which does not exist in the staking implementation's dispatch table (35 entries confirmed). The staking contract IS properly initialized (ttsToken=0x5570..., treasury=0xC3A3858A..., DEFAULT_ADMIN=BANK). The mismatch causes V3b's try/catch to fire for every voter → 1x multiplier for all. **Zero impact in Round 1 (no stakers yet).** Fix: UUPS upgrade to new implementation that adds `getStakingTier(address)` wrapper. BANK has upgrade authority (confirmed via eth_call simulation).
 
 3. **WordPress homepage has 40% prize split** — Two confirmed instances say "40%": "winning profile takes 40% of the weekly prize pool" and "Win — 40% prize pool split weekly". Visible to all visitors. Factual error affecting trust.
 
@@ -368,7 +385,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 1. **URGENT (before May 14 03:23 UTC)**: Re-approve 14 profiles with real user payout wallets. Otherwise Round 1 prize goes to deployer. If no real users submitted their wallet, consider cancelling/extending Round 1 or treating it as a test round.
 
-2. **Staking contract fix**: Is the staking contract (0xaA12B889...) repairable (call `initialize()` with correct params) or does it need redeployment? All user-facing multiplier promises are currently broken.
+2. **Staking contract fix (updated 2026-05-12)**: Contract IS properly initialized. Problem is interface mismatch — `getStakingTier(address)` doesn't exist in the implementation. Fix options: (A) UUPS upgrade via BANK wallet — deploy new impl that adds `getStakingTier(address)` wrapper, call `upgradeToAndCall(newImpl, '')`. (B) V3c redeploy using the correct staking function selector. No re-initialization needed. No proxy redeploy needed. **Recommend Option A — BANK can do it solo without Gnosis Safe.**
 
 3. **V3c redeploy decision**: Fix multipliers (tier 3=2x, tier 4=3x) and add 3 NFT mints? Round 1 has 0 votes — zero-risk migration window is between May 14 settlement and Round 2 start. Delay if undecided.
 
@@ -414,6 +431,6 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 ## Closing
 
-Last verified: 2026-05-12 (UTC). Next verification due: weekly via STATUS.md regeneration.
+Last verified: 2026-05-12 (UTC) — staking investigation updated (init confirmed OK, interface mismatch identified). Next verification due: weekly via STATUS.md regeneration.
 
 Re-run verification: execute `node scripts/check-prize-split.mjs` for code audit; re-run the RPC/Supabase calls above for live state. Re-enable filesystem access in macOS Privacy & Security → Files and Folders to verify source files.
