@@ -1248,9 +1248,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       setLuErr('Must start with http:// or https://')
       showToast('Link URL must start with http:// or https://','e'); return
     }
-    if (!wallet.trim() || !/^0x[0-9a-fA-F]{40}$/.test(wallet.trim())) {
-      setWalletErr('Must be a valid 0x wallet address')
-      showToast('Enter a valid 0x wallet address','e'); return
+    if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      showToast('Wallet not detected — reconnect wallet','e'); return
     }
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
     if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
@@ -1282,7 +1281,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       const r = await fetch(SUPABASE_URL + '/rest/v1/submissions', {
         method: 'POST',
         headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ round_id: currentRoundId, wallet_address: wallet.trim(), payout_wallet: wallet.trim(), display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending', referral_code: clubCode.trim().toLowerCase() || null })
+        body: JSON.stringify({ round_id: currentRoundId, wallet_address: address, payout_wallet: address, display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending', referral_code: clubCode.trim().toLowerCase() || null })
       })
       if (r.ok) {
         showToast('Submission sent for review!', 's')
@@ -1291,7 +1290,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), wallet: wallet.trim(), link_url: lu.trim() })
+          body: JSON.stringify({ name: name.trim(), wallet: address, link_url: lu.trim() })
         }).catch(() => {})
       } else showToast('Fee paid — submission queued for review.', 's')
     } catch {
@@ -1300,7 +1299,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       return
     }
 
-    setPrev(null); setName(''); setLt(''); setLu(''); setWallet(''); setA1(false); setA2(false); setClubCode('')
+    setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
     setSubmitting(false)
   }
 
@@ -1335,9 +1334,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         <label className="flabel">Club Referral Code <span style={{ color:'var(--muted)', fontWeight:400 }}>(optional — if sent by a club)</span></label>
         <input className="finput" type="text" placeholder="e.g. VIXENS or DOLLHOUSE" value={clubCode} onChange={e => setClubCode(e.target.value)} style={{ textTransform:'lowercase' }} />
         <label className="flabel">Your Base Wallet Address (prize payouts)</label>
-        <input className="finput" type="text" placeholder="0x…" value={wallet} onChange={e => { setWallet(e.target.value); setWalletErr('') }} />
-        {walletErr && <div style={{ color:'var(--rose)', fontSize:'.7rem', marginTop:-8, marginBottom:8 }}>⚠ {walletErr}</div>}
-        <div className="addr-warn">⚠ Double-check this address. Prizes sent to an incorrect address are permanently lost. We cannot recover misdirected funds.</div>
+        <input className="finput" type="text" value={address || ''} readOnly style={{ opacity: 0.7, cursor: 'default' }} />
+        <div className="addr-warn">Prize wallet is locked to your connected address. To change it, reconnect a different wallet before submitting.</div>
         <div style={{ fontFamily:'var(--font-d)', fontSize:'1rem', fontStyle:'italic', marginBottom:9 }}>Legal Agreement</div>
         <div className="cbox"><div className="ctxt">{CONTRACT_TEXT}</div></div>
         <label className="chk-row">
