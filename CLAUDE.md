@@ -276,6 +276,56 @@ All 11 findings from the voting contract audit (audit ID 88b99f3a) are patched:
 
 ---
 
+## WordPress Programmatic Edits
+
+WordPress programmatic edits use the **tts-api-auth plugin** (bypasses Hostinger's Application Password block).
+
+- **Endpoint base:** `https://temptationtoken.io/wp-json/tts/v1/`
+- **Auth header:** `X-TTS-API-Key: <key>`
+- **Key stored in Vercel env as:** `TTS_WP_API_KEY`
+- **Plugin source:** `wp-plugins/tts-api-auth/tts-api-auth.php`
+- **Plugin ZIP** (upload to wp-admin): `wp-plugins/tts-api-auth.zip`
+
+### Routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET/POST | `/setup` | One-time setup: POST `{setup_token, api_key}` to register key (token shown in wp-admin notice after activation) |
+| GET | `/status` | Confirm auth works; returns user, logo_fix timestamp |
+| GET/POST | `/elementor/{page_id}` | Read/write Elementor JSON for any page |
+| GET/POST | `/meta/{post_id}` | Read/write any post meta |
+| POST | `/fix-logo` | Re-apply homepage logo CSS fix (idempotent) |
+| GET/POST | `/css` | Read/write WordPress Additional CSS |
+
+### Setup sequence (after uploading ZIP to wp-admin)
+
+```bash
+# 1. Activate plugin — admin notice shows your one-time setup token
+# 2. Register API key (replace TOKEN and KEY):
+curl -s -X POST "https://temptationtoken.io/wp-json/tts/v1/setup" \
+  -H "Content-Type: application/json" \
+  -d '{"setup_token":"TOKEN","api_key":"KEY"}'
+
+# 3. Test auth
+curl -s "https://temptationtoken.io/wp-json/tts/v1/status" \
+  -H "X-TTS-API-Key: KEY"
+
+# 4. Store key in Vercel
+vercel env add TTS_WP_API_KEY production
+```
+
+### Logo fix (runs automatically on activation; re-run if needed)
+
+```bash
+curl -s -X POST "https://temptationtoken.io/wp-json/tts/v1/fix-logo" \
+  -H "X-TTS-API-Key: KEY"
+```
+
+The fix targets Elementor widget `e7cd5ae` (homepage hero logo, page ID 52) and injects
+`max-width: 200px` via both Elementor settings and WordPress Additional CSS.
+
+---
+
 ## Infrastructure
 
 | Service | Project/ID |
