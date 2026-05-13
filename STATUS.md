@@ -1,5 +1,5 @@
 # STATUS.md — Temptation Token Reality Check
-## Generated: 2026-05-13 (UTC) — TTSStakingV2 ready for review
+## Generated: 2026-05-13 (UTC) — Network guard + TTSStakingV2 ready for review
 
 ## Legend
 ✅ Working as intended (verified)
@@ -228,6 +228,7 @@ All 4 keys: signup_bonus_tts=500, vote_match_cap_tts=1000, ratio_numerator=1, ra
 | Signup bonus claim works | ⚠️ LIKELY PASS | 5 successful claims recorded in bonus_claims. API source reads admin_config = 500 TTS ✅. |
 | VOTING_ADDRESS = V3b in JS bundle | ✅ PASS | `6d6fF6A0` found in deployed JS bundle; old V3 address absent. |
 | 500 TTS bonus in JS bundle | ⚠️ UNCERTAIN | "500 TTS" string not found as-is; "100 TTS" found (likely referral line). Bundle may compress differently. |
+| Wrong-network guard | ✅ DEPLOYED | `WrongNetworkModal` added. `castVote`, `submit`, `TransferModal.go` all check `chainId === 8453` before any write. Modal triggers `wallet_switchEthereumChain({chainId:'0x2105'})` + adds Base chain if missing (4902). |
 | getRound ABI — profileCount | ✅ PASS | ABI is correct. Contract source (line 531–543) and on-chain call both confirm: returns 7 static uint256/bool values. word[6] = profileCount = 15 (not 224). Previous "bug" was a misdiagnosis — the 224 was the total return byte length (7×32), not the profileCount value. No fix needed. |
 
 ---

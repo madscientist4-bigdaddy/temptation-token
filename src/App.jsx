@@ -515,8 +515,51 @@ function WalletModal({ onClose, showToast }) {
   )
 }
 
+// ── WRONG NETWORK MODAL ───────────────────────────────────────────────────────
+function WrongNetworkModal({ onClose }) {
+  const [switching, setSwitching] = useState(false)
+
+  const switchToBase = async () => {
+    if (!window.ethereum) { return }
+    setSwitching(true)
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x2105' }],
+      })
+      onClose()
+    } catch(e) {
+      if (e.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{ chainId: '0x2105', chainName: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://mainnet.base.org'], blockExplorerUrls: ['https://basescan.org'] }],
+          })
+          onClose()
+        } catch(_) {}
+      }
+    }
+    setSwitching(false)
+  }
+
+  return (
+    <div className="moverlay" onClick={onClose}>
+      <div className="msheet" onClick={e => e.stopPropagation()}>
+        <div className="mhandle" />
+        <div className="mtitle">Wrong Network</div>
+        <div className="msub">This game runs on Base. Switch networks to continue.</div>
+        <div className="pid-box">⬡ Base Mainnet · Chain ID 8453 (0x2105)</div>
+        <button className="pbtn" onClick={switchToBase} disabled={switching}>
+          {switching ? '⏳ Switching…' : 'Switch to Base'}
+        </button>
+        <button className="mclose" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 // ── TRANSFER MODAL ────────────────────────────────────────────────────────────
-function TransferModal({ dir, onClose, showToast, address, walletClient }) {
+function TransferModal({ dir, onClose, showToast, address, walletClient, chainId, onWrongNetwork }) {
   const [amt, setAmt] = useState('')
   const [toAddr, setToAddr] = useState('')
   const [sending, setSending] = useState(false)
@@ -527,6 +570,7 @@ function TransferModal({ dir, onClose, showToast, address, walletClient }) {
       onClose()
       return
     }
+    if (chainId !== BASE_CHAIN_ID) { onWrongNetwork(); return }
     if (!amt || isNaN(amt) || Number(amt) <= 0) { showToast('Enter a valid amount', 'e'); return }
     if (!toAddr || !/^0x[0-9a-fA-F]{40}$/.test(toAddr)) { showToast('Enter a valid Base wallet address', 'e'); return }
     if (!walletClient) { showToast('Wallet not ready', 'e'); return }
@@ -579,7 +623,7 @@ function TransferModal({ dir, onClose, showToast, address, walletClient }) {
 let photoCache = null
 
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
-function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
+function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
   const [photos, setPhotos] = useState(() => photoCache || FALLBACK_PHOTOS)
   const [photosLoading, setPhotosLoading] = useState(false)
   const [roundEndTime, setRoundEndTime] = useState(null)
@@ -678,6 +722,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
 
   const castVote = async (photo) => {
     if (!connected) { showToast('Connect your wallet to vote', 'e'); return }
+    if (chainId !== BASE_CHAIN_ID) { onWrongNetwork(); return }
     if (!walletClient) { showToast('Wallet not ready', 'e'); return }
     const a = Number(va[photo.id] || 0)
     if (a < 5) { showToast('Minimum vote is 5 $TTS', 'e'); return }
@@ -1187,7 +1232,7 @@ function BuySellScreen({ showToast, connected }) {
 }
 
 // ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
-function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient }) {
+function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
   const [prev, setPrev] = useState(null)
   const [name, setName] = useState('')
   const [lt, setLt] = useState('')
@@ -1234,6 +1279,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
 
   const submit = async () => {
     if (!connected) { showToast('Connect your wallet first','e'); return }
+    if (chainId !== BASE_CHAIN_ID) { onWrongNetwork(); return }
     if (!walletClient) { showToast('Wallet not ready','e'); return }
     if (!prev) { showToast('Please upload a photo','e'); return }
     if (!name.trim()) { showToast('Enter your display name','e'); return }
@@ -1572,7 +1618,7 @@ function FAQScreen() {
 
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, chainId } = useAccount()
   const { disconnect } = useDisconnect()
   const [tab, setTab] = useState('play')
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
@@ -1582,6 +1628,7 @@ export default function App() {
   const { data: walletClient } = useWalletClient()
   const [showW, setShowW] = useState(false)
   const [transDir, setTransDir] = useState(null)
+  const [showWrongNet, setShowWrongNet] = useState(false)
   const [toast, showToast] = useToast()
 
   const tabs = [
@@ -1589,7 +1636,7 @@ export default function App() {
     { k:'nfts', l:'NFTs' }, { k:'submit', l:'Submit' }, { k:'refer', l:'Refer' }, { k:'howto', l:'How to Win' }, { k:'faqs', l:'FAQs' },
   ]
 
-  const sp = { balance, setBalance, showToast, connected: isConnected, address, walletClient }
+  const sp = { balance, setBalance, showToast, connected: isConnected, address, walletClient, chainId, onWrongNetwork: () => setShowWrongNet(true) }
 
   useEffect(() => {
     if (!isConnected || !address) { setBalance(0); return }
@@ -1665,7 +1712,8 @@ export default function App() {
       </div>
 
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
-      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} />}
+      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} />}
+      {showWrongNet && <WrongNetworkModal onClose={() => setShowWrongNet(false)} />}
 
       <TTSChatbot />
       <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>
