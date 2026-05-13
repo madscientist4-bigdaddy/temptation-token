@@ -1,5 +1,5 @@
 # STATUS.md — Temptation Token Reality Check
-## Generated: 2026-05-12 (UTC)
+## Generated: 2026-05-13 (UTC) — TTSStakingV2 ready for review
 
 ## Legend
 ✅ Working as intended (verified)
@@ -111,14 +111,14 @@ OpenZeppelin UUPS/AccessControl uses namespaced (non-sequential) storage — sta
 | Lock period | ✅ 90 days | Selector `0xdd95386e()` returns 7,776,000 seconds = 90 days |
 | Year-lock constant | ✅ 365 days | Selector `0x452ab253()` returns 31,536,000 = 1 year |
 | Tier multipliers in contract | ⚠️ WRONG VALUES | Bronze=1.1 ✅, Silver=1.25 ✅, Gold=1.5 ✅, Diamond=1.75 ❌ (should be 2x), VIP=2.0 ❌ (should be 3x) — all stored as 1e18-scaled constants |
-| `getStakingTier(address)` exists | ❌ FAIL — INTERFACE MISMATCH | Selector `0xa8a82fd7` not in dispatch table (35 entries confirmed via PUSH4+EQ pattern scan). V3b calls this non-existent function → hits fallback → reverts → V3b try/catch fires → 1x for all voters. |
+| `getStakingTier(address)` exists | ❌ FAIL — INTERFACE MISMATCH (V1) | Selector `0xa8a82fd7` not in dispatch table (35 entries confirmed via PUSH4+EQ pattern scan). V3b calls this non-existent function → hits fallback → reverts → V3b try/catch fires → 1x for all voters. |
 | Actual tier/stake query function | ⚠️ UNCONFIRMED | `0x748e6856(address)` + `0x2def6620(address)` both revert for non-stakers ("no stake"). Cannot confirm return value for staked users — no users have staked yet. |
 | Stake deposit function | ⚠️ UNCONFIRMED | `0x6eb5adbe(uint256)` reverts with "ERC20: insufficient allowance" when called — confirms it IS the deposit/stake function. Exact name unknown (source unverified). |
 | TTS held in staking contract | ✅ 10B TTS | Pre-loaded rewards pool. Not user stakes. |
 | Staking user count | ✅ 0 | No users staked. V3b's 1x fallback is correct behavior for all current voters. |
 | 3-month lock enforced | ✅ 90 days | Lock period constant = 90 days confirmed on-chain. |
 | Impact on Round 1 | ✅ NONE | Zero stakers → 1x multiplier for all voters is correct. Issue only matters when users stake. |
-| Recovery path | ⚠️ REQUIRES ACTION | **UUPS upgrade** (BANK can execute solo): deploy new impl with `getStakingTier(address)` wrapper → `upgradeToAndCall(newImpl, '')` from BANK wallet. No proxy redeploy. Requires identifying exact internal tier function name first. |
+| **TTSStakingV2 ready** | ✅ READY — PENDING JIM REVIEW | `contracts/TTSStakingV2.sol` compiled (0 errors/warnings, solc 0.8.20 via_ir 200 runs). Storage layout verified byte-identical to V1 slots 0–354. Slither: 0 HIGH/MEDIUM. Mythril: no exploitable issues. Diff report: `outputs/staking_v2_diff.md`. BANK calls `upgradeTo(newImpl)` then `initializeV2(thresholds)` to activate. |
 
 ---
 
@@ -338,7 +338,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 1. **Profile payout wallets = deployer** — 14/15 approved profiles have `payout_wallet = 0xb1e991bf...`. If Round 1 settles, 100% of winner's prize and top voter's prize go to the deployer, not real users. **Must re-approve profiles with correct wallet addresses before settlement (May 14 03:23 UTC deadline).**
 
-2. **Staking contract: `getStakingTier(address)` interface mismatch with V3b** — V3b calls selector `0xa8a82fd7` which does not exist in the staking implementation's dispatch table (35 entries confirmed). The staking contract IS properly initialized (ttsToken=0x5570..., treasury=0xC3A3858A..., DEFAULT_ADMIN=BANK). The mismatch causes V3b's try/catch to fire for every voter → 1x multiplier for all. **Zero impact in Round 1 (no stakers yet).** Fix: UUPS upgrade to new implementation that adds `getStakingTier(address)` wrapper. BANK has upgrade authority (confirmed via eth_call simulation).
+2. **Staking contract: `getStakingTier(address)` interface mismatch with V3b** — V3b calls selector `0xa8a82fd7` which does not exist in the staking implementation's dispatch table (35 entries confirmed). The staking contract IS properly initialized (ttsToken=0x5570..., treasury=0xC3A3858A..., DEFAULT_ADMIN=BANK). The mismatch causes V3b's try/catch to fire for every voter → 1x multiplier for all. **Zero impact in Round 1 (no stakers yet).** **Fix READY: `contracts/TTSStakingV2.sol` — deploy impl, BANK calls `upgradeTo(newImpl)` then `initializeV2(thresholds)`. See `outputs/staking_v2_diff.md`.**
 
 3. **WordPress homepage has 40% prize split** — Two confirmed instances say "40%": "winning profile takes 40% of the weekly prize pool" and "Win — 40% prize pool split weekly". Visible to all visitors. Factual error affecting trust. Fix requires tts-api-auth plugin installed (ZIP at `wp-plugins/tts-api-auth.zip`).
 
@@ -386,7 +386,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 1. **URGENT (before May 14 03:23 UTC)**: Re-approve 14 profiles with real user payout wallets. Otherwise Round 1 prize goes to deployer. If no real users submitted their wallet, consider cancelling/extending Round 1 or treating it as a test round.
 
-2. **Staking contract fix (updated 2026-05-12)**: Contract IS properly initialized. Problem is interface mismatch — `getStakingTier(address)` doesn't exist in the implementation. Fix options: (A) UUPS upgrade via BANK wallet — deploy new impl that adds `getStakingTier(address)` wrapper, call `upgradeToAndCall(newImpl, '')`. (B) V3c redeploy using the correct staking function selector. No re-initialization needed. No proxy redeploy needed. **Recommend Option A — BANK can do it solo without Gnosis Safe.**
+2. **Staking contract fix (updated 2026-05-13)**: `TTSStakingV2.sol` is ready. Storage-compatible UUPS implementation that adds `getStakingTier(address)` + fixes Diamond (2x) and VIP (3x) multipliers + adds admin-configurable tier thresholds. **Next steps: Jim reviews `contracts/TTSStakingV2.sol` and `outputs/staking_v2_diff.md`, then BANK deploys impl and calls `upgradeTo(newImpl)` + `initializeV2(bronze,silver,gold,diamond,vip)` on the proxy.** BANK can execute solo (no Gnosis Safe needed — BANK holds UPGRADER_ROLE solo).
 
 3. **V3c redeploy decision**: Fix multipliers (tier 3=2x, tier 4=3x) and add 3 NFT mints? Round 1 has 0 votes — zero-risk migration window is between May 14 settlement and Round 2 start. Delay if undecided.
 
