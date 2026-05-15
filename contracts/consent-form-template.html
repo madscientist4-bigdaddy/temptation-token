@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Age Verification Consent — Temptation Token</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #111; line-height: 1.75; font-size: 15px; }
+  h1 { font-size: 1.35rem; margin-bottom: 6px; letter-spacing: .02em; }
+  .meta { font-size: .82rem; color: #555; margin-bottom: 28px; }
+  ol { padding-left: 22px; }
+  li { margin-bottom: 10px; }
+  .sig-block { margin-top: 52px; border-top: 1px solid #ccc; padding-top: 24px; }
+  .sig-label { font-size: .85rem; color: #555; margin-bottom: 8px; }
+  .sig-image { max-width: 280px; min-height: 70px; border: 1px solid #ccc; border-radius: 4px; display: block; margin-bottom: 16px; }
+  .field { margin-bottom: 6px; font-size: .88rem; }
+  .field strong { display: inline-block; min-width: 130px; }
+</style>
+</head>
+<body>
+<h1>Age Verification Consent — Temptation Token</h1>
+<div class="meta">
+  Generated: {{DATE}}<br>
+  Wallet: {{WALLET_ADDRESS}}
+</div>
+
+<p>I, the undersigned, hereby certify and consent to the following:</p>
+
+<ol>
+  <li>I am <strong>18 years of age or older</strong> as of the date stated above.</li>
+  <li>I voluntarily submit my age verification information — including a government-issued photo ID and my date of birth — to Blockchain Entertainment LLC, operator of the Temptation Token platform at <em>temptationtoken.io</em>.</li>
+  <li>The government-issued identification I am providing is authentic, unaltered, and belongs to me.</li>
+  <li>I understand my personal information will be stored securely and used <em>solely</em> for the purpose of age verification. It will not be sold, shared with third parties, or used for marketing.</li>
+  <li>I consent to Blockchain Entertainment LLC retaining this consent record and my verification data for as long as my account remains active, as required to operate the platform in compliance with applicable law.</li>
+  <li>I understand that submission of false or misleading information may result in permanent disqualification from the Temptation Token platform and may expose me to legal liability.</li>
+</ol>
+
+<p>By providing my digital signature below, I confirm that all information I have submitted is truthful and accurate, and that I have read and freely agree to these terms.</p>
+
+<div class="sig-block">
+  <div class="sig-label">Digital Signature:</div>
+  <img class="sig-image" src="{{SIGNATURE_DATA_URL}}" alt="Signature" />
+  <div class="field"><strong>Full Name:</strong> {{FULL_NAME}}</div>
+  <div class="field"><strong>Date of Birth:</strong> {{DATE_OF_BIRTH}}</div>
+  <div class="field"><strong>Wallet Address:</strong> {{WALLET_ADDRESS}}</div>
+  <div class="field"><strong>Date Signed:</strong> {{DATE}}</div>
+</div>
+</body>
+</html>

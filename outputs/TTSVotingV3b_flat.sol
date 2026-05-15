@@ -1,38 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// TTSVotingV3c — Upgraded from V3b
+// TTSVotingV3b — Security-patched build (pre-redeployment fixes applied)
 //
-// Changes from V3b:
-//   MULTIPLIERS   tier 3 (Diamond): 1.75x → 2.0x
-//                 tier 4 (VIP):     2.0x  → 3.0x
-//                 tier 5 (ghost):   removed entirely
-//   NFT MINTS     Settlement now mints 3 NFTs: winning profile, top voter, BE LLC archive (houseWallet)
-//   VOTE CAPS     Per-tier single-tx vote cap: Unstaked 500, Bronze 1000, Silver 2500,
-//                 Gold 5000, Diamond 15000, VIP unlimited
-//                 New public view: tierVoteCap(address voter) for frontend queries
+// Fixes applied (internal security review):
+//   CRITICAL #1  Vote cap check skipped when pool has only one profile (first vote)
+//   HIGH #1      CALLBACK_GAS_LIMIT raised 500k → 2500k; MAX_PROFILES_PER_ROUND = 50
+//   HIGH #2      Zero-address rejected in approveProfile / batchApproveProfiles
+//   HIGH #3      SafeERC20 library — all transfers use safeTransfer/safeTransferFrom
+//   MEDIUM #2    NFT mint uses {gas: 200000} cap inside try/catch
+//   MEDIUM #3    adminResetSettlement() allows owner to unstick stuck VRF
+//   MEDIUM #6    rolloverRound() requires round has actually ended
+//   LOW #1       Constructor zero-address checks on token, charity, house
+//   LOW #2       Events for CharityWalletUpdated, HouseWalletUpdated, NFTContractUpdated
+//   LOW #6       MultiplierFallback event emitted on staking call failure
 //
-// All V3b fixes retained (security, VRF gas limit, SafeERC20, etc.)
-//
-// Canonical prize split (unchanged):
+// Canonical prize split:
 //   No club:   35% top voter / 35% winning profile / 10% charity / 20% house
 //   With club: 35% top voter / 35% winning profile / 10% charity / 10% club / 10% house
 //
-// Storage layout: slots 0-12 identical to V3b (no new state variables)
-//
-// Deployment sequence — see outputs/v3c_v2_deployment_runbook.md for full detail:
-//   1.  Deploy TTSVotingV3c               → V3c_ADDRESS
-//   2.  Deploy TTSKeeper2V2(V3c_ADDRESS)  → KEEPER_ADDRESS
-//   3.  V3c.transferOwnership(KEEPER_ADDRESS)
-//   4.  V3c.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")
-//   5.  Add V3c_ADDRESS as VRF consumer at vrf.chain.link/base
-//   6.  Register Custom Logic upkeep at automation.chain.link/base → FORWARDER_ADDRESS
-//   7.  KEEPER.setForwarder(FORWARDER_ADDRESS)
-//   8.  Gnosis Safe: setTaxExempt(V3c_ADDRESS, true)
-//   9.  KEEPER.manualExecute(1) → starts Round 2
-//   10. V3c.batchApproveProfiles(profileIds[], wallets[])
-//   11. Update VOTING_ADDRESS in src/App.jsx + admin dashboard + api routes
-//   12. npm run build && npx vercel --prod
+// Deployment sequence:
+//   1.  Deploy this contract -> note V3b_ADDRESS
+//   2.  V3b.transferOwnership("0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48")
+//   3.  keeper.setVotingContract("V3b_ADDRESS")
+//   4.  keeper.acceptVotingOwnership("V3b_ADDRESS")
+//   5.  V3b.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")
+//   6.  V3b.batchApproveProfiles(profileIds[], wallets[])
+//   7.  Add V3b_ADDRESS as VRF consumer at vrf.chain.link/base
+//   8.  Update VOTING_ADDRESS in src/App.jsx + admin dashboard + api routes
+//   9.  npm run build && npx vercel --prod
 
 // -----------------------------------------------------------------------------
 // Interfaces
@@ -67,7 +63,7 @@ interface ITTSRoundNFT {
 }
 
 // -----------------------------------------------------------------------------
-// SafeERC20 — handles tokens that don't return bool
+// SafeERC20 (HIGH #3) — handles tokens that don't return bool
 // -----------------------------------------------------------------------------
 
 library SafeERC20 {
@@ -156,11 +152,11 @@ abstract contract VRFConsumerBaseV2Plus {
 }
 
 // -----------------------------------------------------------------------------
-// TTSVotingV3c
+// TTSVotingV3b
 // -----------------------------------------------------------------------------
 
-contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
-    using SafeERC20 for IERC20;
+contract TTSVotingV3b is Ownable, VRFConsumerBaseV2Plus {
+    using SafeERC20 for IERC20;  // HIGH #3
 
     bytes private constant VRF_EXTRA_ARGS = hex"92fd133800000000000000000000000000000000000000000000000000000000"
                                             hex"0000000000000000000000000000000000000000000000000000000000000000";
@@ -194,19 +190,12 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
     uint256 public immutable subscriptionId;
     uint16  public constant REQUEST_CONFIRMATIONS  = 3;
     uint32  public constant NUM_WORDS              = 2;
-    uint32  public constant CALLBACK_GAS_LIMIT     = 2500000;
+    uint32  public constant CALLBACK_GAS_LIMIT     = 2500000;   // HIGH #1: was 500000
 
     // Voting constants
     uint256 public constant MIN_VOTE              = 5e18;
     uint256 public constant MAX_VOTE_CAP_BPS      = 4000;
-    uint256 public constant MAX_PROFILES_PER_ROUND = 50;
-
-    // V3c: per-tier single-tx vote caps (tier 5 VIP = unlimited, no constant needed)
-    uint256 public constant VOTE_CAP_UNSTAKED = 500e18;
-    uint256 public constant VOTE_CAP_BRONZE   = 1000e18;
-    uint256 public constant VOTE_CAP_SILVER   = 2500e18;
-    uint256 public constant VOTE_CAP_GOLD     = 5000e18;
-    uint256 public constant VOTE_CAP_DIAMOND  = 15000e18;
+    uint256 public constant MAX_PROFILES_PER_ROUND = 50;        // HIGH #1
 
     // ── Club referral mappings ────────────────────────────────────────────────
     mapping(string => address) public clubWallets;
@@ -216,10 +205,12 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
     event ProfileClubSet(string indexed profileId, string indexed clubCode);
     event ClubPayoutSent(uint256 indexed roundId, string clubCode, address indexed clubWallet, uint256 amount);
 
+    // LOW #2 — admin setter events
     event CharityWalletUpdated(address indexed previous, address indexed next);
     event HouseWalletUpdated(address indexed previous, address indexed next);
     event NFTContractUpdated(address indexed previous, address indexed next);
 
+    // LOW #6 — staking fallback event
     event MultiplierFallback(address indexed voter);
 
     function setClubWallet(string calldata code, address wallet) external onlyAdmin {
@@ -280,6 +271,7 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         Ownable(msg.sender)
         VRFConsumerBaseV2Plus(vrfCoordinator_)
     {
+        // LOW #1 — zero-address guards
         require(_ttsToken       != address(0), "Zero token");
         require(_charityWallet  != address(0), "Zero charity");
         require(_houseWallet    != address(0), "Zero house");
@@ -315,7 +307,7 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         require(r.startTime > 0, "Round not started");
         require(!r.settled, "Already settled");
         require(!r.vrfPending, "VRF pending");
-        require(block.timestamp >= r.endTime, "Round still active");
+        require(block.timestamp >= r.endTime, "Round still active");  // MEDIUM #6
         r.settled = true;
         emit RoundRolledOver(currentRoundId);
     }
@@ -329,10 +321,10 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
     // -------------------------------------------------------------------------
 
     function approveProfile(string calldata profileId, address wallet) external onlyAdmin {
-        require(wallet != address(0), "Zero wallet");
+        require(wallet != address(0), "Zero wallet");  // HIGH #2
         Round storage r = _rounds[currentRoundId];
         require(r.startTime > 0 && !r.settled, "No active round");
-        require(r.profileIds.length < MAX_PROFILES_PER_ROUND, "Profile cap reached");
+        require(r.profileIds.length < MAX_PROFILES_PER_ROUND, "Profile cap reached");  // HIGH #1
         Profile storage p = _profiles[currentRoundId][profileId];
         require(!p.approved, "Already approved");
         p.approved = true;
@@ -349,8 +341,8 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         Round storage r = _rounds[currentRoundId];
         require(r.startTime > 0 && !r.settled, "No active round");
         for (uint256 i = 0; i < profileIds.length; i++) {
-            require(wallets[i] != address(0), "Zero wallet");
-            require(r.profileIds.length < MAX_PROFILES_PER_ROUND, "Profile cap reached");
+            require(wallets[i] != address(0), "Zero wallet");  // HIGH #2
+            require(r.profileIds.length < MAX_PROFILES_PER_ROUND, "Profile cap reached");  // HIGH #1
             Profile storage p = _profiles[currentRoundId][profileIds[i]];
             if (p.approved) continue;
             p.approved = true;
@@ -412,6 +404,7 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         emit VRFRequested(currentRoundId, requestId);
     }
 
+    // MEDIUM #3 — unstick a stuck VRF request
     function adminResetSettlement(uint256 roundId) external onlyOwner {
         Round storage r = _rounds[roundId];
         require(r.vrfPending, "No pending VRF");
@@ -463,10 +456,12 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
             houseShare = pool - profileShare - voterShare - charityShare;
         }
 
-        address topVoterAddr = winner.topVoter != address(0) ? winner.topVoter : winner.wallet;
-
+        // HIGH #3 — safeTransfer everywhere
         ttsToken.safeTransfer(winner.wallet, profileShare);
-        ttsToken.safeTransfer(topVoterAddr, voterShare);
+        ttsToken.safeTransfer(
+            winner.topVoter != address(0) ? winner.topVoter : winner.wallet,
+            voterShare
+        );
         ttsToken.safeTransfer(charityWallet, charityShare);
         ttsToken.safeTransfer(houseWallet, houseShare);
 
@@ -475,12 +470,9 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
             emit ClubPayoutSent(roundId, clubCode, clubWallet, clubShare);
         }
 
-        // V3c: three NFT mints — winning profile, top voter, BE LLC archive (houseWallet)
+        // MEDIUM #2 — gas cap on NFT mint
         if (nftContract != address(0)) {
-            uint256 voteCount = pool / 1e18;
-            try ITTSRoundNFT(nftContract).mint{gas: 200000}(winner.wallet, roundId, winnerId, voteCount) {} catch {}
-            try ITTSRoundNFT(nftContract).mint{gas: 200000}(topVoterAddr, roundId, winnerId, voteCount) {} catch {}
-            try ITTSRoundNFT(nftContract).mint{gas: 200000}(houseWallet, roundId, winnerId, voteCount) {} catch {}
+            try ITTSRoundNFT(nftContract).mint{gas: 200000}(winner.wallet, roundId, winnerId, pool / 1e18) {} catch {}
         }
 
         uint256 remaining = ttsToken.balanceOf(address(this));
@@ -501,19 +493,18 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         require(block.timestamp >= r.startTime && block.timestamp <= r.endTime, "Round not active");
         require(amount >= MIN_VOTE, "Below minimum");
 
-        // V3c: per-tier single-tx vote cap
-        require(amount <= tierVoteCap(msg.sender), "Exceeds tier vote cap");
-
         Profile storage p = _profiles[currentRoundId][profileId];
         require(p.approved, "Profile not approved");
 
         uint256 newProfileRaw = p.rawVotes + amount;
         uint256 newRoundRaw   = r.totalRawVotes + amount;
 
+        // CRITICAL #1 — skip cap check when this is the only vote in the pool
         if (newRoundRaw > newProfileRaw) {
             require(newProfileRaw * 10000 <= newRoundRaw * MAX_VOTE_CAP_BPS, "Exceeds vote cap");
         }
 
+        // HIGH #3 — safeTransferFrom
         ttsToken.safeTransferFrom(msg.sender, address(this), amount);
 
         uint256 tickets = _applyMultiplier(msg.sender, amount);
@@ -570,33 +561,19 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         return _voterTotals[roundId][profileId][voter];
     }
 
-    // V3c: returns per-tier single-tx vote cap for a given voter address.
-    // getStakingTier() reverts for unstaked addresses — catch covers that case.
-    // Tier numbering from TTSStakingV2: 0=Bronze, 1=Silver, 2=Gold, 3=Diamond, 4=VIP.
-    function tierVoteCap(address voter) public view returns (uint256) {
-        try stakingContract.getStakingTier(voter) returns (uint256 tier) {
-            if (tier == 0) return VOTE_CAP_BRONZE;
-            if (tier == 1) return VOTE_CAP_SILVER;
-            if (tier == 2) return VOTE_CAP_GOLD;
-            if (tier == 3) return VOTE_CAP_DIAMOND;
-            return type(uint256).max; // tier == 4 (VIP): no cap
-        } catch {}
-        return VOTE_CAP_UNSTAKED; // reverts for unstaked/uninitialized: treat as unstaked
-    }
-
     // -------------------------------------------------------------------------
     // Admin setters
     // -------------------------------------------------------------------------
 
     function setCharityWallet(address _charity) external onlyAdmin {
         require(_charity != address(0), "Zero address");
-        emit CharityWalletUpdated(charityWallet, _charity);
+        emit CharityWalletUpdated(charityWallet, _charity);  // LOW #2
         charityWallet = _charity;
     }
 
     function setHouseWallet(address _house) external onlyAdmin {
         require(_house != address(0), "Zero address");
-        emit HouseWalletUpdated(houseWallet, _house);
+        emit HouseWalletUpdated(houseWallet, _house);  // LOW #2
         houseWallet = _house;
     }
 
@@ -605,7 +582,7 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
     }
 
     function setNFTContract(address _nft) external onlyAdmin {
-        emit NFTContractUpdated(nftContract, _nft);
+        emit NFTContractUpdated(nftContract, _nft);  // LOW #2
         nftContract = _nft;
     }
 
@@ -613,16 +590,16 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
     // Internal
     // -------------------------------------------------------------------------
 
-    // V3c multipliers: Diamond (tier 3) 2x, VIP (tier 4) 3x, ghost tier 5 removed
     function _applyMultiplier(address voter, uint256 amount) internal returns (uint256) {
         try stakingContract.getStakingTier(voter) returns (uint256 tier) {
-            if (tier == 4) return amount * 300 / 100;
-            if (tier == 3) return amount * 200 / 100;
+            if (tier == 5) return amount * 300 / 100;
+            if (tier == 4) return amount * 200 / 100;
+            if (tier == 3) return amount * 175 / 100;
             if (tier == 2) return amount * 150 / 100;
             if (tier == 1) return amount * 125 / 100;
             if (tier == 0) return amount * 110 / 100;
         } catch {
-            emit MultiplierFallback(voter);
+            emit MultiplierFallback(voter);  // LOW #6
         }
         return amount;
     }

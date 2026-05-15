@@ -1146,6 +1146,15 @@ function ReviewScreen({ showToast }) {
   const execute = async () => {
     const { id, action, wallet } = confirmed;
     if (action === "approve") {
+      // Block approval if submitter wallet is not age-verified
+      const _vr = await fetch(SUPABASE_URL + '/rest/v1/wallet_verifications?wallet_address=eq.' + wallet + '&select=is_verified', {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+      }).then(r => r.json()).catch(() => []);
+      if (!Array.isArray(_vr) || !_vr.length || !_vr[0].is_verified) {
+        showToast('Cannot approve — submitter wallet not age-verified (check Verifications tab)', 'error');
+        setConfirmed(null);
+        return;
+      }
       showToast("Approving on-chain...", "info");
       try {
         const r = await fetch('/api/approve-profile', {
@@ -1265,6 +1274,90 @@ function ReviewScreen({ showToast }) {
               <button className="deny-btn" onClick={() => setOnchainModal(null)}>Close</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerificationsScreen({ showToast }) {
+  const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('pending');
+
+  const load = (f = filter) => {
+    setLoading(true);
+    const q = f === 'all' ? 'order=submitted_at.asc' : `status=eq.${f}&order=submitted_at.asc`;
+    sb.get('wallet_verifications', q)
+      .then(d => { setQueue(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [filter]);
+
+  const approve = async v => {
+    await sb.patch('wallet_verifications', `id=eq.${v.id}`, {
+      status: 'approved', is_verified: true, verified_at: new Date().toISOString(), reviewed_by: 'admin'
+    });
+    showToast(`✓ Verified: ${v.full_name || v.wallet_address.slice(0,10)}…`, 'success');
+    load();
+  };
+
+  const reject = async v => {
+    await sb.patch('wallet_verifications', `id=eq.${v.id}`, {
+      status: 'rejected', is_verified: false, reviewed_by: 'admin'
+    });
+    showToast(`✕ Rejected: ${v.full_name || v.wallet_address.slice(0,10)}…`, 'info');
+    load();
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Age Verifications</div>
+        <div className="gold-rule" />
+        <div className="page-sub">Review submitted age verifications — wallet must be approved before profiles can be submitted or approved</div>
+      </div>
+      <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
+        {['pending','approved','rejected','all'].map(s => (
+          <button key={s} onClick={() => setFilter(s)} style={{ background: filter===s ? 'var(--crimson)' : 'var(--surface2)', color: filter===s ? '#fff' : 'var(--muted)', border:'1px solid var(--border)', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontFamily:'var(--font-body)', fontWeight:600 }}>
+            {s.charAt(0).toUpperCase()+s.slice(1)}
+          </button>
+        ))}
+        <span style={{ marginLeft:'auto', fontSize:'.63rem', color:'var(--muted)' }}>{queue.length} records</span>
+      </div>
+      {loading ? (
+        <div className="empty-state"><span className="empty-icon">⏳</span>Loading…</div>
+      ) : queue.length === 0 ? (
+        <div className="empty-state"><span className="empty-icon">✅</span>No {filter} verifications.</div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {queue.map(v => (
+            <div key={v.id} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
+                <div style={{ flex:1, minWidth:200 }}>
+                  <div style={{ fontSize:'.8rem', fontWeight:600, color:'var(--text)', marginBottom:4 }}>{v.full_name || '—'}</div>
+                  <div style={{ fontSize:'.64rem', color:'var(--muted)', marginBottom:2, fontFamily:'monospace' }}>{v.wallet_address}</div>
+                  <div style={{ fontSize:'.64rem', color:'var(--muted)', marginBottom:2 }}>DOB: {v.date_of_birth || '—'}</div>
+                  <div style={{ fontSize:'.64rem', color:'var(--muted)', marginBottom:6 }}>Submitted: {v.submitted_at ? new Date(v.submitted_at).toLocaleDateString() : '—'}{v.verified_at ? ` · Reviewed: ${new Date(v.verified_at).toLocaleDateString()}` : ''}</div>
+                  <span style={{ padding:'2px 8px', borderRadius:4, fontSize:'.6rem', fontWeight:700, background: v.status==='approved' ? 'rgba(46,204,113,.15)' : v.status==='rejected' ? 'rgba(232,64,90,.15)' : 'rgba(212,175,55,.15)', color: v.status==='approved' ? 'var(--green)' : v.status==='rejected' ? 'var(--rose)' : 'var(--gold)' }}>
+                    {v.status.toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:10 }}>
+                  {v.signature_img && (
+                    <img src={v.signature_img} alt="Signature" style={{ width:130, height:50, objectFit:'contain', background:'#0d0d1a', border:'1px solid var(--border)', borderRadius:4 }} />
+                  )}
+                  {v.status === 'pending' && (
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => approve(v)} style={{ background:'rgba(46,204,113,.12)', border:'1px solid rgba(46,204,113,.3)', color:'var(--green)', padding:'7px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontWeight:700 }}>✓ Approve</button>
+                      <button onClick={() => reject(v)} style={{ background:'rgba(232,64,90,.08)', border:'1px solid rgba(232,64,90,.22)', color:'var(--rose)', padding:'7px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontWeight:700 }}>✕ Reject</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -2504,6 +2597,22 @@ function getWeekStartStr(from = new Date()) {
   return d.toISOString().split('T')[0]
 }
 
+class ContentCalendarErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) { console.error('[ContentCalendar]', error, info) }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: 28, color: 'var(--rose)', fontSize: '.8rem' }}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Content Calendar failed to load</div>
+        <div style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: '.68rem', wordBreak: 'break-all' }}>{this.state.error.message}</div>
+        <button onClick={() => this.setState({ error: null })} style={{ marginTop: 14, padding: '6px 18px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '.75rem' }}>↺ Retry</button>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
 function ContentCalendarScreen({ showToast }) {
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2567,7 +2676,7 @@ function ContentCalendarScreen({ showToast }) {
   }
 
   const selectCaption = async (post, idx) => {
-    const captions = post.instagram_captions || []
+    const captions = Array.isArray(post.instagram_captions) ? post.instagram_captions : []
     const newContent = captions[idx] || post.content
     await sb.patch('scheduled_posts', `id=eq.${post.id}`, { selected_caption: idx, content: newContent })
     setPosts(p => p.map(x => x.id === post.id ? { ...x, selected_caption: idx, content: newContent } : x))
@@ -2692,8 +2801,9 @@ function CalPostCard({ post, approving, firing, approve, reject, saveEdit, unapp
   const isApproved = post.status === 'approved'
   const isFailed   = post.status === 'failed'
   const isTTS      = post.platform === 'x_tts'
-  const schedTime  = new Date(post.scheduled_at).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
-  const captions   = post.instagram_captions || []
+  const _dt = new Date(post.scheduled_at)
+  const schedTime  = isNaN(_dt.getTime()) ? '—' : _dt.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
+  const captions   = Array.isArray(post.instagram_captions) ? post.instagram_captions : []
   const selIdx     = post.selected_caption ?? 0
 
   return (
@@ -3939,11 +4049,12 @@ const NAV = [
     { key: "manual",     icon: "📖", label: "Operations Manual" },
   ]},
   { section: "Operations", items: [
-    { key: "overview",  icon: "📊", label: "Overview" },
-    { key: "review",    icon: "📸", label: "Photo Review" },
-    { key: "content",   icon: "📅", label: "Content Calendar" },
-    { key: "social",    icon: "📱", label: "Social Media" },
-    { key: "system",    icon: "🛡️", label: "System Health" },
+    { key: "overview",       icon: "📊", label: "Overview" },
+    { key: "review",         icon: "📸", label: "Photo Review" },
+    { key: "verifications",  icon: "🪪", label: "Verifications" },
+    { key: "content",        icon: "📅", label: "Content Calendar" },
+    { key: "social",         icon: "📱", label: "Social Media" },
+    { key: "system",         icon: "🛡️", label: "System Health" },
   ]},
   { section: "Finance", items: [
     { key: "finance",   icon: "📊", label: "Financial KPI" },
@@ -3961,7 +4072,49 @@ const NAV = [
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function AdminApp() {
   useEffect(() => { injectStyles(); }, []);
-  const [loggedIn, setLoggedIn] = useState(false);
+
+  const SESSION_KEY = 'tt_admin_session'
+  const SESSION_TTL = 86400000 // 24 hours
+
+  const [loggedIn, setLoggedIn] = useState(() => {
+    try {
+      const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')
+      return !!(s && s.at && Date.now() - s.at < SESSION_TTL)
+    } catch { return false }
+  })
+
+  // Persist session to sessionStorage
+  useEffect(() => {
+    if (loggedIn) {
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now() })) } catch {}
+    } else {
+      try { sessionStorage.removeItem(SESSION_KEY) } catch {}
+    }
+  }, [loggedIn])
+
+  // Refresh session TTL on any user activity
+  useEffect(() => {
+    if (!loggedIn) return
+    const refresh = () => {
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now() })) } catch {}
+    }
+    window.addEventListener('click', refresh, { passive: true })
+    window.addEventListener('keydown', refresh, { passive: true })
+    return () => { window.removeEventListener('click', refresh); window.removeEventListener('keydown', refresh) }
+  }, [loggedIn])
+
+  // Expire session when TTL elapses without activity
+  useEffect(() => {
+    if (!loggedIn) return
+    const t = setInterval(() => {
+      try {
+        const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')
+        if (!s || !s.at || Date.now() - s.at >= SESSION_TTL) setLoggedIn(false)
+      } catch {}
+    }, 60000)
+    return () => clearInterval(t)
+  }, [loggedIn])
+
   const [active, setActive] = useState("command");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const clock = useLiveClock();
@@ -3977,8 +4130,9 @@ export default function AdminApp() {
     kpi:        <KPIScreen />,
     manual:     <ManualScreen />,
     overview:   <OverviewScreen />,
-    review:     <ReviewScreen {...screenProps} />,
-    content:    <ContentCalendarScreen {...screenProps} />,
+    review:         <ReviewScreen {...screenProps} />,
+    verifications:  <VerificationsScreen {...screenProps} />,
+    content:        <ContentCalendarErrorBoundary><ContentCalendarScreen {...screenProps} /></ContentCalendarErrorBoundary>,
     social:     <SocialScreen {...screenProps} />,
     users:      <UsersScreen {...screenProps} />,
     wallets:    <WalletsScreen />,
@@ -3992,7 +4146,7 @@ export default function AdminApp() {
 
   const titles = {
     command: "Command Center", priorities: "Daily Priorities", kpi: "KPI Dashboard", manual: "Operations Manual",
-    overview: "Overview", review: "Photo Review", content: "Content Calendar", social: "Social Media",
+    overview: "Overview", review: "Photo Review", verifications: "Age Verifications", content: "Content Calendar", social: "Social Media",
     users: "User Management", wallets: "Wallets", payouts: "Payouts",
     staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health",
     finance: "Financial KPI",

@@ -20,17 +20,17 @@ pragma solidity ^0.8.20;
 //
 // Storage layout: slots 0-12 identical to V3b (no new state variables)
 //
-// Deployment sequence — see outputs/v3c_v2_deployment_runbook.md for full detail:
-//   1.  Deploy TTSVotingV3c               → V3c_ADDRESS
-//   2.  Deploy TTSKeeper2V2(V3c_ADDRESS)  → KEEPER_ADDRESS
-//   3.  V3c.transferOwnership(KEEPER_ADDRESS)
-//   4.  V3c.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")
-//   5.  Add V3c_ADDRESS as VRF consumer at vrf.chain.link/base
-//   6.  Register Custom Logic upkeep at automation.chain.link/base → FORWARDER_ADDRESS
-//   7.  KEEPER.setForwarder(FORWARDER_ADDRESS)
-//   8.  Gnosis Safe: setTaxExempt(V3c_ADDRESS, true)
-//   9.  KEEPER.manualExecute(1) → starts Round 2
-//   10. V3c.batchApproveProfiles(profileIds[], wallets[])
+// Deployment sequence (V3c with TTSKeeper2V2):
+//   1.  Deploy this contract → note V3c_ADDRESS
+//   2.  Deploy TTSKeeper2V2(V3c_ADDRESS) → note KEEPER_ADDRESS
+//   3.  V3c.transferOwnership(KEEPER_ADDRESS) from Bank wallet
+//   4.  V3c.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2") from Bank wallet (admin)
+//   5.  V3c.batchApproveProfiles(profileIds[], wallets[]) from Bank wallet (admin)
+//   6.  Add V3c_ADDRESS as VRF consumer at vrf.chain.link/base (same subscription as V3b)
+//   7.  Register Custom Logic upkeep on automation.chain.link/base → target = KEEPER_ADDRESS
+//   8.  KEEPER.setForwarder(FORWARDER_ADDRESS) from Bank wallet (forwarder shown in upkeep UI)
+//   9.  Update Gnosis Safe tax-exempt batch to include V3c_ADDRESS (TX#10)
+//   10. KEEPER.manualExecute(1) from Bank wallet to start Round 2
 //   11. Update VOTING_ADDRESS in src/App.jsx + admin dashboard + api routes
 //   12. npm run build && npx vercel --prod
 
@@ -386,6 +386,23 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
     function midpointSnapshot() external onlyOwner {}
 
     function settleRound() external onlyOwner {
+        _requestSettlement();
+    }
+
+    /// @notice Public fallback settlement path. Callable by anyone.
+    /// Silent no-op if conditions are not yet met — safe for speculative cron calls.
+    /// Zero-profile rounds are rolled over (settled=true, no VRF, no payouts).
+    function settleRoundIfReady() external {
+        Round storage r = _rounds[currentRoundId];
+        if (r.startTime == 0)          return;
+        if (r.settled)                 return;
+        if (r.vrfPending)              return;
+        if (block.timestamp < r.endTime) return;
+        if (r.profileIds.length == 0) {
+            r.settled = true;
+            emit RoundRolledOver(currentRoundId);
+            return;
+        }
         _requestSettlement();
     }
 
