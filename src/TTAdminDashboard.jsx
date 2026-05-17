@@ -2676,7 +2676,14 @@ function ContentCalendarScreen({ showToast }) {
   }
 
   const selectCaption = async (post, idx) => {
-    const captions = Array.isArray(post.instagram_captions) ? post.instagram_captions : []
+    const captions = (() => {
+      const raw = post.instagram_captions
+      if (Array.isArray(raw)) return raw
+      if (typeof raw === 'string' && raw.trim()) {
+        try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch {}
+      }
+      return []
+    })()
     const newContent = captions[idx] || post.content
     await sb.patch('scheduled_posts', `id=eq.${post.id}`, { selected_caption: idx, content: newContent })
     setPosts(p => p.map(x => x.id === post.id ? { ...x, selected_caption: idx, content: newContent } : x))
@@ -2794,7 +2801,7 @@ function ContentCalendarScreen({ showToast }) {
 
 function CalPostCard({ post, approving, firing, approve, reject, saveEdit, unapprove, postNow, selectCaption, copyCaption }) {
   const [editMode, setEditMode]       = useState(false)
-  const [editContent, setEditContent] = useState(post.content)
+  const [editContent, setEditContent] = useState(post.content ?? '')
 
   const isPending  = post.status === 'pending'
   const isPosted   = post.status === 'posted'
@@ -2803,7 +2810,14 @@ function CalPostCard({ post, approving, firing, approve, reject, saveEdit, unapp
   const isTTS      = post.platform === 'x_tts'
   const _dt = new Date(post.scheduled_at)
   const schedTime  = isNaN(_dt.getTime()) ? '—' : _dt.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', timeZone:'UTC', hour12:true }) + ' UTC'
-  const captions   = Array.isArray(post.instagram_captions) ? post.instagram_captions : []
+  const captions   = (() => {
+    const raw = post.instagram_captions
+    if (Array.isArray(raw)) return raw
+    if (typeof raw === 'string' && raw.trim()) {
+      try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch {}
+    }
+    return []
+  })()
   const selIdx     = post.selected_caption ?? 0
 
   return (
