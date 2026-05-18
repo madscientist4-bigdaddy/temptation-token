@@ -433,8 +433,20 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 ---
 
+## Section 13: Known Accepted Findings
+
+Security findings that have been reviewed, assessed non-exploitable, and formally accepted. Full record at `outputs/v3c_accepted_findings.md`.
+
+| ID | Tool | Severity | Contract | Function | Status | Decision date |
+|----|------|----------|----------|----------|--------|---------------|
+| AF-001 | Slither 0.11.3 | HIGH (`reentrancy-eth`) | TTSVotingV3c | `vote()` lines 498–534 | **ACCEPTED — not exploitable** | 2026-05-18 |
+
+**AF-001 summary:** CEI violation — `ttsToken.safeTransferFrom()` precedes state writes. Not exploitable because TTS is a standard ERC-20 with no transfer hooks or callbacks; token address is immutable. Identical pattern present and unraised in SolidProof-audited V3b (live since 2026-05-06, zero incidents). Decision by: Jim Goetz, 2026-05-18.
+
+---
+
 ## Closing
 
-Last verified: 2026-05-17 (UTC) — tax-exempt batch confirmed complete (all 8 addresses), Gnosis Safe queue cleared (on-chain nonce = 6), TTS v2 M-1 fix confirmed deployed.
+Last verified: 2026-05-18 (UTC) — tax-exempt batch confirmed complete (all 8 addresses), Gnosis Safe queue cleared (on-chain nonce = 6), TTS v2 M-1 fix confirmed deployed. Slither HIGH in V3c formally accepted (AF-001).
 
 Re-run verification: execute `node scripts/check-prize-split.mjs` for code audit; re-run the RPC/Supabase calls above for live state. Re-enable filesystem access in macOS Privacy & Security → Files and Folders to verify source files.
