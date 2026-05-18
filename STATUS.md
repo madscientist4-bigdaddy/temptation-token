@@ -17,9 +17,9 @@
 |-------|--------|----------|
 | Total supply = 69B TTS | ✅ PASS | `totalSupply()` returns 69,000,000,000 TTS exactly |
 | Transfer tax 1% enforced | ❓ UNKNOWN | Source inaccessible; canonical per CLAUDE.md. No on-chain test tx run. |
-| Marketing wallet tax-exempt | ❓ UNKNOWN | `taxExempt(address)` selector not found; multiple selector guesses reverted |
+| Tax-exempt batch — all 8 addresses | ✅ COMPLETE 2026-05-17 | `isTaxExempt()` confirmed true for: V3b, Marketing/Bonus, Staking, Polaris/Charity, TTSRoundNFT, TTSKeeper2, TTSLinkReserve, Treasury. Gnosis Safe batch executed (nonces 0–5 cleared). |
 | Marketing wallet TTS balance | ✅ 995,325 TTS | Down from 997,395 (May 1). Δ = 2,070 TTS paid in bonuses/matches |
-| TTS UUPS proxy impl slot | ⚠️ ERC-1967 slot = 0x0 | Address may be the implementation itself; UUPS upgrade mechanism unverified on-chain. Pending Gnosis Safe upgrade to v2. |
+| TTS v2 M-1 fix (zero-amount transfer guard) | ✅ DEPLOYED 2026-05-17 | Gnosis Safe nonce 0 `upgradeTo(0xb995b63c...)` executed. Implementation confirmed via `proxiableUUID()` + `INITIAL_SUPPLY()` pre-execution. |
 | Dead address burned balance | ✅ 1,519 TTS | Minor. Burns accumulate each settlement. |
 
 ---
@@ -131,7 +131,9 @@ OpenZeppelin UUPS/AccessControl uses namespaced (non-sequential) storage — sta
 | Signer 1 | ✅ 0xb1e991bf... (Bank/Deployer) | Decoded from getOwners() |
 | Signer 2 | ⚠️ 0x95607dcf... | Unrecognized address — not documented in CLAUDE.md. Confirm this is Jim's address. |
 | ETH balance | ✅ 0.002 ETH | Minimal; sufficient for signing |
-| Pending transactions | ❓ UNKNOWN | Cannot query Gnosis API programmatically |
+| On-chain nonce | ✅ 6 (2026-05-17) | Nonces 0–5 all processed. M-1 upgrade (nonce 0) + tax-exempt batch (nonce 4) both executed. |
+| Pending queue | ✅ CLEARED 2026-05-17 | Effective queue empty. 4 orphaned entries at nonces 1,2,3,5 in tx-service (permanently non-executable — on-chain nonce passed them). |
+| Tax-exempt batch executed | ✅ COMPLETE | All 8 ecosystem addresses confirmed tax-exempt on-chain. See TTS Token section. |
 | Singleton (masterCopy) | ✅ 0x29fcb43b... | Gnosis Safe v1.3.0 Singleton on Base |
 
 ---
@@ -369,7 +371,7 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 14. **Staking schema mismatch** — `stakes.amount_tts` column does not exist. Dashboard staking tab will error.
 
-15. **TTS token upgrade pending** — v2 implementation with M1 zero-amount fix at `0xb995b63c...` awaiting Gnosis Safe upgrade. No deadline set.
+15. ~~**TTS token upgrade pending**~~ — ✅ **RESOLVED 2026-05-17.** v2 implementation `0xb995b63c...` deployed via Gnosis Safe nonce 0. M-1 zero-amount transfer guard is live.
 
 16. **1 extra Supabase submission vs on-chain** — 15 Supabase approved, 14 on-chain ProfileApproved events. Check which submission is missing on-chain.
 
@@ -433,6 +435,6 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 ## Closing
 
-Last verified: 2026-05-12 (UTC) — staking investigation updated (init confirmed OK, interface mismatch identified). Next verification due: weekly via STATUS.md regeneration.
+Last verified: 2026-05-17 (UTC) — tax-exempt batch confirmed complete (all 8 addresses), Gnosis Safe queue cleared (on-chain nonce = 6), TTS v2 M-1 fix confirmed deployed.
 
 Re-run verification: execute `node scripts/check-prize-split.mjs` for code audit; re-run the RPC/Supabase calls above for live state. Re-enable filesystem access in macOS Privacy & Security → Files and Folders to verify source files.
