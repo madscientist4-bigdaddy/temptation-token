@@ -322,8 +322,9 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 | SolidProof audit page | ✅ PASS | https://app.solidproof.io/projects/temptation-token returns 200 |
 | SolidProof TrustNet score | ❓ UNKNOWN | Page loads but score requires JS rendering |
 | 9 audit findings acknowledged | ❓ UNKNOWN | Requires SolidProof portal login |
-| Blockaid false positive | ❓ UNKNOWN | Pending submission per CLAUDE.md |
-| GoPlus whitelist | ❓ UNKNOWN | Pending submission per CLAUDE.md |
+| Blockaid false positive | ✅ SUBMITTED 2026-05-18 | Ticket #1263614 filed manually at report.blockaid.io. Awaiting review (1–3 day ETA). Full submission template in `outputs/metamask_remediation.md` Section 5. |
+| MetaMask support email | ✅ SENT 2026-05-18 | Email sent to MetaMask support re: false-positive malicious flag on TTS token. Template in `outputs/metamask_remediation.md` Section 7. |
+| GoPlus whitelist | ⚠️ CHANNEL FOUND — PENDING SEND | `security@gopluslabs.io` is invalid (bounced). Correct channels: `service@gopluslabs.io` and Telegram `@Goplusservice`. Appeal template in `outputs/metamask_remediation.md` Section 6. Jim to send. |
 | CoinGecko listing | ❌ NOT LISTED | API `/coins/temptation-token` returns 404. Not listed. |
 | CoinMarketCap listing | ❓ UNKNOWN | Not checked |
 | DexScreener pair indexed | ❌ FAIL | `/latest/dex/tokens/0x5570...` returns `pairs: null`. Pair not indexed. |
@@ -407,6 +408,10 @@ Last verified scheduler execution: content_generator Monday run ✅; 4 failed po
 
 10. **CoinGecko resubmission**: LP lock confirmed. File at `outputs/exchange_submissions/coingecko_update.md`. Publish /audit page first per CoinGecko requirements.
 
+11. **Audit strategy decision (2026-05-18)**: NO further third-party audits before V3c launch. V3c is a small, well-bounded delta from SolidProof-audited V3b. Slither HIGH (AF-001) accepted as non-exploitable. Final delta-audit to be conducted only at acquisition stage. Deploy V3c per automated tooling (Option 2 from runbook) once Round 1 settled.
+
+12. **Treasury 55% concentration restructure**: Creator wallet holds ~55% of supply — flagged by GoPlus and MetaMask/Blockaid as a risk signal. Planned mitigation: timelock contract, labeled treasury sub-wallets, public transparency page. **NOT started. Not a launch blocker.** Schedule for next-phase post-launch.
+
 ---
 
 ## Section 12: Verification Method Log
@@ -447,6 +452,6 @@ Security findings that have been reviewed, assessed non-exploitable, and formall
 
 ## Closing
 
-Last verified: 2026-05-18 (UTC) — tax-exempt batch confirmed complete (all 8 addresses), Gnosis Safe queue cleared (on-chain nonce = 6), TTS v2 M-1 fix confirmed deployed. Slither HIGH in V3c formally accepted (AF-001).
+Last verified: 2026-05-18 (UTC) — tax-exempt batch confirmed complete (all 8 addresses), Gnosis Safe queue cleared (on-chain nonce = 6), TTS v2 M-1 fix confirmed deployed. Slither HIGH in V3c formally accepted (AF-001). Blockaid ticket #1263614 submitted. MetaMask support email sent. GoPlus correct channel identified (service@gopluslabs.io / @Goplusservice). V3c pre-deployment check PASS — ready to deploy per runbook once Round 1 settled.
 
 Re-run verification: execute `node scripts/check-prize-split.mjs` for code audit; re-run the RPC/Supabase calls above for live state. Re-enable filesystem access in macOS Privacy & Security → Files and Folders to verify source files.
