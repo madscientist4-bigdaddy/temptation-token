@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: May 10, 2026 — contract audit + canonical value lock.
+Last verified: May 19, 2026 — full session state update.
 
 ## Commands
 
@@ -67,14 +67,17 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 | Contract | Address |
 |---|---|
 | **TTS Token (UUPS Proxy)** | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` |
-| TTS v2 Implementation (M1 fix, pending upgrade) | `0xb995b63cdf848b7884cdc51da82e4a80ad02395a` |
+| TTS v2 Implementation (M-1 fix — **LIVE as of 2026-05-17**) | `0xb995b63cdf848b7884cdc51da82e4a80ad02395a` |
 | TTSVotingV2 (deprecated) | `0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA` |
 | TTSVotingV3 (deprecated) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
-| **TTSVotingV3b (ACTIVE — FINAL, all audit fixes)** | **`0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`** |
+| **TTSVotingV3b (ACTIVE — Round 1 overdue settlement)** | **`0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`** |
+| **TTSVotingV3c (COMPILED — ready to deploy, not yet on-chain)** | `contracts/TTSVotingV3c.sol` |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
+| **TTSKeeper2V2 (COMPILED — ready to deploy, not yet on-chain)** | `contracts/TTSKeeper2V2.sol` |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
 | **TTSRoundNFT** | **`0x0768e862D3AB14d85213BfeF8f1D012E77721da2`** |
-| TTSStaking | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` |
+| TTSStaking (proxy) | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` |
+| TTSStakingV2 Implementation (COMPILED — ready to deploy) | `contracts/TTSStakingV2.sol` |
 | Gnosis Safe (2/2 multisig) | `0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86` |
 | Uniswap V2 Pool | `0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68` |
 
@@ -88,10 +91,28 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 ---
 
+## Current Round Status (verified on-chain May 19, 2026)
+
+| Field | Value |
+|-------|-------|
+| Contract | TTSVotingV3b `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` |
+| currentRoundId | 1 |
+| startTime | 2026-05-07 03:23:13 UTC |
+| endTime | **2026-05-14 03:23:13 UTC — PASSED 5 days ago** |
+| totalRawVotes | ~0 (1 wei — effectively zero) |
+| totalTickets | 0 |
+| settled | **false — OVERDUE** |
+| vrfPending | false |
+| profileCount | 15 |
+| Round 2 | Not started |
+
+**🚨 Round 1 is past its endTime and NOT settled.** Chainlink automation did not fire (likely LINK shortage). Manual settlement required before V3c deployment. See Pending Action #1.
+
+---
+
 ## Verified Contract Behavior (May 10 2026 Audit)
 
 Contract: TTSVotingV3b at `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`
-Source: `/TTSVotingV3b.sol` (local, unverified on BaseScan as of May 10)
 
 ### Q: Where do votes go? (vote() function)
 `ttsToken.safeTransferFrom(msg.sender, address(this), amount)` — all voted TTS accumulates in the voting contract until settlement. [TTSVotingV3b.sol:508]
@@ -113,39 +134,56 @@ houseShare   = remainder (20% no club, 10% with club)  → houseWallet
 [TTSVotingV3b.sol:443-456]
 
 ### Q: House wallet address?
-`houseWallet = 0xb1e991bf617459b58964eef7756b350e675c53b5` (Bank/Deployer wallet) — verified on-chain May 10.
+`houseWallet = 0xb1e991bf617459b58964eef7756b350e675c53b5` (Bank/Deployer wallet)
 
 ### Q: Charity wallet address?
-`charityWallet = 0xf7dd429d679cb61231e73785fd1737e60138aba3` (Polaris/Charity) — verified on-chain May 10.
+`charityWallet = 0xf7dd429d679cb61231e73785fd1737e60138aba3` (Polaris/Charity)
 
 ### Q: NFT mints at settlement?
-**1 NFT only** — minted to `winner.wallet` (winning profile wallet). [TTSVotingV3b.sol:474-476]
-`try ITTSRoundNFT(nftContract).mint{gas: 200000}(winner.wallet, roundId, winnerId, pool / 1e18) {} catch {}`
+**V3b: 1 NFT only** — minted to `winner.wallet`. **V3c fixes this: 3 NFTs** (winner.wallet + topVoterAddr + houseWallet archive).
 
 ### Q: Submission fee?
-**Off-chain only** — handled in `src/App.jsx`. User pays 5 TTS via `transfer(HOUSE_WALLET, SUBMISSION_FEE)` where `HOUSE_WALLET = 0xb1e991bf...` and `SUBMISSION_FEE = 5e18`. No submission-fee function exists in the voting contract. [App.jsx:16-17, 1269]
+**Off-chain only** — handled in `src/App.jsx`. User pays 5 TTS via `transfer(HOUSE_WALLET, SUBMISSION_FEE)` where `HOUSE_WALLET = 0xb1e991bf...` and `SUBMISSION_FEE = 5e18`. [App.jsx:16-17, 1269]
 
 ### Q: Minimum vote?
 `MIN_VOTE = 5e18` (5 TTS) — enforced in `vote()`. [TTSVotingV3b.sol:196, 494]
 
 ### Q: Max vote cap?
-`MAX_VOTE_CAP_BPS = 4000` (40% of total round votes) — enforced per profile. [TTSVotingV3b.sol:197, 504]
-Note: cap is skipped when a profile is the only one with votes in the pool (CRITICAL fix #1). [TTSVotingV3b.sol:502-504]
+`MAX_VOTE_CAP_BPS = 4000` (40% of total round votes) — enforced per profile. Cap skipped when only one profile has votes (first vote in round). [TTSVotingV3b.sol:197, 502-504]
 
 ### Q: Vote match — in contract or off-chain?
 **Off-chain only** — handled in `/api/vote-match.js`. Not in the voting contract.
 
 ---
 
-## CONTRACT DOES NOT MATCH FOUNDER INTENT — REDEPLOYMENT DECISION NEEDED
+## V3c Changes vs V3b (pre-deployment — not yet live)
 
-| Item | Founder Intent | Contract Reality | Severity |
-|------|---------------|-----------------|----------|
-| NFT mints per settlement | 3 (winning profile, top voter, Blockchain Entertainment LLC archive) | **1** — winning profile wallet only | 🚨 CRITICAL — requires contract + NFT contract changes |
-| Submission fee destination | 0xC3A3858A3777E4C9B542e60298c3161086c5Faae | `0xb1e991bf...` (Bank/Deployer) | ⚠️ COSMETIC — fix `HOUSE_WALLET` constant in App.jsx if correct address confirmed |
-| Staking multiplier for tier 3 | Diamond (1000+) = 2x | tier 3 = 1.75x (old "Platinum" tier still present in contract) | 🚨 CRITICAL — Diamond stakers get 1.75x not 2x; requires staking contract audit + likely redeploy |
+Source: `contracts/TTSVotingV3c.sol`. Pre-deployment check: ✅ PASS (0 compiler errors/warnings, Slither HIGH accepted as AF-001). Deployment runbook: `outputs/v3c_v2_deployment_runbook.md`.
 
-Items that MATCH founder intent (contract confirmed ✅):
+| Area | V3b (current) | V3c (pending deploy) |
+|------|--------------|----------------------|
+| Tier 3 (Diamond) vote multiplier | 1.75x | **2.0x** |
+| Tier 4 (VIP) vote multiplier | 2.0x | **3.0x** |
+| Tier 5 (ghost) | 3.0x | **removed** |
+| NFT mints at settlement | 1 (winner only) | **3 (winner + top voter + houseWallet archive)** |
+| Per-tier vote cap | none | **500/1000/2500/5000/15000 TTS / unlimited (VIP)** |
+| Storage slots 0–12 | identical | **identical — no migration needed** |
+
+Slither HIGH (AF-001): `reentrancy-eth` in `vote()` — CEI violation accepted as non-exploitable (TTS is standard ERC-20, no hooks). Full record: `outputs/v3c_accepted_findings.md`.
+
+---
+
+## CONTRACT DOES NOT MATCH FOUNDER INTENT — V3c RESOLVES MOST
+
+| Item | Founder Intent | V3b Reality | V3c Status |
+|------|---------------|-------------|------------|
+| NFT mints per settlement | 3 | 1 (winner only) | ✅ Fixed in V3c |
+| Diamond (tier 3) vote multiplier | 2x | 1.75x | ✅ Fixed in V3c |
+| VIP (tier 4) vote multiplier | 3x | 2x | ✅ Fixed in V3c |
+| Submission fee destination | 0xC3A3858A... | `0xb1e991bf...` (Bank) | ⚠️ Still unresolved — Jim to confirm correct address |
+| getStakingTier() interface | Works | Selector mismatch → 1x for all | ✅ Fixed by TTSStakingV2 deploy (separate) |
+
+Items confirmed matching founder intent (V3b ✅):
 - Prize pool = winning-profile votes only ✅
 - Losing votes burned to 0x000...dEaD ✅
 - Split 35/35/10/20 (no club) or 35/35/10/10/10 (with club) ✅
@@ -210,10 +248,10 @@ Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chain
 | Bronze | $50+ | 8% | 1.1x | 0 |
 | Silver | $100+ | 12% | 1.25x | 1 |
 | Gold | $250+ | 18% | 1.5x | 2 |
-| Diamond | $1,000+ | 32% | 2x | 3 (⚠️ contract returns 1.75x — MISMATCH) |
-| VIP | $5,000+ | 45% | 3x | 4 (contract returns 2x) |
+| Diamond | $1,000+ | 32% | 2x | 3 |
+| VIP | $5,000+ | 45% | 3x | 4 |
 
-🚨 **STAKING MULTIPLIER MISMATCH**: The voting contract's `_applyMultiplier()` maps tier 3 → 1.75x and tier 4 → 2x, but the canonical spec requires Diamond (tier 3) = 2x and VIP (tier 4) = 3x. This means Diamond stakers are being underserved. **TODO: audit staking contract to confirm tier numbering, then redeploy voting contract with corrected multipliers.**
+V3b voting contract has wrong multipliers (Diamond=1.75x, VIP=2x). **V3c fixes this.** Staking contract `getStakingTier()` interface mismatch (selector not found) causes 1x fallback for all voters — fixed by deploying TTSStakingV2.
 
 **Display both USD threshold and live TTS equivalent in all UI.** TTS equivalent = USD ÷ current Uniswap price. "Platinum" tier does not exist — remove if found anywhere.
 
@@ -223,7 +261,7 @@ Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chain
 |-----------|-------|--------|
 | Minimum vote | 5 TTS | On-chain: `MIN_VOTE = 5e18` |
 | Profile submission fee | 5 TTS | Off-chain: App.jsx `SUBMISSION_FEE` |
-| Submission fee destination | `0xb1e991bf...` (Bank/Deployer) | App.jsx `HOUSE_WALLET` |
+| Submission fee destination | `0xb1e991bf...` (Bank/Deployer) | App.jsx `HOUSE_WALLET` — confirm correct address with Jim |
 | Max vote cap per profile | 40% of round pool | On-chain: `MAX_VOTE_CAP_BPS = 4000` |
 | Signup bonus | **500 TTS** (admin-configurable) | Off-chain: `admin_config.signup_bonus_tts` |
 | Vote match | 1:1 up to **1,000 TTS** (admin-configurable) | Off-chain: `admin_config.vote_match_cap_tts` |
@@ -240,7 +278,6 @@ Note: During EST (winter, Nov–Mar), rounds drift 1 hour. Unavoidable — Chain
 - `vote_match_ratio_numerator` — match ratio numerator (default: 1)
 - `vote_match_ratio_denominator` — match ratio denominator (default: 1)
 
-Create tables: `node scripts/supabase-admin-config.sql` (run SQL in Supabase dashboard).
 Dashboard settings path: Admin Dashboard → Settings → Bonus Configuration.
 
 ---
@@ -259,7 +296,7 @@ Dashboard settings path: Admin Dashboard → Settings → Bonus Configuration.
 
 ## TTSVotingV3b Security Patches (applied May 2026)
 
-All 11 findings from the voting contract audit (audit ID 88b99f3a) are patched:
+All 11 findings from the voting contract audit (audit ID 88b99f3a) are patched in V3b:
 
 | Fix | Type | Description |
 |-----|------|-------------|
@@ -273,6 +310,75 @@ All 11 findings from the voting contract audit (audit ID 88b99f3a) are patched:
 | Constructor guards | LOW | Zero-address checks for token, charity, house |
 | Admin setter events | LOW | CharityWalletUpdated, HouseWalletUpdated, NFTContractUpdated |
 | MultiplierFallback event | LOW | Emitted in _applyMultiplier catch block |
+
+## Known Accepted Security Findings
+
+| ID | Tool | Severity | Contract | Function | Status | Date |
+|----|------|----------|----------|----------|--------|------|
+| AF-001 | Slither 0.11.3 | HIGH (reentrancy-eth) | TTSVotingV3c | `vote()` lines 498–534 | **ACCEPTED — not exploitable** | 2026-05-18 |
+
+Full record: `outputs/v3c_accepted_findings.md`. AF-001 summary: CEI violation — `safeTransferFrom` precedes state writes. Not exploitable because TTS is a standard ERC-20 with no transfer hooks; token address is immutable; identical pattern in audited V3b with zero incidents. Decision: Jim Goetz.
+
+---
+
+## SolidProof Audit Status (as of May 19, 2026)
+
+**Audit ID:** 88b99f3a | **Portal:** app.solidproof.io/projects/temptation-token | **TrustNet Score:** 0.01 (Poor — no findings acknowledged yet)
+
+**Portal access: LOST.** Account email: `jgoetz@functionised.com`. Recovery: email `support@solidproof.io` or Telegram `@Solidproof_io_Support`. No self-service password-reset URL exists at app.solidproof.io.
+
+**Actual findings on portal** (two sub-reports — TTSVoting + Token):
+
+*TTSVoting contract:*
+| ID | Severity | Title | Code Status |
+|----|----------|-------|-------------|
+| C-1 | Critical | Vote cap check prevents any vote | ✅ Fixed in V3b |
+| H-1 | High | Settlement callback gas limit bricks contract | ✅ Fixed in V3b |
+| H-2 | High | Zero wallet address traps funds | ✅ Fixed in V3b |
+| H-3 | High | ERC-20 transfer return values unchecked | ✅ Fixed in V3b (SafeERC20) |
+| M-1 | Medium | Admin can redirect club share during VRF window | ⚠️ Not patched — acknowledged |
+| M-2 | Medium | NFT contract can be set to gas-bomb | ✅ Fixed in V3b (gas cap) |
+| M-3 | Medium | Round unrecoverable if VRF never delivers | ✅ Fixed in V3b (adminResetSettlement) |
+| M-4 | Medium | Single-step ownership with reachable renounceOwnership | ⚠️ Not patched — acknowledged |
+| M-5 | Medium | State changes after external transferFrom in vote() | ✅ Accepted as AF-001 |
+| M-6 | Medium | rolloverRound executes before round end | ✅ Fixed in V3b |
+| M-7 | Medium | Payout destinations mutable during VRF window | ⚠️ Not patched — acknowledged |
+| L-1 to L-6 | Low | Zero-address, events, pragma, etc. | Mostly fixed in V3b |
+| O-1 to O-3 | Optimization | Storage, errors, magic numbers | Acknowledged |
+| I-1 to I-8 | Informational | Various | Acknowledged |
+
+*TTS Token contract:* Zero-value transfer (M-1 = **FIXED, live 2026-05-17**), centralization/wallet updates (M-2 = mitigated by Gnosis Safe), rounding dust (M-3 = negligible), and low/informational findings.
+
+**⚠️ WARNING:** The pre-written acknowledgment responses in `outputs/seo/solidproof_acknowledgment_responses.md` use M-1/M-2/M-3 labels that match the TOKEN sub-report, NOT the voting contract sub-report. Do not submit them without logging in first and mapping to the correct portal finding IDs.
+
+**KYC ($600):** Not started. Requires portal access first. Checklist: `outputs/urgent/solidproof_kyc_checklist.md`.
+
+---
+
+## MetaMask / Security Scanner Status (as of May 19, 2026)
+
+| Channel | Status |
+|---------|--------|
+| Blockaid false-positive | ✅ Submitted 2026-05-18 — Ticket #1263614 — awaiting review (1–3 day ETA) |
+| MetaMask support email | ✅ Sent 2026-05-18 — template in `outputs/metamask_remediation.md` Section 7 |
+| GoPlus appeal | ⚠️ Pending Jim — correct channel: `service@gopluslabs.io` or Telegram `@Goplusservice` (security@gopluslabs.io is invalid/bounced). Template: `outputs/metamask_remediation.md` Section 6 |
+
+Root causes of false-positive flag: `blacklisted` mapping (standard compliance feature), 55% creator concentration, UUPS proxy pattern, grantable MINTER_ROLE (currently held by nobody — confirmed on-chain). Full analysis: `outputs/metamask_remediation.md`.
+
+---
+
+## Gnosis Safe Status (as of May 17, 2026)
+
+| Check | Status |
+|-------|--------|
+| Threshold | 2/2 |
+| On-chain nonce | 6 |
+| Pending queue | CLEARED — 4 orphaned entries at nonces 1,2,3,5 (permanently non-executable) |
+| Nonce 0 executed | ✅ upgradeTo(0xb995b63c) — TTS M-1 fix live |
+| Nonce 4 executed | ✅ Tax-exempt batch — all 8 addresses confirmed |
+| All 8 isTaxExempt | ✅ true on-chain |
+| DEFAULT_ADMIN_ROLE on TTS | ✅ Held by Safe only |
+| MINTER/PAUSER/UPGRADER roles | ✅ No holders |
 
 ---
 
@@ -314,15 +420,7 @@ curl -s "https://temptationtoken.io/wp-json/tts/v1/status" \
 vercel env add TTS_WP_API_KEY production
 ```
 
-### Logo fix (runs automatically on activation; re-run if needed)
-
-```bash
-curl -s -X POST "https://temptationtoken.io/wp-json/tts/v1/fix-logo" \
-  -H "X-TTS-API-Key: KEY"
-```
-
-The fix targets Elementor widget `e7cd5ae` (homepage hero logo, page ID 52) and injects
-`max-width: 200px` via both Elementor settings and WordPress Additional CSS.
+The logo fix targets Elementor widget `e7cd5ae` (homepage hero logo, page ID 52) and injects `max-width: 200px` via both Elementor settings and WordPress Additional CSS.
 
 ---
 
@@ -383,51 +481,84 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 ---
 
-## Pending Actions (priority order)
+## Pending Actions (priority order — May 19, 2026)
 
-1. **🚨 RUN SUPABASE SQL SETUP** — Create `admin_config` and `admin_audit_log` tables. Run `scripts/supabase-admin-config.sql` in Supabase SQL editor. Without this, admin_config reads will silently use defaults (500 TTS / 1000 TTS).
-2. **🚨 batchApproveProfiles on V3b** — New contract `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` needs profiles approved for Round 2.
-3. **🚨 STAKING MULTIPLIER MISMATCH** — Audit staking contract to confirm tier numbering. If tier 3 ≠ Diamond, redeploy voting contract with corrected `_applyMultiplier()`.
-4. **🚨 NFT MINTS MISMATCH** — Contract mints 1 NFT (winning profile only). Founder intends 3 (winning profile + top voter + archive). Requires voting contract + NFT contract changes.
-5. **X social media credentials** — X_API_KEY may return 401. Regenerate at developer.twitter.com if needed.
-6. **Solidproof pending items** — acknowledge M-1/M-2/M-3 on portal, complete KYC.
-7. **Publish website content** — trust_page.html → temptationtoken.io/trust. WordPress .htaccess fix needed (Hostinger).
-8. **CoinGecko resubmission** — LP lock complete. File: `outputs/exchange_submissions/coingecko_update.md`.
-9. **Verify TTSVotingV3b on BaseScan** — use Remix (solc 0.8.20, 200 runs, via_ir=true). Address: `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`.
-10. **Deploy TTS v2 M1 fix** through Gnosis Safe multisig.
-11. **Round 1 settlement** — on-chain endTime = May 14 03:23 UTC. Round 1 has 0 votes. No force-settle path exists before endTime. After settlement: manually call keeper `startRound(345960)` to start Round 2 with corrected duration ending May 18 03:59 UTC, restoring canonical Mon-Sun schedule.
-12. ✅ Marketing wallet funded — 997,395 TTS + 0.005 ETH.
-13. ✅ LP locked.
+### 🚨 CRITICAL — Blocking Round 2 and V3c deployment
+
+1. **Settle Round 1 manually** — Round 1 endTime was May 14 03:23 UTC. Chainlink did not auto-settle (likely no LINK). Jim calls `manualExecute(3)` on TTSKeeper2 (`0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48`) from Bank wallet. Verify: `V3b.getRound(1).settled = true` after call.
+
+2. **Deploy TTSVotingV3c + TTSKeeper2V2** — full runbook at `outputs/v3c_v2_deployment_runbook.md`. Requires Round 1 settled (step 1 above). Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → deploy Keeper2V2 → transferOwnership → setNFTContract → add VRF consumer → register Chainlink upkeep → set forwarder → Gnosis tax-exempt batch for V3c → start Round 2 → batchApproveProfiles.
+
+3. **Update VOTING_ADDRESS in frontend** — after V3c deploys, replace `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` in:
+   - `src/App.jsx` (VOTING_ADDRESS constant)
+   - `src/TTAdminDashboard.jsx` (V3_ADDRESS / VOTING_ADDRESS + screens config)
+   - `api/approve-profile.js` (V3_ADDRESS constant)
+
+4. **Add V3c to tax-exempt batch and execute** — add TX#10 to `outputs/gnosis_setTaxExempt_batch.json` (V3c address, selector `0x1dc61040`). Import in app.safe.global and execute (2/2 sign). REQUIRED before any votes can settle on V3c.
+
+5. **batchApproveProfiles on V3c** — call after Round 2 starts. Pull wallet addresses from Supabase (`SELECT id::text, payout_wallet FROM submissions WHERE status = 'approved' ORDER BY approved_at`). Ensure payout wallets are real user wallets — not Bank/Deployer.
+
+6. **Deploy TTSStakingV2** — fixes `getStakingTier()` interface mismatch and corrects Diamond/VIP multipliers. Bank wallet calls `upgradeTo(newImpl)` then `initializeV2(thresholds)` on staking proxy `0xaA12B889...`. No Gnosis Safe needed (BANK holds UPGRADER_ROLE solo). Diff report: `outputs/staking_v2_diff.md`.
+
+### ⚠️ HIGH — Security scanner remediation
+
+7. **GoPlus appeal** — send to `service@gopluslabs.io` or Telegram `@Goplusservice` using template in `outputs/metamask_remediation.md` Section 6. Jim to send manually.
+
+8. **Blockaid ticket #1263614** — submitted 2026-05-18. Awaiting 1–3 day review. Draft reply in this session covers on-chain evidence. No action needed until Blockaid responds.
+
+9. **SolidProof portal access recovery** — email `support@solidproof.io` + Telegram `@Solidproof_io_Support`. Account email: `jgoetz@functionised.com`. No self-service reset URL — manual recovery only. After access restored: acknowledge all findings on portal (remap `outputs/seo/solidproof_acknowledgment_responses.md` to correct portal finding IDs), then complete KYC ($600).
+
+### ⚠️ HIGH — WordPress
+
+10. **Fix homepage 40% prize split** — two wrong instances: "winning profile takes 40% of the weekly prize pool" and "Win — 40% prize pool split weekly". Fix via WP admin or tts-api-auth plugin once installed.
+
+11. **Publish /trust and /audit pages** — both return 404. Hostinger .htaccess blocking custom slugs. Requires manual Hostinger support ticket or publish via WP admin directly.
+
+12. **Install tts-api-auth plugin** — ZIP at `wp-plugins/tts-api-auth.zip`. Upload via wp-admin → Plugins → Add New → Upload Plugin → Activate → run setup curl. Logo fix (max-width 200px) applies automatically on activation.
+
+### 🟡 MEDIUM
+
+13. **Verify TTSVotingV3b on BaseScan** — Remix (solc 0.8.20, 200 runs, via-IR, single file). Address: `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`. Low priority — superseded by V3c deploy, but improves trust score.
+
+14. **Verify TTSVotingV3c on BaseScan** — after deploy. Same Remix settings. Flattened source at `outputs/v3c_flattened.sol`.
+
+15. **Verify TTSKeeper2V2 on BaseScan** — after deploy. Flattened source at `outputs/keeper_v2_flattened.sol`.
+
+16. **CoinGecko resubmission** — LP lock confirmed. Publish /audit page first (CoinGecko requirement). File: `outputs/exchange_submissions/coingecko_update.md`.
+
+17. **DexScreener manual submission** — pair not indexed. Submit at dexscreener.com/update-token-info.
+
+18. **Age verification system** — full implementation complete May 15. Awaiting Jim to manually copy files + run SQL + create Supabase storage bucket + deploy.
+
+### 🟢 NEXT-PHASE (not launch blockers)
+
+19. **Treasury 55% concentration restructure** — timelock contract + labeled sub-wallets + public transparency page. PLANNED, NOT started. Required to improve GoPlus/Blockaid scores long-term.
+
+20. **SolidProof KYC ($600)** — requires portal access first. Adds KYC Verified badge + improves TrustNet score + required for Gate.io/MEXC listing applications.
+
+21. **Confirm Gnosis Safe signer 2** — `0x95607dcf6c815e6a7cb79eb6199174dfadc78758` not documented in CLAUDE.md. Confirm this is Jim's address.
+
+22. **Submission fee destination** — confirm whether `0xb1e991bf...` or `0xC3A3858A...` is the intended destination for the 5 TTS submission fee. Fix `HOUSE_WALLET` in App.jsx if needed.
 
 ---
 
-## Round 1 On-Chain Status (May 10 2026)
+## V3c + TTSKeeper2V2 Constructor Params (ready to paste into Remix)
 
-| Field | Value |
-|-------|-------|
-| Contract | `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` |
-| currentRoundId | 1 |
-| startTime | 2026-05-07 03:23:13 UTC |
-| endTime | 2026-05-14 03:23:13 UTC (Thu May 13 11:23 PM EDT) |
-| totalRawVotes | 0 |
-| totalTickets | 0 |
-| settled | false |
-| vrfPending | false |
-| profileCount | 14 |
-| TTS in contract | 0 TTS |
+```
+TTSVotingV3c:
+  _ttsToken:        "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9"
+  vrfCoordinator_:  "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634"
+  _keyHash:         "0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70"
+  _subscriptionId:  58222014484560539249027457203866883376041731162442592604288474822166186263722
+  _stakingContract: "0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc"
+  _charityWallet:   "0xf7dd429d679cb61231e73785fd1737e60138aba3"
+  _houseWallet:     "0xb1e991bf617459b58964eef7756b350e675c53b5"
 
-**⚠️ Round 1 has 0 votes.** Verify the frontend is pointing to the correct VOTING_ADDRESS and that profiles are visible/voteable. Natural settlement fires May 14 03:23 UTC; VRF callback will early-return with no prizes (totalTickets = 0).
+TTSKeeper2V2:
+  _votingContract:  <V3c address — fill after deploy>
 
----
-
-## Planned V2 Token Contract Fixes
-
-### Fix 1 — Solidproof Medium Finding #1: Zero-Amount Transfer Guard
-
-Add `if (amount == 0) return true;` at the top of both `transfer()` and `transferFrom()` before any tax calculation. EIP-20 compliance + underflow guard.
-
-**Implementation contract:** `0xb995b63cdf848b7884cdc51da82e4a80ad02395a` (pending upgrade)
-**Upgrade path:** Deploy new implementation → Gnosis Safe proposeUpgrade → 2/2 sign → execute
+Remix settings: Solidity 0.8.20 · optimizer ON (200 runs) · via IR ✅ · Base mainnet (8453)
+```
 
 ---
 
@@ -457,6 +588,24 @@ Check memory files for any session-specific context.
 
 ## Completed History
 
+### May 15–19, 2026
+- ✅ TTS v2 M-1 fix (zero-amount transfer guard) deployed live via Gnosis Safe nonce 0 — implementation `0xb995b63c` verified on BaseScan (solc 0.8.20, Exact Match)
+- ✅ Tax-exempt batch executed (Gnosis Safe nonce 4) — all 8 addresses confirmed `isTaxExempt=true` on-chain: V3b, Marketing/Bonus, Staking, Polaris/Charity, TTSRoundNFT, TTSKeeper2, TTSLinkReserve, Treasury
+- ✅ Gnosis Safe queue cleared — on-chain nonce = 6, 4 orphaned entries at nonces 1/2/3/5 permanently non-executable
+- ✅ TTSVotingV3c pre-deployment check PASS — 0 compiler errors/warnings, Slither HIGH accepted as AF-001, tier numbering verified (Diamond=2x, VIP=3x), storage slots 0–12 match V3b
+- ✅ TTSKeeper2V2 pre-deployment check PASS — 0 HIGH Slither findings
+- ✅ AF-001 accepted finding formally documented — `outputs/v3c_accepted_findings.md`
+- ✅ Blockaid false-positive submitted — ticket #1263614 (2026-05-18)
+- ✅ MetaMask support email sent (2026-05-18) — template: `outputs/metamask_remediation.md`
+- ✅ GoPlus correct channel identified — `service@gopluslabs.io` / Telegram `@Goplusservice` (security@ bounced)
+- ✅ MetaMask remediation doc created — `outputs/metamask_remediation.md` — root causes, Blockaid submission, GoPlus appeal, MetaMask email
+- ✅ SolidProof full finding audit — portal shows 1C + 3H + 7M + 6L for voting contract + token sub-report; pre-written ack doc finding numbers do NOT match portal (must remap after login)
+- ✅ SolidProof contact channels documented — support@solidproof.io, @Solidproof_io_Support (Telegram), no self-service password reset URL
+- ✅ Deployment runbook updated — `outputs/v3c_v2_deployment_runbook.md`
+- ✅ STATUS.md updated and pushed (commit 5df6396)
+- ✅ Audit decision logged: no further third-party audits until final delta-audit at acquisition stage
+- ✅ Treasury 55% restructure: planned next-phase, not a launch blocker
+
 ### May 10, 2026
 - ✅ Contract audit: verified charityWallet, houseWallet, MIN_VOTE, MAX_VOTE_CAP_BPS, prize split, burn mechanic, NFT mint count
 - ✅ Signup bonus 100 → 500 TTS across tts_bot.py, App.jsx, TTSChatbot.jsx
@@ -478,15 +627,3 @@ Check memory files for any session-specific context.
 - ✅ MARKETING_WALLET_PRIVATE_KEY corrected in Vercel
 - ✅ Chainlink crons confirmed: `0 4 * * 1` start, `59 3 * * 1` settle
 - ✅ Marketing wallet ETH funded (0.005 ETH)
-
-### TTSVotingV3b Constructor Params (for redeploy reference)
-```
-_ttsToken:        "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9"
-vrfCoordinator_:  "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634"
-_keyHash:         "0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70"
-_subscriptionId:  58222014484560539249027457203866883376041731162442592604288474822166186263722
-_stakingContract: "0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc"
-_charityWallet:   "0xf7dd429d679cb61231e73785fd1737e60138aba3"
-_houseWallet:     "0xb1e991bf617459b58964eef7756b350e675c53b5"
-```
-Remix settings: Solidity 0.8.20 · optimizations ON (200 runs) · Base mainnet (8453)
