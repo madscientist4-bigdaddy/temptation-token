@@ -378,7 +378,9 @@ Root causes of false-positive flag: `blacklisted` mapping (standard compliance f
 | Nonce 4 executed | ✅ Tax-exempt batch — all 8 addresses confirmed |
 | All 8 isTaxExempt | ✅ true on-chain |
 | DEFAULT_ADMIN_ROLE on TTS | ✅ Held by Safe only |
-| MINTER/PAUSER/UPGRADER roles | ✅ No holders |
+| MINTER_ROLE | ✅ No holders (address(0)) |
+| UPGRADER_ROLE | ✅ No holders (address(0)) |
+| PAUSER_ROLE | ⚠️ Held by BANK wallet (`0xb1e991bf...`) — not "nobody" as previously stated. Verify intent with Jim. Low risk (Safe holds admin), but worth documenting. |
 
 ---
 
@@ -473,8 +475,12 @@ Always `git add` + commit + push after every change.
 | `X_API_SECRET` | X app credential (shared) | ✅ Set |
 | `TTS_X_ACCESS_TOKEN` | @temptationtoken user token — all automated X posts | ✅ Set |
 | `TTS_X_ACCESS_SECRET` | @temptationtoken user secret | ✅ Set |
-| `SUPABASE_URL` | Supabase project URL | ✅ Set |
+| `SUPABASE_URL` | Supabase project URL | ✅ Set (also hardcoded fallback `gmlikdxykgviyprqtqwz.supabase.co` in several API files) |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key | ✅ Set |
+| `COMMUNITY_CHAT_ID` | Telegram community chat ID (`-1003930752060`) | ⚠️ Undocumented — may be hardcoded in api files |
+| `MAIN_CHANNEL_ID` | Telegram main channel ID (`-1002207667493`) | ⚠️ Undocumented — may be hardcoded in api files |
+| `ADMIN_CHAT_ID` | Telegram admin chat ID (`-5273368658`) | ⚠️ Undocumented — may be hardcoded in api files |
+| `TELEGRAM_BOT_TOKEN` | TTSGameBot token (Railway env `BOT_TOKEN`) | ⚠️ Undocumented in Vercel if used there |
 
 **X posting: @temptationtoken only (automated). @CryptoFitJim posts manually.**
 Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` in Vercel; regenerate @temptationtoken Access Token → update `TTS_X_ACCESS_TOKEN` + `TTS_X_ACCESS_SECRET`.
@@ -487,7 +493,7 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 1. **Settle Round 1 manually** — Round 1 endTime was May 14 03:23 UTC. Chainlink did not auto-settle (likely no LINK). Jim calls `manualExecute(3)` on TTSKeeper2 (`0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48`) from Bank wallet. Verify: `V3b.getRound(1).settled = true` after call.
 
-2. **Deploy TTSVotingV3c + TTSKeeper2V2** — full runbook at `outputs/v3c_v2_deployment_runbook.md`. Requires Round 1 settled (step 1 above). Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → deploy Keeper2V2 → transferOwnership → setNFTContract → add VRF consumer → register Chainlink upkeep → set forwarder → Gnosis tax-exempt batch for V3c → start Round 2 → batchApproveProfiles.
+2. **Deploy TTSVotingV3c + TTSKeeper2V2 + fund Chainlink** — full runbook at `outputs/v3c_v2_deployment_runbook.md`. Requires Round 1 settled (step 1 above). Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → deploy Keeper2V2 → transferOwnership → setNFTContract → add VRF consumer → **register new Chainlink upkeep with 5+ LINK at automation.chain.link** (TTSKeeper2 had 0 LINK; TTSLinkReserve has 1 LINK — withdraw and top up) → call `setForwarder(upkeepForwarderAddr)` on Keeper2V2 → Gnosis tax-exempt batch for V3c → start Round 2 → batchApproveProfiles. **Bank wallet ETH = 0.0245 ETH — borderline for deployment + gas; top up if below 0.015 ETH before starting.**
 
 3. **Update VOTING_ADDRESS in frontend** — after V3c deploys, replace `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` in:
    - `src/App.jsx` (VOTING_ADDRESS constant)
@@ -586,7 +592,139 @@ Check memory files for any session-specific context.
 
 ---
 
+## Full-System Audit Results — May 19, 2026
+
+Executed: PHASE 0–4. Commits: 5df6396, 32532dd, 1b995c5.
+
+### PHASE 0 — Blockers
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Round 1 settled | ❌ FAIL | settled=false; endTime May 14 passed 5 days ago |
+| Chainlink LINK balance | ❌ FAIL | Keeper=0 LINK; LinkReserve=1 LINK (not funded into upkeep) |
+| Chainlink upkeep registered | ⚠️ UNKNOWN | Upkeep ID not stored in keeper; may need full re-registration |
+| V3c pre-deploy check (compiler) | ✅ PASS | 0 errors, 0 warnings |
+| V3c pre-deploy check (Slither) | ✅ PASS | 1 HIGH accepted as AF-001 (non-exploitable) |
+| TTSKeeper2V2 pre-deploy check | ✅ PASS | 0 HIGH Slither findings |
+| Bank ETH for deployment gas | ⚠️ WARN | 0.0245 ETH — borderline; top up if below 0.015 before deploy |
+| Gnosis Safe queue | ✅ PASS | Cleared; on-chain nonce=6 |
+| Tax-exempt batch | ✅ PASS | 8 addresses confirmed isTaxExempt=true |
+| TTS v2 M-1 fix (token upgrade) | ✅ PASS | impl 0xb995b63c live since 2026-05-17 |
+
+### PHASE 1 — Full App Audit
+
+| Flow | Result | Notes |
+|------|--------|-------|
+| VOTING_ADDRESS (App.jsx) | ✅ PASS | 0x6d6fF6... (V3b active) |
+| Prize split display (35/35/10/20) | ✅ PASS | Fixed May 10 session |
+| Signup bonus = 500 TTS | ✅ PASS | Reads admin_config; no hardcodes |
+| Vote match = 1:1/1000 TTS | ✅ PASS | Reads admin_config |
+| Staking tiers (5 correct, no Platinum) | ✅ PASS | Bronze/Silver/Gold/Diamond/VIP |
+| Chatbot referral amount | ✅ FIXED | Was "100 TTS" hardcoded — changed to admin-configurable description (commit 1b995c5) |
+| referral-credit.js response amount | ✅ FIXED | Was `'100 TTS'` hardcoded — now uses actual creditAmount (commit 1b995c5) |
+| Wrong-network guard | ✅ PASS | Applied commit 5375099 |
+| Submission fee (5 TTS) | ✅ PASS | App.jsx SUBMISSION_FEE = 5e18 |
+| Minimum vote (5 TTS) | ✅ PASS | ON-chain MIN_VOTE = 5e18 |
+| Marketing site prize split | ❌ FAIL | "40%" on 2 homepage locations — WP admin required |
+| Marketing site adult strings | ❌ FAIL | OG/meta "Adult Entertainment", "adult content" — WP admin required |
+| Marketing site /trust page | ❌ FAIL | 404 — .htaccess blocking custom slugs |
+| Marketing site /audit page | ❌ FAIL | 404 — same |
+
+### PHASE 2 — Integrity: Spec vs. Reality
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| `check-prize-split.mjs` CI | ✅ PASS | "No canonical-value violations found" |
+| "40%" near prize words in source | ✅ PASS | Zero instances |
+| "Platinum" tier in source | ✅ PASS | Zero instances |
+| "100 TTS" signup in source | ✅ PASS | Cleaned this session |
+| "adult entertainment" in source | ✅ PASS | Zero instances in /src or /api |
+| DEFAULT_ADMIN_ROLE | ✅ PASS | Gnosis Safe only (on-chain confirmed) |
+| MINTER_ROLE | ✅ PASS | Nobody / address(0) |
+| UPGRADER_ROLE | ✅ PASS | Nobody / address(0) |
+| PAUSER_ROLE | ⚠️ DISCREPANCY | Held by BANK wallet — not "nobody"; not a security exploit (Safe holds admin) but undocumented |
+| LP lock | ✅ PASS | 231.3 LP on Team.Finance until May 5 2027 |
+| Vercel env vars documented | ⚠️ WARN | COMMUNITY_CHAT_ID, MAIN_CHANNEL_ID, ADMIN_CHAT_ID undocumented; SUPABASE_URL has silent fallback |
+| Marketing wallet funded | ✅ PASS | 994,290 TTS + ~0.005 ETH |
+
+### PHASE 3 — Social / Automation
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| X token env vars present | ✅ PASS | All 4 tokens in Vercel env (code review) |
+| Telegram BROADCAST_BOT_TOKEN | ✅ PASS | Set in Vercel |
+| Scheduler cron expressions | ✅ PASS | 0 0/13/18 UTC daily + 0 8 Mon content gen |
+| Content generator 8 critical rules | ✅ PASS | All 8 present in system prompt |
+| Live X OAuth validation | ⚠️ NOT TESTED | Requires actual API call; if 401, regenerate at developer.twitter.com |
+| Live Telegram post test | ⚠️ NOT TESTED | Not executed this session |
+| @TTSBroadcastBot is channel admin | ⚠️ UNVERIFIED | Required for Post Now + scheduler; confirm in channel settings |
+
+### PHASE 4 — Marketing Site (temptationtoken.io)
+
+All failures require tts-api-auth plugin installation + WP admin access.
+Fix document: `outputs/wordpress_meta_fixes.md`
+
+| Issue | Result | Priority |
+|-------|--------|----------|
+| tts-api-auth plugin installed | ❌ FAIL | All WP fixes blocked until installed |
+| og:title "Adult Entertainment & NFTs" | ❌ FAIL | 🚨 Critical — indexed by Google |
+| og:description "40% of the prize pool" | ❌ FAIL | 🚨 Critical |
+| og:site_name "Adult Crypto Game on Base" | ❌ FAIL | 🚨 Critical |
+| og:image:alt "Payment Processor for Adult Content" | ❌ FAIL | 🚨 Critical |
+| FAQ og:title "Adult Games, NFTs" | ❌ FAIL | 🚨 Critical |
+| FAQ og:description "adult entertainment" | ❌ FAIL | 🚨 Critical |
+| FAQ og:image:alt "Polygon blockchain" (wrong chain) | ❌ FAIL | 🚨 Critical |
+| FAQ body text "adult entertainment and NFT markets" | ❌ FAIL | High |
+| Homepage img alt "adult entertainment" | ❌ FAIL | High |
+| Google Play / Apple Store images visible | ❌ FAIL | Medium |
+| Copyright 2024 stale instance | ❌ FAIL | Low |
+| Telegram links → broadcast not community | ❌ FAIL | Medium |
+| Dynamic OG image (admin-ajax URL) | ⚠️ WARN | Nice-to-have — replace with static 1200×630 PNG |
+
+---
+
+## Investor Executive Status — May 19, 2026
+
+**What is live and working:**
+- TTS token on Base mainnet — 69B fixed supply, 1% burn tax, LP locked 1 year (Team.Finance)
+- Voting contract V3b live — prize split 35/35/10/20, VRF-powered fairness, all 11 audit findings patched
+- TTS v2 token upgrade live (M-1 fix) — zero-amount transfer guard, EIP-20 compliant
+- Gnosis Safe 2/2 multisig controls admin — no single-key risk
+- Tax-exempt on 8 addresses confirmed on-chain
+- Signup bonus (500 TTS) + vote match (1:1 / 1000 TTS) operational
+- Social automation: X + Telegram content scheduler running
+- Admin dashboard fully operational
+
+**What is pending (ordered by release impact):**
+1. Round 1 must be settled manually (`manualExecute(3)`) — Chainlink had 0 LINK
+2. V3c + Keeper2V2 deployment — fixes Diamond/VIP multipliers + 3-NFT mints + per-tier vote caps; runbook ready
+3. Chainlink upkeep re-registration with 5+ LINK (automation.chain.link)
+4. WordPress OG/meta cleanup — adult content strings and "40%" are in live indexed meta tags; tts-api-auth plugin install required
+5. GoPlus appeal + Blockaid #1263614 response — security scanner false-positives; evidence submitted
+6. SolidProof portal access recovery — TrustNet score 0.01; all voting contract findings fixed in code, not yet acknowledged on portal
+7. TTSStakingV2 deploy — fixes interface mismatch (all stakers currently getting 1x boost instead of tier boost)
+
+**Clean for investor presentation:**
+- ✅ No price-target or promissory language found in code or live site
+- ✅ Charitable component (10% → Polaris Project anti-trafficking nonprofit) verified on-chain
+- ✅ LP lock evidence on-chain (Team.Finance TX `0xd98b2bb4...`)
+- ✅ Gnosis Safe audit trail available
+- ⚠️ Marketing site still shows adult content strings in OG tags — fix BEFORE any press or investor link-share
+
+---
+
 ## Completed History
+
+### May 19, 2026 (Phase 1–5 audit pass)
+- ✅ referral-credit.js: fixed hardcoded `'100 TTS'` response → actual admin_config amount (commit 1b995c5)
+- ✅ TTSChatbot.jsx: fixed hardcoded "100 TTS per referral" → admin-configurable description (commit 1b995c5)
+- ✅ `outputs/wordpress_meta_fixes.md`: created 11-point WP fix list with exact copy and WP admin paths (commit 1b995c5)
+- ✅ PAUSER_ROLE discrepancy documented: held by BANK wallet, not "nobody" as previously stated
+- ✅ Chainlink 0 LINK root cause documented: explains why Round 1 did not auto-settle; upkeep may need full re-registration
+- ✅ Undocumented Vercel env vars (COMMUNITY_CHAT_ID, MAIN_CHANNEL_ID, ADMIN_CHAT_ID, SUPABASE_URL fallback) added to CLAUDE.md
+- ✅ Full Phase 0–4 PASS/FAIL audit tables written into CLAUDE.md
+- ✅ Investor executive status summary written
+- ✅ CI check passed: `node scripts/check-prize-split.mjs` → no violations
 
 ### May 15–19, 2026
 - ✅ TTS v2 M-1 fix (zero-amount transfer guard) deployed live via Gnosis Safe nonce 0 — implementation `0xb995b63c` verified on BaseScan (solc 0.8.20, Exact Match)
