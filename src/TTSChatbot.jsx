@@ -22,7 +22,7 @@ CONTRACT ADDRESSES (Base Mainnet):
 
 SUBMISSION FEE: 5 TTS per profile, max 3 submissions per wallet per week
 STAKING TIERS: Bronze $50+ 8% APR 1.1x boost | Silver $100+ 12% APR 1.25x | Gold $250+ 18% APR 1.5x | Diamond $1000+ 32% APR 2x | VIP $5000+ 45% APR 3x. TTS equivalent shown live in app based on current price.
-REFERRALS: 100 TTS per referral bonus paid to referrer.
+REFERRALS: Referral bonus paid to referrer when they bring a new user (amount admin-configurable, default 100 TTS).
 BUY TTS: Uniswap on Base — app.uniswap.org — contract 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
 
 You have access to a web search tool. Use it to:

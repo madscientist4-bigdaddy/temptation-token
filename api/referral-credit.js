@@ -5,7 +5,7 @@
 // Flow:
 //   1. Look up which referral_code the new user used (submissions table)
 //   2. Find the referrer wallet from referrals table
-//   3. Transfer 100 TTS from house wallet to referrer via on-chain tx
+//   3. Transfer referrer_bonus TTS (admin-configurable, default 100) from house wallet to referrer via on-chain tx
 //   4. Log to referral_credits table
 //
 // Required env vars:
@@ -124,5 +124,5 @@ export default async function handler(req, res) {
     }),
   })
 
-  return res.status(200).json({ ok: true, referrerWallet, txHash, amount: '100 TTS' })
+  return res.status(200).json({ ok: true, referrerWallet, txHash, amount: `${Number(creditAmount) / 1e18} TTS` })
 }
