@@ -91,22 +91,25 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 ---
 
-## Current Round Status (verified on-chain May 19, 2026)
+## Current Round Status (verified on-chain May 20, 2026)
 
 | Field | Value |
 |-------|-------|
 | Contract | TTSVotingV3b `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` |
 | currentRoundId | 1 |
 | startTime | 2026-05-07 03:23:13 UTC |
-| endTime | **2026-05-14 03:23:13 UTC — PASSED 5 days ago** |
-| totalRawVotes | ~0 (1 wei — effectively zero) |
+| endTime | 2026-05-14 03:23:13 UTC |
+| totalRawVotes | 0 (no votes in Round 1) |
 | totalTickets | 0 |
-| settled | **false — OVERDUE** |
+| settled | **true ✅ — settled 2026-05-15 21:43 UTC** |
 | vrfPending | false |
 | profileCount | 15 |
-| Round 2 | Not started |
+| Round 2 | Not started (V3c not yet deployed) |
+| Settlement TX | `0x50d0ec5ed6ff5d0c30fa79956162e8d2278ccbc33bd091be14784f71f423c41d` (Bank wallet → manualExecute(3) → VRFRequested → VRF fulfilled → 0 votes → no prizes) |
 
-**🚨 Round 1 is past its endTime and NOT settled.** Chainlink automation did not fire (likely LINK shortage). Manual settlement required before V3c deployment. See Pending Action #1.
+**✅ Round 1 settled.** Jim manually called `manualExecute(3)` on TTSKeeper2 (May 15). VRF fulfilled; 0 votes → no prize distribution. Round 2 pending V3c deployment.
+
+**Root cause of automation failure confirmed:** TTSKeeper2 `s_forwarder` holds `0x6593c7de001fc8542bb1703532ee1e5aa0d458fd` — **no code on Base mainnet** (Ethereum mainnet address). Automation calls routed through forwarder all failed silently. TTSKeeper2V2 fixes this. See `outputs/chainlink_automation_runbook.md`.
 
 ---
 
@@ -491,9 +494,9 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 ### 🚨 CRITICAL — Blocking Round 2 and V3c deployment
 
-1. **Settle Round 1 manually** — Round 1 endTime was May 14 03:23 UTC. Chainlink did not auto-settle (likely no LINK). Jim calls `manualExecute(3)` on TTSKeeper2 (`0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48`) from Bank wallet. Verify: `V3b.getRound(1).settled = true` after call.
+1. **✅ DONE — Round 1 settled** — Jim called `manualExecute(3)` on TTSKeeper2 (May 15, TX `0x50d0ec5ed6...`). VRF fulfilled; 0 votes → no prizes distributed. V3c deployment can proceed.
 
-2. **Deploy TTSVotingV3c + TTSKeeper2V2 + fund Chainlink** — full runbook at `outputs/v3c_v2_deployment_runbook.md`. Requires Round 1 settled (step 1 above). Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → deploy Keeper2V2 → transferOwnership → setNFTContract → add VRF consumer → **register new Chainlink upkeep with 5+ LINK at automation.chain.link** (TTSKeeper2 had 0 LINK; TTSLinkReserve has 1 LINK — withdraw and top up) → call `setForwarder(upkeepForwarderAddr)` on Keeper2V2 → Gnosis tax-exempt batch for V3c → start Round 2 → batchApproveProfiles. **Bank wallet ETH = 0.0245 ETH — borderline for deployment + gas; top up if below 0.015 ETH before starting.**
+2. **Deploy TTSVotingV3c + TTSKeeper2V2 + fund Chainlink** — full runbook at `outputs/v3c_v2_deployment_runbook.md` + `outputs/chainlink_automation_runbook.md`. Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → set NFT contract on V3c → deploy Keeper2V2 → transferOwnership(Keeper2V2) on V3c → add V3c as VRF consumer → **register new Chainlink upkeep with 10 LINK at automation.chain.link** → call `setForwarder(upkeepForwarderAddr)` on Keeper2V2 → Gnosis tax-exempt batch for V3c → start Round 1 on V3c → batchApproveProfiles. **Bank wallet ETH = 0.0245 ETH — top up if below 0.015 ETH. Need ~9 additional LINK (TTSLinkReserve has 1 LINK — buy remainder on Uniswap).**
 
 3. **Update VOTING_ADDRESS in frontend** — after V3c deploys, replace `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` in:
    - `src/App.jsx` (VOTING_ADDRESS constant)
@@ -514,13 +517,17 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 9. **SolidProof portal access recovery** — email `support@solidproof.io` + Telegram `@Solidproof_io_Support`. Account email: `jgoetz@functionised.com`. No self-service reset URL — manual recovery only. After access restored: acknowledge all findings on portal (remap `outputs/seo/solidproof_acknowledgment_responses.md` to correct portal finding IDs), then complete KYC ($600).
 
-### ⚠️ HIGH — WordPress
+### 🚨 CRITICAL — WordPress (ALL require WP admin access; plugin not installed)
 
-10. **Fix homepage 40% prize split** — two wrong instances: "winning profile takes 40% of the weekly prize pool" and "Win — 40% prize pool split weekly". Fix via WP admin or tts-api-auth plugin once installed.
+10. **🚨 RELEASE-BLOCKING: Remove price-target / promissory language from live site** — Found on live site May 20: `TTS price target $0.10`, `TTS price target $1.00`, `Price rises`, `guaranteed`. These are roadmap/milestone claims but constitute promissory/price-target language. Must be removed before any investor or press link-share. Requires WP admin (Elementor) — cannot be automated without plugin. Full fix list: `outputs/wordpress_meta_fixes.md`.
 
-11. **Publish /trust and /audit pages** — both return 404. Hostinger .htaccess blocking custom slugs. Requires manual Hostinger support ticket or publish via WP admin directly.
+11. **Fix homepage/FAQ 40% prize split** — Multiple "40%" instances still on live site. Fix via WP admin. Full doc: `outputs/wordpress_meta_fixes.md`.
 
-12. **Install tts-api-auth plugin** — ZIP at `wp-plugins/tts-api-auth.zip`. Upload via wp-admin → Plugins → Add New → Upload Plugin → Activate → run setup curl. Logo fix (max-width 200px) applies automatically on activation.
+12. **Remove adult content strings from OG/meta** — All adult content meta tags still live: og:title "Adult Entertainment & NFTs", og:site_name "Adult Crypto Game on Base", og:image:alt "Payment Processor for Adult Content", FAQ og:title "Adult Games, NFTs", FAQ body "adult entertainment and NFT markets". WP admin required.
+
+13. **Publish /trust and /audit pages** — both return 404. Hostinger .htaccess blocking custom slugs. Requires manual Hostinger support ticket or publish via WP admin directly.
+
+14. **Install tts-api-auth plugin** — ZIP at `wp-plugins/tts-api-auth.zip`. Upload via wp-admin → Plugins → Add New → Upload Plugin → Activate → run setup curl. Logo fix (max-width 200px) applies automatically on activation. This unblocks all programmatic WP edits.
 
 ### 🟡 MEDIUM
 
@@ -592,17 +599,18 @@ Check memory files for any session-specific context.
 
 ---
 
-## Full-System Audit Results — May 19, 2026
+## Full-System Audit Results — May 20, 2026 (updated)
 
-Executed: PHASE 0–4. Commits: 5df6396, 32532dd, 1b995c5.
+Executed: PHASE 0–F. Commits: 5df6396, 32532dd, 1b995c5, 224da44, [current].
 
-### PHASE 0 — Blockers
+### PHASE 0 — Blockers (updated May 20)
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| Round 1 settled | ❌ FAIL | settled=false; endTime May 14 passed 5 days ago |
+| Round 1 settled | ✅ PASS | settled=true; Jim manually settled May 15 (TX 0x50d0ec5ed6...) |
 | Chainlink LINK balance | ❌ FAIL | Keeper=0 LINK; LinkReserve=1 LINK (not funded into upkeep) |
-| Chainlink upkeep registered | ⚠️ UNKNOWN | Upkeep ID not stored in keeper; may need full re-registration |
+| Chainlink forwarder (ROOT CAUSE) | ❌ FAIL | s_forwarder = 0x6593c7de...0d458fd has NO CODE on Base (Ethereum mainnet addr). This is why automation never fired. TTSKeeper2V2 fixes this. |
+| Round 2 started | ❌ FAIL | Not started — waiting for V3c deployment |
 | V3c pre-deploy check (compiler) | ✅ PASS | 0 errors, 0 warnings |
 | V3c pre-deploy check (Slither) | ✅ PASS | 1 HIGH accepted as AF-001 (non-exploitable) |
 | TTSKeeper2V2 pre-deploy check | ✅ PASS | 0 HIGH Slither findings |
@@ -659,61 +667,112 @@ Executed: PHASE 0–4. Commits: 5df6396, 32532dd, 1b995c5.
 | Live Telegram post test | ⚠️ NOT TESTED | Not executed this session |
 | @TTSBroadcastBot is channel admin | ⚠️ UNVERIFIED | Required for Post Now + scheduler; confirm in channel settings |
 
-### PHASE 4 — Marketing Site (temptationtoken.io)
+### PHASE 4 — Marketing Site (temptationtoken.io) — updated May 20
 
-All failures require tts-api-auth plugin installation + WP admin access.
+**WRITE ACCESS STATUS: NONE.** tts-api-auth plugin not installed (all /wp-json/tts/v1/* return 404). Hostinger blocks Application Passwords. All fixes require WP admin login.
+
 Fix document: `outputs/wordpress_meta_fixes.md`
 
 | Issue | Result | Priority |
 |-------|--------|----------|
 | tts-api-auth plugin installed | ❌ FAIL | All WP fixes blocked until installed |
+| **Price-target language: "$0.10", "$1.00", "Price rises", "price target"** | ❌ FAIL | 🚨 RELEASE-BLOCKING — NEW FINDING |
+| **"guaranteed" baseline rewards claim** | ❌ FAIL | 🚨 RELEASE-BLOCKING — NEW FINDING |
 | og:title "Adult Entertainment & NFTs" | ❌ FAIL | 🚨 Critical — indexed by Google |
 | og:description "40% of the prize pool" | ❌ FAIL | 🚨 Critical |
 | og:site_name "Adult Crypto Game on Base" | ❌ FAIL | 🚨 Critical |
 | og:image:alt "Payment Processor for Adult Content" | ❌ FAIL | 🚨 Critical |
 | FAQ og:title "Adult Games, NFTs" | ❌ FAIL | 🚨 Critical |
-| FAQ og:description "adult entertainment" | ❌ FAIL | 🚨 Critical |
-| FAQ og:image:alt "Polygon blockchain" (wrong chain) | ❌ FAIL | 🚨 Critical |
-| FAQ body text "adult entertainment and NFT markets" | ❌ FAIL | High |
+| FAQ og:description "adult entertainment" | ❌ FAIL | 🚨 Critical — multiple instances in body too |
+| FAQ og:image:alt "Polygon blockchain" (wrong chain) | ❌ FAIL | 🚨 Critical — multiple Polygon references |
+| FAQ body "adult entertainment and NFT markets" | ❌ FAIL | High |
 | Homepage img alt "adult entertainment" | ❌ FAIL | High |
-| Google Play / Apple Store images visible | ❌ FAIL | Medium |
+| Google Play / Apple Store badges | ❌ FAIL | Medium |
 | Copyright 2024 stale instance | ❌ FAIL | Low |
-| Telegram links → broadcast not community | ❌ FAIL | Medium |
-| Dynamic OG image (admin-ajax URL) | ⚠️ WARN | Nice-to-have — replace with static 1200×630 PNG |
+| Telegram footer links (→ broadcast, not community) | ❌ FAIL | Medium |
+| Solidproof shown as "In Progress" (correct) | ✅ PASS | Audit claim is accurate |
+| Staking tiers count (5 tiers, no Platinum) | ✅ PASS | Bronze/Silver/Gold/Diamond/VIP confirmed |
+| /trust page | ❌ FAIL | 404 |
+| /audit page | ❌ FAIL | 404 |
+| Dynamic OG image (admin-ajax URL) | ⚠️ WARN | Not broken; replace with static PNG when possible |
+
+### WORKSTREAM C — On-Chain Split Verification (May 20)
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| C1: profileShare = 35% | ✅ PASS | Source: `pool * 35 / 100` (V3b.sol:443) |
+| C1: voterShare = 35% | ✅ PASS | Source: `pool * 35 / 100` (V3b.sol:444) |
+| C1: charityShare = 10% | ✅ PASS | Source: `pool * 10 / 100` (V3b.sol:445) |
+| C1: houseShare = 20% (remainder) | ✅ PASS | Source: `pool - profileShare - voterShare - charityShare` (V3b.sol:456) |
+| C2: charityWallet on-chain | ✅ PASS | `0xf7dD429D679CB61231e73785fD1737E60138ABa3` (Polaris) ✅ |
+| C2: houseWallet on-chain | ⚠️ DISCREPANCY | On-chain = `0xB1E991bF...` (Bank/Deployer). Workstream expected `0x7a9ff2f...` (Marketing). Per CLAUDE.md spec, Bank wallet IS the correct 20% recipient. The workstream reference to Marketing wallet appears to be an error in the workstream description. **NOT a contract bug.** |
+| C2: Prize distribution triggered? | N/A | Round 1 had 0 votes → no prizes distributed → no payout addresses to verify |
+
+### WORKSTREAM F — Bot Token Security (May 20)
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Telegram bot tokens in committed code | ✅ PASS | No `123456789:AAF...` patterns found in any file |
+| BROADCAST_BOT_TOKEN in code | ✅ PASS | Only referenced via env vars in serverless functions |
+| Supabase ANON key hardcoded | ⚠️ WARN | Hardcoded as fallback in 10 API files. This is the anon (public) key, not the service key. Service key is env-only. Low risk but code smell — should move to env-only. Files: api/approve-profile.js, api/community-stats.js, api/vote-match.js, api/content-generator.js, api/scheduler.js, api/set-club-wallet.js, api/signup-bonus.js, api/referral-credit.js, scripts/deployV3.js, scripts/seed-tts-posts.js |
+| No rotation needed | ✅ PASS | No actual token secrets found in code |
 
 ---
 
-## Investor Executive Status — May 19, 2026
+## Investor Executive Status — May 20, 2026
 
 **What is live and working:**
 - TTS token on Base mainnet — 69B fixed supply, 1% burn tax, LP locked 1 year (Team.Finance)
 - Voting contract V3b live — prize split 35/35/10/20, VRF-powered fairness, all 11 audit findings patched
+- Round 1 settled May 15 (on-chain confirmed; 0 votes, no prizes — first round was test)
 - TTS v2 token upgrade live (M-1 fix) — zero-amount transfer guard, EIP-20 compliant
 - Gnosis Safe 2/2 multisig controls admin — no single-key risk
 - Tax-exempt on 8 addresses confirmed on-chain
 - Signup bonus (500 TTS) + vote match (1:1 / 1000 TTS) operational
 - Social automation: X + Telegram content scheduler running
 - Admin dashboard fully operational
+- Polaris Project wallet confirmed on-chain as charity recipient
 
 **What is pending (ordered by release impact):**
-1. Round 1 must be settled manually (`manualExecute(3)`) — Chainlink had 0 LINK
-2. V3c + Keeper2V2 deployment — fixes Diamond/VIP multipliers + 3-NFT mints + per-tier vote caps; runbook ready
-3. Chainlink upkeep re-registration with 5+ LINK (automation.chain.link)
-4. WordPress OG/meta cleanup — adult content strings and "40%" are in live indexed meta tags; tts-api-auth plugin install required
-5. GoPlus appeal + Blockaid #1263614 response — security scanner false-positives; evidence submitted
-6. SolidProof portal access recovery — TrustNet score 0.01; all voting contract findings fixed in code, not yet acknowledged on portal
-7. TTSStakingV2 deploy — fixes interface mismatch (all stakers currently getting 1x boost instead of tier boost)
+1. 🚨 **WordPress price-target language on live site** — "$0.10", "$1.00", "Price rises", "price target" still live. MUST remove before investor/press link-share.
+2. 🚨 **WordPress adult content OG tags** — "Adult Entertainment & NFTs", "Payment Processor for Adult Content" still in live meta. MUST fix before investor/press.
+3. **V3c + Keeper2V2 deployment** — runbooks ready; need ~9 additional LINK for automation upkeep
+4. **Chainlink upkeep registration** — root cause confirmed: bad forwarder address in TTSKeeper2; TTSKeeper2V2 fixes this
+5. **GoPlus appeal + Blockaid #1263614** — false-positives; evidence submitted; awaiting response
+6. **SolidProof portal access recovery** — TrustNet 0.01; code fixes done, portal unacknowledged
+7. **TTSStakingV2 deploy** — staking interface mismatch (all stakers get 1x instead of tier boost)
+8. **WordPress plugin install** → enables programmatic fixes for items 1 + 2
 
-**Clean for investor presentation:**
-- ✅ No price-target or promissory language found in code or live site
-- ✅ Charitable component (10% → Polaris Project anti-trafficking nonprofit) verified on-chain
-- ✅ LP lock evidence on-chain (Team.Finance TX `0xd98b2bb4...`)
-- ✅ Gnosis Safe audit trail available
-- ⚠️ Marketing site still shows adult content strings in OG tags — fix BEFORE any press or investor link-share
+**NOT launch-ready while these remain open:**
+- ❌ Price-target / promissory language on live site (NEW — RELEASE-BLOCKING)
+- ❌ Adult content strings in live OG/meta tags
+- ❌ Round 2 not started (V3c not deployed)
+
+**Facts verifiable on-chain for investors:**
+- ✅ Charitable component: 10% → Polaris Project on-chain (`0xf7dD...`) verified in V3b settlement logic
+- ✅ LP lock: Team.Finance TX `0xd98b2bb4...`; 231.3 LP locked until 2027-05-05
+- ✅ Gnosis Safe 2/2 audit trail on-chain (nonce=6)
+- ✅ Prize split 35/35/10/20 hardcoded in contract source (pool*35/100 for each)
+- ✅ SolidProof audit shown as "In Progress" on live site (not falsely "complete")
 
 ---
 
 ## Completed History
+
+### May 20, 2026 (Workstreams A–F + CLAUDE.md update)
+- ✅ A1: Round 1 on-chain state confirmed — settled=true (VRF fulfilled May 15, 0 votes, no prizes)
+- ✅ A2: Settlement + manual override runbook written — `outputs/round1_settle_runbook.md`
+- ✅ A3: No prize distribution (0 votes) — houseWallet=Bank ✅, charityWallet=Polaris ✅ confirmed on-chain
+- ✅ B1: Chainlink root cause confirmed — TTSKeeper2 `s_forwarder` = Ethereum mainnet address (no code on Base); automation calls all failed
+- ✅ B2: Chainlink remediation runbook written — `outputs/chainlink_automation_runbook.md` (~9 LINK needed)
+- ✅ B3: Confirmed fully autonomous AFTER V3c + Keeper2V2 deploy + upkeep registration + setForwarder
+- ✅ C1: Prize split 35/35/10/20 confirmed from V3b source (pool*35/100 hardcoded)
+- ⚠️ C2: houseWallet on-chain = Bank wallet `0xb1e991bf...` (correct per spec). Workstream expected Marketing wallet `0x7a9ff2f...` — workstream description had wrong address. Not a contract bug.
+- ❌ D: WordPress write access UNAVAILABLE — tts-api-auth plugin not installed, Hostinger blocks App Passwords. All 14 WP violations still live. Cannot automate without plugin.
+- 🚨 D NEW FINDING: Price-target language found on live site — "$0.10", "$1.00", "Price rises", "price target", "guaranteed". RELEASE-BLOCKING. Must remove before investor/press link-share.
+- ✅ E: SolidProof full questionnaire written — `outputs/solidproof_questionnaire.md` (all 19 findings with status)
+- ✅ F: Bot tokens NOT in committed code (no Telegram token patterns found). Supabase anon key hardcoded in 10 files as fallback — anon key (not service key), low risk but flagged.
+- ✅ CLAUDE.md updated with all PASS/FAIL tables + investor executive status (this commit)
 
 ### May 19, 2026 (Phase 1–5 audit pass)
 - ✅ referral-credit.js: fixed hardcoded `'100 TTS'` response → actual admin_config amount (commit 1b995c5)
