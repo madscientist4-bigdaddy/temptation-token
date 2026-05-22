@@ -91,6 +91,18 @@ uint256 public tierThresholdVIP;      // min TTS for VIP     tier — ~$5,000 US
 | Diamond | $1,000 | 1,000,000 TTS = `1_000_000e18` |
 | VIP     | $5,000 | 5,000,000 TTS = `5_000_000e18` |
 
+**Current price estimate (verified 2026-05-21):** Uniswap pool reserves = 0.500001 ETH / 107,000 TTS → ~4.67e-6 ETH/TTS. At ETH=$3,000 → **~$0.014/TTS**. Recommended thresholds at this price:
+
+| Tier | USD Target | TTS Amount | Wei value |
+|------|-----------|------------|-----------|
+| Bronze  | $50   | 3,571 TTS  | `3571e18`       |
+| Silver  | $100  | 7,143 TTS  | `7143e18`       |
+| Gold    | $250  | 17,857 TTS | `17857e18`      |
+| Diamond | $1,000 | 71,429 TTS | `71429e18`     |
+| VIP     | $5,000 | 357,143 TTS | `357143e18`   |
+
+**Recalculate at deploy time:** `threshold_TTS = usd_target / tts_price_usd`. Price: cast call 0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68 "getReserves()(uint112,uint112,uint32)" --rpc-url https://mainnet.base.org → (WETH_reserve / TTS_reserve) × ETH_USD_price.
+
 **Note:** These are representative only. Bank wallet should use current Uniswap price to calculate actual TTS amounts when calling `initializeV2`.
 
 ---

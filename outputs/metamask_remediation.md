@@ -180,7 +180,8 @@ Contact: jgoetz@functionised.com
 
 ## 6. Pre-Filled GoPlus Appeal
 
-**Submit at:** https://gopluslabs.io → "Report Incorrect Info" OR email: security@gopluslabs.io
+**Submit at:** https://gopluslabs.io → "Report Incorrect Info" OR email: service@gopluslabs.io  
+**Note:** `service@gopluslabs.io` bounces — use `service@gopluslabs.io` OR Telegram `@Goplusservice`
 
 ```
 Subject: False Positive — Token Security Report for TTS on Base (0x5570eA97...)
@@ -292,7 +293,7 @@ App: https://app.temptationtoken.io
 | Action | Where | ETA |
 |--------|-------|-----|
 | Submit Blockaid false positive | https://report.blockaid.io | Immediate |
-| Submit GoPlus appeal | security@gopluslabs.io | Immediate |
+| Submit GoPlus appeal | service@gopluslabs.io | Immediate |
 | Send MetaMask support email | support@metamask.io | Immediate |
 | Add TTS to Token Lists (Uniswap, Coingecko) | GitHub PRs | 1–2 weeks (improves scanner trust signals) |
 | Reduce creator wallet concentration | Transfer portion to DAO/multisig | Reduces creator_percent flag permanently |
@@ -308,7 +309,7 @@ App: https://app.temptationtoken.io
 | Submission | Method | Status | Reference |
 |------------|--------|--------|-----------|
 | Blockaid false positive | report.blockaid.io (JavaScript form) | **PENDING MANUAL** — form requires browser; cannot submit programmatically. Use text from Section 5. | — |
-| GoPlus appeal | security@gopluslabs.io (email) | **PENDING MANUAL** — use text from Section 6 as email body. | — |
+| GoPlus appeal | service@gopluslabs.io (email) | **PENDING MANUAL** — use text from Section 6 as email body. | — |
 | MetaMask support email | support@metamask.io | **PENDING MANUAL** — use text from Section 7. | — |
 
 *Generated: 2026-05-17. Corrections applied: 2026-05-18 — implementation `0xb995b63c` confirmed already verified (Exact Match, solc 0.8.20, optimization disabled, EVM shanghai); proxy `0x5570eA97` confirmed verified (Exact Match, solc 0.8.27). Verification compiler settings corrected in email template. Based on live on-chain reads via cast/viem against Base mainnet RPC.*

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: May 19, 2026 — full session state update.
+Last verified: May 21, 2026 — full session state update.
 
 ## Commands
 
@@ -490,13 +490,13 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 ---
 
-## Pending Actions (priority order — May 19, 2026)
+## Pending Actions (priority order — May 21, 2026)
 
 ### 🚨 CRITICAL — Blocking Round 2 and V3c deployment
 
-1. **✅ DONE — Round 1 settled** — Jim called `manualExecute(3)` on TTSKeeper2 (May 15, TX `0x50d0ec5ed6...`). VRF fulfilled; 0 votes → no prizes distributed. V3c deployment can proceed.
+1. **✅ DONE — Round 1 settled** — Jim called `manualExecute(3)` on TTSKeeper2 (May 15, TX `0x50d0ec5ed6...`). VRF fulfilled; 0 votes → no prizes distributed. V3c deployment can proceed. Distribution verified: `python3 outputs/verify_round_distribution.py 1` → PASS.
 
-2. **Deploy TTSVotingV3c + TTSKeeper2V2 + fund Chainlink** — full runbook at `outputs/v3c_v2_deployment_runbook.md` + `outputs/chainlink_automation_runbook.md`. Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → set NFT contract on V3c → deploy Keeper2V2 → transferOwnership(Keeper2V2) on V3c → add V3c as VRF consumer → **register new Chainlink upkeep with 10 LINK at automation.chain.link** → call `setForwarder(upkeepForwarderAddr)` on Keeper2V2 → Gnosis tax-exempt batch for V3c → start Round 1 on V3c → batchApproveProfiles. **Bank wallet ETH = 0.0245 ETH — top up if below 0.015 ETH. Need ~9 additional LINK (TTSLinkReserve has 1 LINK — buy remainder on Uniswap).**
+2. **Deploy TTSVotingV3c + TTSKeeper2V2 + fund Chainlink** — full runbook at `outputs/v3c_v2_deployment_runbook.md` + `outputs/chainlink_automation_runbook.md`. Key steps: compile in Remix (solc 0.8.20, 200 runs, via-IR) → deploy V3c → set NFT contract on V3c → deploy Keeper2V2 → transferOwnership(Keeper2V2) on V3c → add V3c as VRF consumer → **register new Chainlink upkeep with 10 LINK at automation.chain.link** → call `setForwarder(upkeepForwarderAddr)` on Keeper2V2 → Gnosis tax-exempt batch for V3c → start Round 1 on V3c → batchApproveProfiles. **Bank wallet ETH = 0.0245 ETH — top up if below 0.015 ETH. Need ~9 additional LINK (TTSLinkReserve has 1 LINK — buy remainder on Uniswap).** ⚠️ **CRITICAL: V3c `_houseWallet` constructor arg MUST be Marketing wallet `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` — NOT Bank wallet. V3b used Bank — that was an error. Full constructor args locked in runbook.**
 
 3. **Update VOTING_ADDRESS in frontend** — after V3c deploys, replace `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` in:
    - `src/App.jsx` (VOTING_ADDRESS constant)
@@ -507,7 +507,7 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 5. **batchApproveProfiles on V3c** — call after Round 2 starts. Pull wallet addresses from Supabase (`SELECT id::text, payout_wallet FROM submissions WHERE status = 'approved' ORDER BY approved_at`). Ensure payout wallets are real user wallets — not Bank/Deployer.
 
-6. **Deploy TTSStakingV2** — fixes `getStakingTier()` interface mismatch and corrects Diamond/VIP multipliers. Bank wallet calls `upgradeTo(newImpl)` then `initializeV2(thresholds)` on staking proxy `0xaA12B889...`. No Gnosis Safe needed (BANK holds UPGRADER_ROLE solo). Diff report: `outputs/staking_v2_diff.md`.
+6. **Deploy TTSStakingV2** — fixes `getStakingTier()` interface mismatch and corrects Diamond/VIP multipliers. Bank wallet calls `upgradeTo(newImpl)` then `initializeV2(thresholds)` on staking proxy `0xaA12B889...`. No Gnosis Safe needed (BANK holds UPGRADER_ROLE solo). Diff report: `outputs/staking_v2_diff.md`. Current-price thresholds (at ~$0.014/TTS, ETH=$3k): Bronze 3,571 / Silver 7,143 / Gold 17,857 / Diamond 71,429 / VIP 357,143 TTS — recalculate at deploy time.
 
 ### ⚠️ HIGH — Security scanner remediation
 
@@ -515,7 +515,7 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 8. **Blockaid ticket #1263614** — submitted 2026-05-18. Awaiting 1–3 day review. Draft reply in this session covers on-chain evidence. No action needed until Blockaid responds.
 
-9. **SolidProof portal access recovery** — email `support@solidproof.io` + Telegram `@Solidproof_io_Support`. Account email: `jgoetz@functionised.com`. No self-service reset URL — manual recovery only. After access restored: acknowledge all findings on portal (remap `outputs/seo/solidproof_acknowledgment_responses.md` to correct portal finding IDs), then complete KYC ($600).
+9. **SolidProof portal access recovery** — Ready-to-send email draft at `outputs/urgent/solidproof_recovery_email.md`. Send from `jgoetz@functionised.com` to `support@solidproof.io` + Telegram `@Solidproof_io_Support`. No self-service reset URL — manual recovery only. After access restored: acknowledge all findings on portal (remap `outputs/seo/solidproof_acknowledgment_responses.md` to correct portal finding IDs — TOKEN vs VOTING sub-reports have different ID sequences), then complete KYC ($600).
 
 ### 🚨 CRITICAL — WordPress (ALL require WP admin access; plugin not installed)
 
@@ -565,7 +565,7 @@ TTSVotingV3c:
   _subscriptionId:  58222014484560539249027457203866883376041731162442592604288474822166186263722
   _stakingContract: "0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc"
   _charityWallet:   "0xf7dd429d679cb61231e73785fd1737e60138aba3"
-  _houseWallet:     "0xb1e991bf617459b58964eef7756b350e675c53b5"
+  _houseWallet:     "0x7a9ff2f584248744cBbA32c737D660ED6f077fCB"  ← Marketing wallet (CORRECTED — V3b used Bank wallet, that was wrong)
 
 TTSKeeper2V2:
   _votingContract:  <V3c address — fill after deploy>
@@ -759,6 +759,16 @@ Fix document: `outputs/wordpress_meta_fixes.md`
 
 ## Completed History
 
+### May 21, 2026 (Workstreams J/K/M)
+- ✅ J1: V3c + Keeper2V2 deployment runbook COMPLETELY REWRITTEN — `outputs/v3c_v2_deployment_runbook.md`. 13 steps, each with post-step verification + rollback. houseWallet corrected to Marketing wallet `0x7a9ff2f...` throughout. setForwarder documented as CRITICAL ROOT-CAUSE FIX (Step 8). Gas estimates, LINK acquisition guide, forwarder code-size check all included.
+- ✅ J houseWallet CORRECTION LOCKED: V3b `_houseWallet` = Bank wallet `0xb1e991bf...` (an ERROR). V3c MUST use Marketing wallet `0x7a9ff2f...`. Constructor args updated in runbook and CLAUDE.md.
+- ✅ K2: Distribution audit tool created — `outputs/verify_round_distribution.py`. Scans VRF → RoundSettled events, fetches TTS transfers from voting contract, labels wallets, validates 35/35/10/20 split. Handles zero-vote case correctly.
+- ✅ K3: Tool validated against Round 1 — result: PASS (zero votes → no distribution, correct behavior). Function selectors fixed (getRound=0x8f1327c0, houseWallet=0x77818f02, charityWallet=0x7b208769). Event topics confirmed correct.
+- ✅ M1: SolidProof recovery email drafted — `outputs/urgent/solidproof_recovery_email.md`. Jim sends from jgoetz@functionised.com.
+- ✅ M2: GoPlus appeal email address corrected in `outputs/metamask_remediation.md` — was `security@gopluslabs.io` (bounces), fixed to `service@gopluslabs.io` across all 3 occurrences.
+- ✅ M3: TTSStakingV2 current-price thresholds computed from live Uniswap pool (0.5 ETH / 107K TTS → ~$0.014/TTS at ETH=$3k). Recommended values added to `outputs/staking_v2_diff.md`. Full deploy procedure already documented in that file.
+- ⏳ J2/J3 + L: V3c deploy, setForwarder verification, Round 2 autonomous run — all blocked on Bank wallet signing. Jim executes when ready.
+
 ### May 20, 2026 (Workstreams A–F + CLAUDE.md update)
 - ✅ A1: Round 1 on-chain state confirmed — settled=true (VRF fulfilled May 15, 0 votes, no prizes)
 - ✅ A2: Settlement + manual override runbook written — `outputs/round1_settle_runbook.md`
@@ -767,7 +777,7 @@ Fix document: `outputs/wordpress_meta_fixes.md`
 - ✅ B2: Chainlink remediation runbook written — `outputs/chainlink_automation_runbook.md` (~9 LINK needed)
 - ✅ B3: Confirmed fully autonomous AFTER V3c + Keeper2V2 deploy + upkeep registration + setForwarder
 - ✅ C1: Prize split 35/35/10/20 confirmed from V3b source (pool*35/100 hardcoded)
-- ⚠️ C2: houseWallet on-chain = Bank wallet `0xb1e991bf...` (correct per spec). Workstream expected Marketing wallet `0x7a9ff2f...` — workstream description had wrong address. Not a contract bug.
+- ⚠️ C2: houseWallet on-chain V3b = Bank wallet `0xb1e991bf...`. **CORRECTION (May 21):** This was an ERROR in V3b, not a spec match. Jim confirmed V3c MUST use Marketing wallet `0x7a9ff2f...`. V3b prize house-cut went to Bank — will not repeat in V3c.
 - ❌ D: WordPress write access UNAVAILABLE — tts-api-auth plugin not installed, Hostinger blocks App Passwords. All 14 WP violations still live. Cannot automate without plugin.
 - 🚨 D NEW FINDING: Price-target language found on live site — "$0.10", "$1.00", "Price rises", "price target", "guaranteed". RELEASE-BLOCKING. Must remove before investor/press link-share.
 - ✅ E: SolidProof full questionnaire written — `outputs/solidproof_questionnaire.md` (all 19 findings with status)
