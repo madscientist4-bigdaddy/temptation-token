@@ -15,7 +15,7 @@
 | V3c compiler check | ✅ PASS (0 errors, 0 warnings; Slither HIGH accepted AF-001) |
 | Keeper2V2 compiler check | ✅ PASS (0 HIGH Slither findings) |
 | Gnosis co-signer available | Check before starting — 2/2 needed for tax-exempt batch (Step 6) |
-| LINK for automation upkeep | ⚠️ 1 LINK in TTSLinkReserve — need 10 total. Buy ~9 LINK before Step 7. |
+| LINK for automation upkeep | ✅ No purchase needed. 4 existing upkeeps hold 27.41 LINK total. Cancel all 4 before Step 7 to recover funds. |
 
 ---
 
@@ -183,32 +183,60 @@ cast call 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9 \
 
 ---
 
-## Step 7 — Register Chainlink Automation Upkeep
+## Step 7 — Cancel Existing Upkeeps and Re-register for Keeper2V2
 
-> **Root-cause of prior automation failure:** TTSKeeper2's `s_forwarder` was `0x6593c7de001fc8542bb1703532ee1e5aa0d458fd` — no code on Base mainnet (confirmed May 20 on-chain). This was likely the Ethereum mainnet Chainlink Registrar address, copied without verifying it exists on Base. Chainlink routes `performUpkeep` through the forwarder; with a dead address, all automation calls failed silently.
->
-> **TTSKeeper2V2 fixes this:** `s_forwarder` is NOT set at deploy time. It is set explicitly via `setForwarder()` in Step 8, using the actual address Chainlink assigns after registration.
+> **Root-cause of prior automation failure:** TTSKeeper2's `s_forwarder` was `0x6593c7de001fc8542bb1703532ee1e5aa0d458fd` — no code on Base mainnet (confirmed May 20 on-chain). Chainlink routes `performUpkeep` through the forwarder; with a dead address, all automation calls failed silently. TTSKeeper2V2 fixes this.
 
-**LINK needed:** Buy ~9 LINK on Uniswap (Base LINK: `0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196`). 1 LINK in TTSLinkReserve can be added after.
+> **Why cancel, not edit:** Chainlink Automation v2.3 does not allow editing the target contract address on any registered upkeep (Custom Logic, Time-based, or Log Trigger). The target is immutable at registration. To retarget to Keeper2V2, you must cancel all 4 existing upkeeps and register 1 new one.
 
-### Upkeep Registration Form (automation.chain.link)
+> **Why 1 upkeep instead of 4:** Keeper2V2 uses a consolidated `checkUpkeep`/`performUpkeep` design. It reads live on-chain state to decide which action is needed. The old 4-upkeep approach was time-based (fired on schedule regardless of contract state), which is why it silently failed — if settlement failed, the next Start Round cron would fire anyway. One consolidated upkeep is more reliable and cheaper to maintain.
 
-1. Connect wallet to Base mainnet
-2. **Register New Upkeep** → **Custom Logic**
-3. Form values:
+### Step 7a — Map existing upkeeps to their fate
+
+| Upkeep name | LINK balance | Keeper2V2 equivalent | Action |
+|-------------|-------------|---------------------|--------|
+| TTS Start Round | 5.9 LINK | `ACTION_START_ROUND (1)` — handled by consolidated `checkUpkeep` | **Cancel + withdraw** |
+| TTS Settle Or Rollover | 6.2 LINK | `ACTION_SETTLE (3)` / `ACTION_ROLLOVER (4)` — same consolidated `checkUpkeep` | **Cancel + withdraw** |
+| TTS Midpoint Snapshot | 8.2 LINK | **None** — `takeMidpointSnapshot()` is a no-op in V3c (line 323, kept for interface compatibility only) | **Cancel + withdraw** |
+| TTS Link Reserve Monitor | 7.11 LINK | Not a game mechanic — unrelated to Keeper2V2 | **Cancel + withdraw** |
+| **Total to recover** | **27.41 LINK** | | |
+
+### Step 7b — Cancel all 4 upkeeps
+
+1. Go to `automation.chain.link` → connect Bank wallet → Base mainnet
+2. For each of the 4 upkeeps above:
+   - Open upkeep → **Cancel upkeep** → confirm in MetaMask
+   - Chainlink enforces a 50-block cooldown before funds can be withdrawn (~2 minutes on Base)
+3. After the cooldown, open each cancelled upkeep → **Withdraw funds** → confirm
+   - LINK is returned to the wallet that registered the upkeep (Bank wallet if Jim registered them)
+
+**Post-step check:** All 4 upkeeps show status "Cancelled" and LINK balance = 0 on dashboard.
+
+**LINK now in Bank wallet:** ~27.41 LINK (minus minor gas). No additional LINK purchase needed.
+
+### Step 7c — Register new Custom Logic upkeep for Keeper2V2
+
+**LINK needed:** 10 from the 27.41 recovered. No Uniswap swap required.
+
+1. `automation.chain.link` → Base mainnet → **Register New Upkeep** → **Custom Logic**
+2. Form values:
    - Target contract address: `KEEPER2V2_ADDRESS`
    - Upkeep name: `TTS Game Keeper V2`
    - Gas limit: `500000`
    - Check data: (leave empty)
    - Starting balance: `10 LINK`
-4. Submit → confirm in MetaMask
-5. On upkeep detail page, copy the **Forwarder address**
+3. Submit → confirm in MetaMask
+4. On upkeep detail page, copy the **Forwarder address**
 
 **Record: `FORWARDER_ADDRESS = ___________________________`**
+
+**Remaining LINK (~17 LINK):** Transfer back to `TTSLinkReserve (0xE8006d8F36827c97fd8f2932d4D2198B833A432F)` for future top-ups, or hold in Bank wallet.
 
 ---
 
 ## Step 8 — setForwarder on Keeper2V2 — CRITICAL ROOT-CAUSE FIX
+
+> This is the exact fix for what silently broke the old automation. The old TTSKeeper2 was deployed with a hard-coded forwarder that had no code on Base mainnet. Keeper2V2 ships with `s_forwarder = address(0)` and only sets it here, using the live address Chainlink assigns in Step 7c.
 
 Interact with KEEPER2V2_ADDRESS from Bank wallet:
 ```
@@ -219,17 +247,17 @@ setForwarder(<FORWARDER_ADDRESS>)
 ```bash
 # 1. Confirm stored correctly
 cast call <KEEPER2V2_ADDRESS> "s_forwarder()(address)" --rpc-url https://mainnet.base.org
-# Expected: FORWARDER_ADDRESS
+# Expected: FORWARDER_ADDRESS (non-zero)
 
-# 2. Confirm forwarder has code on Base (this is what was missing before)
+# 2. Confirm forwarder has code on Base — the exact check that would have caught the prior failure
 CODESIZE=$(cast code <FORWARDER_ADDRESS> --rpc-url https://mainnet.base.org | wc -c)
 echo "Forwarder bytecode length: $CODESIZE"
 # PASS: > 100 characters → forwarder is a live contract on Base
-# HALT: 2 characters ("0x") → forwarder has no code → automation will fail
-# If HALT: setForwarder(address(0)), contact Chainlink support, investigate before Round 2
+# HALT: 2 characters ("0x") → no code at that address → automation will fail silently again
+# If HALT: setForwarder(address(0)) immediately, contact Chainlink support before proceeding
 ```
 
-**Rollback:** `setForwarder(address(0))` from Bank wallet. Disables automated performUpkeep; `manualExecute()` still works.
+**Rollback:** `setForwarder(address(0))` from Bank wallet. Disables automated `performUpkeep`; `manualExecute()` still works from Bank wallet at any time.
 
 ---
 
@@ -344,19 +372,24 @@ echo "isTaxExempt(V3C):" && cast call $TTS "isTaxExempt(address)(bool)" $V3C --r
 | Wrong V3c in Keeper2V2 | Redeploy Keeper2V2 |
 | V3c bug post-ownership-transfer | `KEEPER.setVotingContract(old_V3b)` temporarily |
 | Forwarder code size = 0 (J3 fail) | `setForwarder(0)` on Keeper2V2; manual execution still works; investigate |
-| Automation not executing | Check LINK, check s_forwarder, check checkUpkeep() |
+| Automation not executing | Check upkeep LINK balance, check s_forwarder code size (J3), check checkUpkeep() return |
 | VRF stuck | `adminResetSettlement(roundId)` from owner (Keeper2V2 → manualExecute) |
 
 ---
 
 ## LINK Acquisition
 
-TTSLinkReserve: 1 LINK at `0xE8006d8F36827c97fd8f2932d4D2198B833A432F`
-Need total: 10 LINK in automation upkeep
-Must buy: ~9 LINK
+**No purchase required.** Cancelling the 4 existing upkeeps recovers ~27.41 LINK to the Bank wallet. 10 LINK funds the new upkeep; ~17 LINK remainder should be transferred back to TTSLinkReserve (`0xE8006d8F36827c97fd8f2932d4D2198B833A432F`) for future top-ups.
 
-**Buy on Uniswap (Base):** app.uniswap.org → Base → swap ETH for `0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196`
-~$135 for 9 LINK. Bank wallet needs ~0.07 ETH for this swap + gas.
+| Source | LINK |
+|--------|------|
+| TTS Start Round (cancel) | 5.9 |
+| TTS Settle Or Rollover (cancel) | 6.2 |
+| TTS Midpoint Snapshot (cancel) | 8.2 |
+| TTS Link Reserve Monitor (cancel) | 7.11 |
+| **Total recovered** | **27.41** |
+| New upkeep funding | −10.0 |
+| **Net to TTSLinkReserve** | **~17.4** |
 
 ---
 
@@ -377,4 +410,4 @@ Bank wallet: 0.0245 ETH — sufficient.
 
 ---
 
-*Document last updated: 2026-05-21*
+*Document last updated: 2026-05-24 — Steps 7/8 rewritten for existing 4 upkeeps; LINK purchase removed*

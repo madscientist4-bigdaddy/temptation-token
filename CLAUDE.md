@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: May 21, 2026 — full session state update.
+Last verified: May 24, 2026 — KYC/age verification system added.
 
 ## Commands
 
@@ -30,6 +30,10 @@ node scripts/check-prize-split.mjs  # CI: check for canonical-value violations
    - `/api/social-post.js` — Posts to X and/or Telegram; `{type,data}` template mode, `{platform:'telegram',content}` direct Telegram, `{platform:'x_tts',content}` direct @temptationtoken X post
    - `/api/scheduler.js` — Fires at 00, 13, 18, 19 UTC daily (4 Vercel crons): fires approved scheduled_posts + 19:00 Telegram round status + auto-correction alerts
    - `/api/content-generator.js` — Monday 8am UTC: generates @temptationtoken 21 posts for the week (templates, status=approved). POST `{force:true}` or `{tts_bootstrap:true}` to regenerate. @CryptoFitJim posts manually — no auto-generation.
+   - `/api/kyc-session.js` — POST `{ walletAddress }`: creates Persona inquiry, returns `{ inquiryId, personaUrl }`. Upserts pending row in `verified_submitters`. Requires `PERSONA_API_KEY` + `PERSONA_TEMPLATE_ID`.
+   - `/api/kyc-webhook.js` — POST (Persona webhook): updates `verified_submitters` on `inquiry.approved/declined/failed`. Verifies `Persona-Signature` header with `PERSONA_WEBHOOK_SECRET`. Set webhook URL in Persona dashboard.
+   - `/api/kyc-status.js` — GET `?wallet=0x...`: returns `{ status, source }` checking `verified_submitters`, `wallet_verifications` (legacy), and `verified_wallet_links`.
+   - `/api/age-acknowledge.js` — POST `{ walletAddress }` / GET `?wallet=0x...`: records/checks 18+ acknowledgment in `age_acknowledgments`.
    - `/api/referral-credit.js` — Credits referrer wallet on new user signup. Uses `referral_credits` table.
    - `/api/community-stats.js` — Returns Telegram community member count via bot API
    - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends fixed TTS amount (default 500, admin-configurable via `admin_config` table) from Marketing wallet on first connect. 20/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY` in Vercel env.
@@ -46,7 +50,7 @@ node scripts/check-prize-split.mjs  # CI: check for canonical-value violations
 
 ### Data layer
 
-- **Supabase** (`gmlikdxykgviyprqtqwz`) — Primary app database. Tables: `users`, `submissions`, `votes`, `rounds`, `stakes`, `scheduled_posts`, `bonus_claims`, `referral_settings`, `referral_credits`, `referrals`, `outreach_queue`, `admin_config`, `admin_audit_log` (all created as of May 10 2026).
+- **Supabase** (`gmlikdxykgviyprqtqwz`) — Primary app database. Tables: `users`, `submissions`, `votes`, `rounds`, `stakes`, `scheduled_posts`, `bonus_claims`, `referral_settings`, `referral_credits`, `referrals`, `outreach_queue`, `admin_config`, `admin_audit_log` (all created as of May 10 2026). KYC tables (added May 24 2026 — run `outputs/kyc_setup.sql`): `verified_submitters`, `verified_wallet_links`, `age_acknowledgments`.
 - **SQLite** — Used only by the Telegram bot worker.
 - **Smart contracts on Base mainnet** — Token, Voting, Staking, Airdrop, NFT. Addresses are hardcoded constants in `App.jsx`.
 
@@ -484,6 +488,9 @@ Always `git add` + commit + push after every change.
 | `MAIN_CHANNEL_ID` | Telegram main channel ID (`-1002207667493`) | ⚠️ Undocumented — may be hardcoded in api files |
 | `ADMIN_CHAT_ID` | Telegram admin chat ID (`-5273368658`) | ⚠️ Undocumented — may be hardcoded in api files |
 | `TELEGRAM_BOT_TOKEN` | TTSGameBot token (Railway env `BOT_TOKEN`) | ⚠️ Undocumented in Vercel if used there |
+| `PERSONA_API_KEY` | Persona identity verification API key | ⚠️ Add before KYC goes live |
+| `PERSONA_TEMPLATE_ID` | Persona inquiry template ID (itmpl_...) — gov ID + selfie | ⚠️ Add before KYC goes live |
+| `PERSONA_WEBHOOK_SECRET` | Persona webhook signing secret | ⚠️ Add before KYC goes live |
 
 **X posting: @temptationtoken only (automated). @CryptoFitJim posts manually.**
 Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` in Vercel; regenerate @temptationtoken Access Token → update `TTS_X_ACCESS_TOKEN` + `TTS_X_ACCESS_SECRET`.

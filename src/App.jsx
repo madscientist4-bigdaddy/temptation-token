@@ -471,6 +471,161 @@ function useToast() {
   return [t, show]
 }
 
+// ── AGE ACKNOWLEDGMENT MODAL ──────────────────────────────────────────────────
+function AgeAcknowledgmentModal({ onAccept }) {
+  const [checked, setChecked] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const accept = async () => {
+    if (!checked) return
+    setSaving(true)
+    onAccept()
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(5,5,10,0.96)', zIndex:900, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'32px 24px' }}>
+      <div style={{ maxWidth:360, width:'100%', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'28px 24px', display:'flex', flexDirection:'column', gap:18 }}>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:'2rem', marginBottom:10 }}>🔞</div>
+          <div style={{ fontFamily:'var(--font-d)', fontSize:'1.5rem', fontWeight:300, fontStyle:'italic', color:'var(--text)', marginBottom:6 }}>Age Confirmation</div>
+          <div style={{ fontSize:'.75rem', color:'var(--muted)', lineHeight:1.6 }}>Temptation Token is an 18+ platform. You must confirm your age to continue.</div>
+        </div>
+        <div style={{ background:'rgba(212,175,55,0.06)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px', fontSize:'.75rem', color:'var(--muted)', lineHeight:1.7 }}>
+          By continuing you confirm that: (a) you are at least 18 years of age; (b) viewing adult-oriented content is legal in your jurisdiction; (c) you accept the platform's Terms of Service. This acknowledgment is recorded with your wallet address and timestamp.
+        </div>
+        <label style={{ display:'flex', alignItems:'flex-start', gap:12, cursor:'pointer' }}>
+          <input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} style={{ marginTop:3, flexShrink:0, accentColor:'var(--gold)', width:16, height:16 }} />
+          <span style={{ fontSize:'.78rem', color:'var(--text)', lineHeight:1.6 }}>I confirm I am <strong>18 years of age or older</strong> and I agree to the Terms of Service.</span>
+        </label>
+        <button
+          onClick={accept}
+          disabled={!checked || saving}
+          style={{ background: checked ? 'linear-gradient(135deg,var(--crimson),#a0203a)' : 'var(--surface2)', color: checked ? 'var(--text)' : 'var(--muted)', border:'none', borderRadius:10, padding:'16px', fontFamily:'var(--font-b)', fontSize:'.82rem', letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, cursor: checked ? 'pointer' : 'not-allowed', transition:'all .2s' }}
+        >
+          {saving ? 'Recording…' : 'I Confirm — Continue'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── KYC GATE (inside SubmitScreen when not yet verified) ─────────────────────
+function KYCGate({ address, showToast, onVerified }) {
+  const [status, setStatus] = useState('loading')
+  const [personaUrl, setPersonaUrl] = useState(null)
+  const [checking, setChecking] = useState(false)
+  const [starting, setStarting] = useState(false)
+
+  const checkStatus = async (quiet = false) => {
+    if (!address) return
+    if (!quiet) setChecking(true)
+    try {
+      const r = await fetch(`/api/kyc-status?wallet=${address}`)
+      const d = await r.json()
+      if (d.status === 'approved') { onVerified(); return }
+      setStatus(d.status || 'not_started')
+    } catch { if (!quiet) setStatus('not_started') }
+    if (!quiet) setChecking(false)
+  }
+
+  useEffect(() => { checkStatus(true) }, [address])
+
+  // Handle redirect-back from Persona (?kyc_complete=1)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('kyc_complete') === '1') {
+      window.history.replaceState({}, '', window.location.pathname)
+      checkStatus(false)
+    }
+  }, [])
+
+  const startKYC = async () => {
+    if (!address) { showToast('Connect your wallet first', 'e'); return }
+    setStarting(true)
+    try {
+      const r = await fetch('/api/kyc-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: address }),
+      })
+      const d = await r.json()
+      if (d.alreadyVerified) { onVerified(); return }
+      if (d.error) { showToast('KYC error: ' + d.error, 'e'); return }
+      setPersonaUrl(d.personaUrl)
+      setStatus('pending')
+      window.open(d.personaUrl, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      showToast('Could not start verification — try again', 'e')
+    }
+    setStarting(false)
+  }
+
+  if (status === 'loading') {
+    return <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--muted)', fontSize:'.8rem' }}>Checking verification status…</div>
+  }
+
+  if (status === 'approved') {
+    onVerified()
+    return null
+  }
+
+  return (
+    <div style={{ padding:'0 4px' }}>
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:14, padding:'24px 20px', marginBottom:16, textAlign:'center' }}>
+        <div style={{ fontSize:'2rem', marginBottom:12 }}>🪪</div>
+        <div style={{ fontFamily:'var(--font-d)', fontSize:'1.4rem', fontWeight:300, fontStyle:'italic', color:'var(--text)', marginBottom:8 }}>Identity Verification Required</div>
+        <div style={{ fontSize:'.78rem', color:'var(--muted)', lineHeight:1.7, marginBottom:20 }}>
+          Profile submitters must complete a one-time government ID + liveness check. This is required by our content policy and age verification obligations. Your ID images are stored securely by Persona — never on our servers.
+        </div>
+        {status === 'pending' && (
+          <div style={{ background:'rgba(212,175,55,0.08)', border:'1px solid rgba(212,175,55,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--gold)', lineHeight:1.6 }}>
+            Verification in progress. If you already completed verification in another tab, click <strong>Check Status</strong> below. It may take a few minutes for the result to process.
+          </div>
+        )}
+        {status === 'declined' && (
+          <div style={{ background:'rgba(232,64,90,0.08)', border:'1px solid rgba(232,64,90,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--rose)', lineHeight:1.6 }}>
+            Your previous verification was declined. You may retry below. If you believe this is an error, contact support at <strong>support@temptationtoken.io</strong>.
+          </div>
+        )}
+        {status === 'needs_review' && (
+          <div style={{ background:'rgba(212,175,55,0.08)', border:'1px solid rgba(212,175,55,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--gold)', lineHeight:1.6 }}>
+            Your verification is under manual review. This typically resolves within 24 hours. You will be able to submit a profile once approved.
+          </div>
+        )}
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {status !== 'needs_review' && (
+            <button
+              onClick={startKYC}
+              disabled={starting}
+              style={{ background:'linear-gradient(135deg,var(--crimson),#a0203a)', color:'var(--text)', border:'none', borderRadius:10, padding:'16px', fontFamily:'var(--font-b)', fontSize:'.82rem', letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, cursor:'pointer' }}
+            >
+              {starting ? 'Starting…' : status === 'declined' ? 'Retry Verification' : 'Start Verification →'}
+            </button>
+          )}
+          {personaUrl && status === 'pending' && (
+            <button
+              onClick={() => window.open(personaUrl, '_blank', 'noopener,noreferrer')}
+              style={{ background:'var(--surface2)', color:'var(--gold)', border:'1px solid var(--border)', borderRadius:10, padding:'12px', fontFamily:'var(--font-b)', fontSize:'.76rem', letterSpacing:'.06em', textTransform:'uppercase', fontWeight:600, cursor:'pointer' }}
+            >
+              Reopen Verification Window
+            </button>
+          )}
+          <button
+            onClick={() => checkStatus(false)}
+            disabled={checking}
+            style={{ background:'transparent', color:'var(--muted)', border:'1px solid var(--border)', borderRadius:10, padding:'12px', fontFamily:'var(--font-b)', fontSize:'.74rem', letterSpacing:'.06em', textTransform:'uppercase', cursor:'pointer' }}
+          >
+            {checking ? 'Checking…' : 'Check Status'}
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize:'.68rem', color:'var(--muted)', textAlign:'center', lineHeight:1.6 }}>
+        Powered by <strong>Persona</strong> · Your ID documents are never stored on Temptation Token servers.
+      </div>
+    </div>
+  )
+}
+
 // ── WALLET MODAL ─────────────────────────────────────────────────────────────
 function WalletModal({ onClose, showToast }) {
   const { open } = useAppKit()
@@ -1233,6 +1388,8 @@ function BuySellScreen({ showToast, connected }) {
 
 // ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
 function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
+  const [kycVerified, setKycVerified] = useState(false)
+
   const [prev, setPrev] = useState(null)
   const [name, setName] = useState('')
   const [lt, setLt] = useState('')
@@ -1352,6 +1509,12 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   return (
     <div>
       <div className="shead"><h2>Submit Profile</h2><div className="grule" /><p>Be voted on · Win $TTS · Promote yourself · 3 per week max</p></div>
+      {connected && address && !kycVerified && (
+        <div className="sub-wrap">
+          <KYCGate address={address} showToast={showToast} onVerified={() => setKycVerified(true)} />
+        </div>
+      )}
+      {(!connected || !address || kycVerified) && (
       <div className="sub-wrap">
         <input ref={fRef} type="file" accept=".jpg,.jpeg,.png" style={{ display:'none' }} onChange={handleFile} />
         {prev
@@ -1396,6 +1559,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
         <button className="pbtn" onClick={submit} disabled={submitting}>{submitting ? 'Processing…' : 'Sign Contract & Submit (5 $TTS)'}</button>
       </div>
+      )}
     </div>
   )
 }
@@ -1630,6 +1794,7 @@ export default function App() {
   const [transDir, setTransDir] = useState(null)
   const [showWrongNet, setShowWrongNet] = useState(false)
   const [toast, showToast] = useToast()
+  const [showAgeModal, setShowAgeModal] = useState(false)
 
   const tabs = [
     { k:'buysell', l:'Buy/Sell' }, { k:'play', l:'Play' }, { k:'leaderboard', l:'Leaderboard' },
@@ -1656,7 +1821,23 @@ export default function App() {
         setBalance(b => b + Math.floor(d.amount))
       }
     }).catch(() => {})
+
+    // 18+ acknowledgment — check once per wallet, show modal if not yet recorded
+    fetch(`${SUPABASE_URL}/rest/v1/age_acknowledgments?wallet_address=eq.${address.toLowerCase()}&select=id`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(r => r.json()).then(d => {
+      if (!Array.isArray(d) || d.length === 0) setShowAgeModal(true)
+    }).catch(() => {})
   }, [isConnected, address])
+
+  // Handle redirect back from Persona (?kyc_complete=1) — navigate to submit tab
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('kyc_complete') === '1') {
+      window.history.replaceState({}, '', window.location.pathname)
+      setTab('submit')
+    }
+  }, [])
 
   useEffect(() => {
     const style = document.createElement('style')
@@ -1714,6 +1895,16 @@ export default function App() {
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
       {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} />}
       {showWrongNet && <WrongNetworkModal onClose={() => setShowWrongNet(false)} />}
+      {showAgeModal && isConnected && address && (
+        <AgeAcknowledgmentModal onAccept={() => {
+          setShowAgeModal(false)
+          fetch('/api/age-acknowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ walletAddress: address }),
+          }).catch(() => {})
+        }} />
+      )}
 
       <TTSChatbot />
       <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>

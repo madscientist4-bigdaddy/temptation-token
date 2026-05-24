@@ -1146,12 +1146,17 @@ function ReviewScreen({ showToast }) {
   const execute = async () => {
     const { id, action, wallet } = confirmed;
     if (action === "approve") {
-      // Block approval if submitter wallet is not age-verified
-      const _vr = await fetch(SUPABASE_URL + '/rest/v1/wallet_verifications?wallet_address=eq.' + wallet + '&select=is_verified', {
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-      }).then(r => r.json()).catch(() => []);
-      if (!Array.isArray(_vr) || !_vr.length || !_vr[0].is_verified) {
-        showToast('Cannot approve — submitter wallet not age-verified (check Verifications tab)', 'error');
+      // Block approval if submitter wallet is not KYC-verified.
+      // Checks: verified_submitters (Persona KYC), wallet_verifications (legacy manual), verified_wallet_links (linked wallets).
+      const hdrs = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+      const [_vs, _wv, _wl] = await Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/verified_submitters?wallet_address=eq.' + wallet + '&status=eq.approved&select=id', { headers: hdrs }).then(r => r.json()).catch(() => []),
+        fetch(SUPABASE_URL + '/rest/v1/wallet_verifications?wallet_address=eq.' + wallet + '&is_verified=eq.true&select=id', { headers: hdrs }).then(r => r.json()).catch(() => []),
+        fetch(SUPABASE_URL + '/rest/v1/verified_wallet_links?linked_wallet=eq.' + wallet + '&select=id', { headers: hdrs }).then(r => r.json()).catch(() => []),
+      ]);
+      const isKycVerified = [_vs, _wv, _wl].some(d => Array.isArray(d) && d.length > 0);
+      if (!isKycVerified) {
+        showToast('Cannot approve — submitter wallet not KYC-verified (check Verifications tab)', 'error');
         setConfirmed(null);
         return;
       }
@@ -1281,84 +1286,211 @@ function ReviewScreen({ showToast }) {
 }
 
 function VerificationsScreen({ showToast }) {
-  const [queue, setQueue] = useState([]);
+  const [activeTab, setActiveTab] = useState('kyc');
+  const [kycRows, setKycRows] = useState([]);
+  const [ackRows, setAckRows] = useState([]);
+  const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('pending');
+  const [kycFilter, setKycFilter] = useState('all');
+  const [expandedId, setExpandedId] = useState(null);
+  const [linkWallet, setLinkWallet] = useState('');
+  const [linkTarget, setLinkTarget] = useState(null);
+  const [linking, setLinking] = useState(false);
 
-  const load = (f = filter) => {
+  const loadAll = () => {
     setLoading(true);
-    const q = f === 'all' ? 'order=submitted_at.asc' : `status=eq.${f}&order=submitted_at.asc`;
-    sb.get('wallet_verifications', q)
-      .then(d => { setQueue(Array.isArray(d) ? d : []); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      sb.get('verified_submitters', 'order=created_at.desc'),
+      sb.get('age_acknowledgments', 'order=acknowledged_at.desc&limit=200'),
+      sb.get('verified_wallet_links', 'order=linked_at.desc'),
+    ]).then(([ks, as, ls]) => {
+      setKycRows(Array.isArray(ks) ? ks : []);
+      setAckRows(Array.isArray(as) ? as : []);
+      setLinks(Array.isArray(ls) ? ls : []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => { loadAll(); }, []);
 
-  const approve = async v => {
-    await sb.patch('wallet_verifications', `id=eq.${v.id}`, {
-      status: 'approved', is_verified: true, verified_at: new Date().toISOString(), reviewed_by: 'admin'
+  const overrideApprove = async row => {
+    await sb.patch('verified_submitters', `id=eq.${row.id}`, {
+      status: 'approved', verified_at: new Date().toISOString()
     });
-    showToast(`✓ Verified: ${v.full_name || v.wallet_address.slice(0,10)}…`, 'success');
-    load();
+    showToast(`✓ Admin-approved: ${row.wallet_address.slice(0,10)}…`, 'success');
+    loadAll();
   };
 
-  const reject = async v => {
-    await sb.patch('wallet_verifications', `id=eq.${v.id}`, {
-      status: 'rejected', is_verified: false, reviewed_by: 'admin'
+  const overrideDecline = async row => {
+    await sb.patch('verified_submitters', `id=eq.${row.id}`, {
+      status: 'declined', rejection_reason: 'Admin override'
     });
-    showToast(`✕ Rejected: ${v.full_name || v.wallet_address.slice(0,10)}…`, 'info');
-    load();
+    showToast(`✕ Admin-declined: ${row.wallet_address.slice(0,10)}…`, 'info');
+    loadAll();
   };
+
+  const addWalletLink = async (primaryWallet) => {
+    const w = linkWallet.trim().toLowerCase();
+    if (!/^0x[0-9a-fA-F]{40}$/i.test(w)) { showToast('Invalid wallet address', 'error'); return; }
+    setLinking(true);
+    await sb.post('verified_wallet_links', {
+      primary_wallet: primaryWallet,
+      linked_wallet: w,
+      linked_at: new Date().toISOString(),
+      linked_by: 'admin',
+    });
+    showToast(`Linked ${w.slice(0,10)}… to ${primaryWallet.slice(0,10)}…`, 'success');
+    setLinkWallet('');
+    setLinkTarget(null);
+    setLinking(false);
+    loadAll();
+  };
+
+  const statusBadge = (s) => {
+    const cfg = {
+      approved:     { bg:'rgba(46,204,113,.12)', color:'var(--green)' },
+      pending:      { bg:'rgba(212,175,55,.12)', color:'var(--gold)' },
+      needs_review: { bg:'rgba(212,175,55,.12)', color:'var(--gold)' },
+      declined:     { bg:'rgba(232,64,90,.10)',  color:'var(--rose)' },
+    }[s] || { bg:'rgba(180,180,180,.1)', color:'var(--muted)' };
+    return <span style={{ padding:'2px 8px', borderRadius:4, fontSize:'.6rem', fontWeight:700, background:cfg.bg, color:cfg.color }}>{(s||'unknown').toUpperCase()}</span>;
+  };
+
+  const filteredKyc = kycFilter === 'all' ? kycRows : kycRows.filter(r => r.status === kycFilter);
+
+  const tabStyle = (k) => ({ background: activeTab===k ? 'var(--crimson)' : 'var(--surface2)', color: activeTab===k ? '#fff' : 'var(--muted)', border:'1px solid var(--border)', padding:'7px 16px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontWeight:700 });
 
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Age Verifications</div>
+        <div className="page-title">KYC Status</div>
         <div className="gold-rule" />
-        <div className="page-sub">Review submitted age verifications — wallet must be approved before profiles can be submitted or approved</div>
+        <div className="page-sub">Identity verifications via Persona · Age acknowledgments · Wallet links · Profiles cannot be approved for unverified wallets</div>
       </div>
-      <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
-        {['pending','approved','rejected','all'].map(s => (
-          <button key={s} onClick={() => setFilter(s)} style={{ background: filter===s ? 'var(--crimson)' : 'var(--surface2)', color: filter===s ? '#fff' : 'var(--muted)', border:'1px solid var(--border)', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontFamily:'var(--font-body)', fontWeight:600 }}>
-            {s.charAt(0).toUpperCase()+s.slice(1)}
-          </button>
-        ))}
-        <span style={{ marginLeft:'auto', fontSize:'.63rem', color:'var(--muted)' }}>{queue.length} records</span>
+
+      <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+        <button style={tabStyle('kyc')} onClick={() => setActiveTab('kyc')}>KYC Verifications <span style={{ marginLeft:6, background:'rgba(255,255,255,.15)', borderRadius:10, padding:'1px 6px' }}>{kycRows.length}</span></button>
+        <button style={tabStyle('acks')} onClick={() => setActiveTab('acks')}>18+ Acks <span style={{ marginLeft:6, background:'rgba(255,255,255,.15)', borderRadius:10, padding:'1px 6px' }}>{ackRows.length}</span></button>
+        <button style={tabStyle('links')} onClick={() => setActiveTab('links')}>Wallet Links <span style={{ marginLeft:6, background:'rgba(255,255,255,.15)', borderRadius:10, padding:'1px 6px' }}>{links.length}</span></button>
       </div>
-      {loading ? (
-        <div className="empty-state"><span className="empty-icon">⏳</span>Loading…</div>
-      ) : queue.length === 0 ? (
-        <div className="empty-state"><span className="empty-icon">✅</span>No {filter} verifications.</div>
-      ) : (
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          {queue.map(v => (
-            <div key={v.id} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
-                <div style={{ flex:1, minWidth:200 }}>
-                  <div style={{ fontSize:'.8rem', fontWeight:600, color:'var(--text)', marginBottom:4 }}>{v.full_name || '—'}</div>
-                  <div style={{ fontSize:'.64rem', color:'var(--muted)', marginBottom:2, fontFamily:'monospace' }}>{v.wallet_address}</div>
-                  <div style={{ fontSize:'.64rem', color:'var(--muted)', marginBottom:2 }}>DOB: {v.date_of_birth || '—'}</div>
-                  <div style={{ fontSize:'.64rem', color:'var(--muted)', marginBottom:6 }}>Submitted: {v.submitted_at ? new Date(v.submitted_at).toLocaleDateString() : '—'}{v.verified_at ? ` · Reviewed: ${new Date(v.verified_at).toLocaleDateString()}` : ''}</div>
-                  <span style={{ padding:'2px 8px', borderRadius:4, fontSize:'.6rem', fontWeight:700, background: v.status==='approved' ? 'rgba(46,204,113,.15)' : v.status==='rejected' ? 'rgba(232,64,90,.15)' : 'rgba(212,175,55,.15)', color: v.status==='approved' ? 'var(--green)' : v.status==='rejected' ? 'var(--rose)' : 'var(--gold)' }}>
-                    {v.status.toUpperCase()}
-                  </span>
-                </div>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:10 }}>
-                  {v.signature_img && (
-                    <img src={v.signature_img} alt="Signature" style={{ width:130, height:50, objectFit:'contain', background:'#0d0d1a', border:'1px solid var(--border)', borderRadius:4 }} />
-                  )}
-                  {v.status === 'pending' && (
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => approve(v)} style={{ background:'rgba(46,204,113,.12)', border:'1px solid rgba(46,204,113,.3)', color:'var(--green)', padding:'7px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontWeight:700 }}>✓ Approve</button>
-                      <button onClick={() => reject(v)} style={{ background:'rgba(232,64,90,.08)', border:'1px solid rgba(232,64,90,.22)', color:'var(--rose)', padding:'7px 14px', borderRadius:6, cursor:'pointer', fontSize:'.65rem', fontWeight:700 }}>✕ Reject</button>
-                    </div>
-                  )}
-                </div>
-              </div>
+
+      {loading ? <div className="empty-state"><span className="empty-icon">⏳</span>Loading…</div> : (
+
+        activeTab === 'kyc' ? (
+          <>
+            <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
+              {['all','approved','pending','needs_review','declined'].map(s => (
+                <button key={s} onClick={() => setKycFilter(s)} style={{ background: kycFilter===s ? 'rgba(212,175,55,.15)' : 'transparent', color: kycFilter===s ? 'var(--gold)' : 'var(--muted)', border:'1px solid var(--border)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:600 }}>
+                  {s === 'needs_review' ? 'Needs Review' : s.charAt(0).toUpperCase()+s.slice(1)}
+                </button>
+              ))}
+              <span style={{ marginLeft:'auto', fontSize:'.6rem', color:'var(--muted)' }}>{filteredKyc.length} records</span>
             </div>
-          ))}
-        </div>
+            {filteredKyc.length === 0 ? (
+              <div className="empty-state"><span className="empty-icon">✅</span>No {kycFilter} verifications.</div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {filteredKyc.map(row => (
+                  <div key={row.id} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
+                      <div style={{ flex:1, minWidth:200 }}>
+                        <div style={{ fontSize:'.68rem', color:'var(--muted)', fontFamily:'monospace', marginBottom:4 }}>{row.wallet_address}</div>
+                        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:6 }}>
+                          {statusBadge(row.status)}
+                          <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>Persona</span>
+                          {row.reference_id && <span style={{ fontSize:'.6rem', color:'var(--muted)', fontFamily:'monospace' }}>{row.reference_id.slice(0,16)}…</span>}
+                        </div>
+                        <div style={{ fontSize:'.63rem', color:'var(--muted)' }}>
+                          Created: {row.created_at ? new Date(row.created_at).toLocaleDateString() : '—'}
+                          {row.verified_at ? ` · Verified: ${new Date(row.verified_at).toLocaleDateString()}` : ''}
+                          {row.rejection_reason ? ` · Reason: ${row.rejection_reason}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end' }}>
+                        {row.status !== 'approved' && (
+                          <button onClick={() => overrideApprove(row)} style={{ background:'rgba(46,204,113,.1)', border:'1px solid rgba(46,204,113,.3)', color:'var(--green)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap' }}>✓ Override Approve</button>
+                        )}
+                        {row.status === 'approved' && (
+                          <>
+                            <button onClick={() => overrideDecline(row)} style={{ background:'rgba(232,64,90,.08)', border:'1px solid rgba(232,64,90,.2)', color:'var(--rose)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700 }}>✕ Revoke</button>
+                            <button onClick={() => { setLinkTarget(row.wallet_address); setExpandedId(expandedId === row.id ? null : row.id); }} style={{ background:'var(--surface2)', border:'1px solid var(--border)', color:'var(--muted)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:600 }}>+ Link Wallet</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {expandedId === row.id && row.status === 'approved' && (
+                      <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:'.65rem', color:'var(--muted)', marginBottom:8, fontWeight:600 }}>ADD LINKED WALLET — shares this KYC approval</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <input
+                            value={linkWallet}
+                            onChange={e => setLinkWallet(e.target.value)}
+                            placeholder="0x… new wallet address"
+                            style={{ flex:1, background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', fontSize:'.72rem', color:'var(--text)', fontFamily:'monospace' }}
+                          />
+                          <button onClick={() => addWalletLink(row.wallet_address)} disabled={linking} style={{ background:'var(--crimson)', color:'#fff', border:'none', borderRadius:6, padding:'8px 14px', cursor:'pointer', fontSize:'.65rem', fontWeight:700, whiteSpace:'nowrap' }}>
+                            {linking ? '…' : 'Link'}
+                          </button>
+                        </div>
+                        {links.filter(l => l.primary_wallet === row.wallet_address).length > 0 && (
+                          <div style={{ marginTop:10 }}>
+                            <div style={{ fontSize:'.6rem', color:'var(--muted)', marginBottom:6 }}>CURRENTLY LINKED</div>
+                            {links.filter(l => l.primary_wallet === row.wallet_address).map(l => (
+                              <div key={l.id} style={{ fontSize:'.65rem', color:'var(--text)', fontFamily:'monospace', padding:'4px 0', borderBottom:'1px solid var(--border2)' }}>
+                                {l.linked_wallet} <span style={{ color:'var(--muted)', fontSize:'.58rem' }}>linked {new Date(l.linked_at).toLocaleDateString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : activeTab === 'acks' ? (
+          <>
+            <div style={{ fontSize:'.65rem', color:'var(--muted)', marginBottom:14 }}>18+ acknowledgment recorded on first wallet connect. Required for all voters.</div>
+            {ackRows.length === 0 ? (
+              <div className="empty-state"><span className="empty-icon">—</span>No acknowledgments yet.</div>
+            ) : (
+              <table className="adm-table">
+                <thead><tr><th>Wallet</th><th>Acknowledged</th><th>Version</th></tr></thead>
+                <tbody>
+                  {ackRows.map(r => (
+                    <tr key={r.id}>
+                      <td style={{ fontFamily:'monospace', fontSize:'.65rem' }}>{r.wallet_address?.slice(0,10)}…{r.wallet_address?.slice(-6)}</td>
+                      <td style={{ fontSize:'.65rem' }}>{r.acknowledged_at ? new Date(r.acknowledged_at).toLocaleString() : '—'}</td>
+                      <td style={{ fontSize:'.65rem', color:'var(--muted)' }}>{r.agreement_version || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize:'.65rem', color:'var(--muted)', marginBottom:14 }}>Linked wallets inherit approval from their primary verified wallet. Managed by admin only.</div>
+            {links.length === 0 ? (
+              <div className="empty-state"><span className="empty-icon">—</span>No linked wallets. Use the KYC tab to add links to an approved wallet.</div>
+            ) : (
+              <table className="adm-table">
+                <thead><tr><th>Primary Wallet (verified)</th><th>Linked Wallet</th><th>Linked</th><th>By</th></tr></thead>
+                <tbody>
+                  {links.map(l => (
+                    <tr key={l.id}>
+                      <td style={{ fontFamily:'monospace', fontSize:'.65rem' }}>{l.primary_wallet?.slice(0,10)}…{l.primary_wallet?.slice(-4)}</td>
+                      <td style={{ fontFamily:'monospace', fontSize:'.65rem' }}>{l.linked_wallet?.slice(0,10)}…{l.linked_wallet?.slice(-4)}</td>
+                      <td style={{ fontSize:'.65rem' }}>{l.linked_at ? new Date(l.linked_at).toLocaleDateString() : '—'}</td>
+                      <td style={{ fontSize:'.65rem', color:'var(--muted)' }}>{l.linked_by || 'admin'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )
       )}
     </div>
   );
@@ -4065,7 +4197,7 @@ const NAV = [
   { section: "Operations", items: [
     { key: "overview",       icon: "📊", label: "Overview" },
     { key: "review",         icon: "📸", label: "Photo Review" },
-    { key: "verifications",  icon: "🪪", label: "Verifications" },
+    { key: "verifications",  icon: "🪪", label: "KYC Status" },
     { key: "content",        icon: "📅", label: "Content Calendar" },
     { key: "social",         icon: "📱", label: "Social Media" },
     { key: "system",         icon: "🛡️", label: "System Health" },
