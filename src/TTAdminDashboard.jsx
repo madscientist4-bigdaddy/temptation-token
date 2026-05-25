@@ -1592,9 +1592,19 @@ function UsersScreen({ showToast }) {
   );
 }
 
+const TTS_TOKEN      = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9';
+const MARKETING_WALLET = '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB';
+const LIVE_BALANCE_WALLETS = [
+  HOUSE_WALLET.toLowerCase(),
+  MARKETING_WALLET.toLowerCase(),
+  CHARITY_WALLET.toLowerCase(),
+];
+const WARN_TTS_MIN = 100_000;
+const WARN_ETH_MIN = 0.01;
+
 const WALLETS_CONFIG = [
   { label: "House / Revenue", name: "Blockchain Entertainment LLC", addr: HOUSE_WALLET, role: "House cut (10%), deployer, admin" },
-  { label: "Marketing / Bonus", name: "Marketing & Bonus Wallet", addr: '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB', role: "Signup bonus + vote-match TTS payouts" },
+  { label: "Marketing / Bonus", name: "Marketing & Bonus Wallet", addr: MARKETING_WALLET, role: "Signup bonus + vote-match TTS payouts" },
   { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
   { label: "Voting Contract", name: "TTSVotingV3b — Escrow", addr: '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6', role: "Holds votes during active round" },
   { label: "Staking Contract", name: "TTSStaking", addr: '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc', role: "Staked TTS lockup + APR distribution" },
@@ -1602,26 +1612,94 @@ const WALLETS_CONFIG = [
   { label: "Keeper / Automation", name: "TTSKeeper2", addr: '0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48', role: "Chainlink automation: start, snapshot, settle, rollover" },
   { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
 ];
+
+function parseTTSBalance(hex) {
+  if (!hex || hex === '0x') return null;
+  try { return Number(BigInt(hex) / (10n ** 18n)); } catch { return null; }
+}
+function parseETHBalance(hex) {
+  if (!hex || hex === '0x') return null;
+  try { return Number(BigInt(hex)) / 1e18; } catch { return null; }
+}
+
 function WalletsScreen() {
+  const [balances, setBalances] = useState({});
+  const [lastRefresh, setLastRefresh] = useState(null);
+
+  async function fetchBalances() {
+    const result = {};
+    await Promise.all(LIVE_BALANCE_WALLETS.map(async (addr) => {
+      const addrPadded = addr.slice(2).padStart(64, '0');
+      const [ttsHex, ethHex] = await Promise.all([
+        rpcCall('eth_call', [{ to: TTS_TOKEN, data: '0x70a08231' + addrPadded }, 'latest']).catch(() => null),
+        rpcCall('eth_getBalance', [addr, 'latest']).catch(() => null),
+      ]);
+      result[addr] = { tts: parseTTSBalance(ttsHex), eth: parseETHBalance(ethHex) };
+    }));
+    setBalances(result);
+    setLastRefresh(new Date());
+  }
+
+  useEffect(() => {
+    fetchBalances();
+    const t = setInterval(fetchBalances, 60000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Wallet Addresses</div>
         <div className="gold-rule" />
-        <div className="page-sub">All operational wallets on Base Mainnet · Verified on-chain</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div className="page-sub">All operational wallets on Base Mainnet · Verified on-chain</div>
+          <div style={{ fontSize:'.6rem', color:'var(--muted)' }}>
+            {lastRefresh ? `Balances refreshed ${lastRefresh.toLocaleTimeString()}` : 'Loading balances…'}
+          </div>
+        </div>
       </div>
       <div className="wallet-panel-grid">
-        {WALLETS_CONFIG.map((w, i) => (
-          <div key={i} className="wallet-panel-card">
-            <div className="wpc-label">{w.label}</div>
-            <div className="wpc-name">{w.name}</div>
-            <div className="wpc-addr" style={{ cursor:'pointer' }} onClick={() => navigator.clipboard.writeText(w.addr)}>{w.addr}</div>
-            <div className="wpc-network" style={{ marginTop:6, fontSize:'.62rem', color:'var(--muted)' }}>{w.role}</div>
-            <div style={{ marginTop:8 }}>
-              <a href={`https://basescan.org/address/${w.addr}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'.6rem', color:'var(--gold-dim)', textDecoration:'none' }}>View on BaseScan →</a>
+        {WALLETS_CONFIG.map((w, i) => {
+          const bal = balances[w.addr.toLowerCase()];
+          const isLive = LIVE_BALANCE_WALLETS.includes(w.addr.toLowerCase());
+          const isMkt = w.addr.toLowerCase() === MARKETING_WALLET.toLowerCase();
+          const warnTTS = isMkt && bal?.tts != null && bal.tts < WARN_TTS_MIN;
+          const warnETH = isMkt && bal?.eth != null && bal.eth < WARN_ETH_MIN;
+          return (
+            <div key={i} className="wallet-panel-card" style={{ border: (warnTTS || warnETH) ? '1px solid var(--crimson)' : undefined }}>
+              <div className="wpc-label">{w.label}</div>
+              <div className="wpc-name">{w.name}</div>
+              <div className="wpc-addr" style={{ cursor:'pointer' }} onClick={() => navigator.clipboard.writeText(w.addr)}>{w.addr}</div>
+              <div className="wpc-network" style={{ marginTop:6, fontSize:'.62rem', color:'var(--muted)' }}>{w.role}</div>
+              {isLive && (
+                <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ fontSize:'.62rem', color:'var(--muted)' }}>TTS:</span>
+                    <span style={{ fontSize:'.7rem', fontFamily:'monospace', color: warnTTS ? 'var(--crimson)' : 'var(--gold-light)', fontWeight:600 }}>
+                      {bal?.tts != null ? bal.tts.toLocaleString() : '…'}
+                    </span>
+                    {warnTTS && <span style={{ fontSize:'.55rem', background:'var(--crimson)', color:'#fff', padding:'1px 5px', borderRadius:3 }}>LOW</span>}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ fontSize:'.62rem', color:'var(--muted)' }}>ETH:</span>
+                    <span style={{ fontSize:'.7rem', fontFamily:'monospace', color: warnETH ? 'var(--crimson)' : 'var(--gold-light)', fontWeight:600 }}>
+                      {bal?.eth != null ? bal.eth.toFixed(4) : '…'}
+                    </span>
+                    {warnETH && <span style={{ fontSize:'.55rem', background:'var(--crimson)', color:'#fff', padding:'1px 5px', borderRadius:3 }}>LOW</span>}
+                  </div>
+                  {(warnTTS || warnETH) && (
+                    <div style={{ fontSize:'.58rem', color:'var(--crimson)', marginTop:2 }}>
+                      ⚠ Marketing wallet below threshold — bonus/vote-match payments at risk
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ marginTop:8 }}>
+                <a href={`https://basescan.org/address/${w.addr}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'.6rem', color:'var(--gold-dim)', textDecoration:'none' }}>View on BaseScan →</a>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
