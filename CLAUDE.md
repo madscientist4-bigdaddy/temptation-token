@@ -3,6 +3,30 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 Last verified: May 24, 2026 — KYC/age verification system added.
 
+## Operating Mode
+
+### AUTONOMOUS EXECUTION POLICY
+
+- Execute all reads, file edits, code changes, git commits, git pushes,
+  npm/yarn commands, vercel commands, Supabase queries, BaseScan
+  verifications, email drafting, RPC calls, contract reads, and
+  documentation updates WITHOUT asking permission.
+- Default to "yes" on every implementation choice. Make the call,
+  document it, move on.
+- The ONLY actions requiring Jim's explicit confirmation are:
+  (a) Transactions signed from the Bank wallet
+  (b) Transactions signed from the Gnosis Safe multisig
+  (c) Destructive irreversible actions (deleting production data,
+      canceling Chainlink upkeeps, dropping Supabase tables)
+- Do NOT ask "should I proceed?", "want me to continue?", "ready for
+  the next step?", or any variant. Just proceed.
+- Do NOT ask "should I commit this?" — commit it.
+- Do NOT ask "should I deploy?" — deploy if the change is non-destructive
+  and the build passes.
+- If multiple paths exist and one is clearly better, pick it and note
+  the choice. If they're genuinely equivalent, pick the simpler one.
+- Surface decisions made AFTER the fact, not before.
+
 ## Commands
 
 ```bash
