@@ -1,4 +1,5 @@
 // POST /api/social-post — posts to X (@temptationtoken only) and mirrors to Telegram
+// Also handles /api/notify (via vercel.json rewrite to ?action=notify)
 //
 // Required env vars (set in Vercel):
 //   X_API_KEY, X_API_SECRET         — app credentials
@@ -198,10 +199,42 @@ const TTS_TEMPLATES = {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const body = req.body || {}
+
+  // ── Admin submission notify (from /api/notify rewrite) ────────────────────
+  if (req.query?.action === 'notify') {
+    const { name, wallet, link_url } = body
+    const token  = process.env.TELEGRAM_BOT_TOKEN
+    const chatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+    if (!token) return res.status(200).json({ ok: true, skipped: true })
+    const text = [
+      '🔔 <b>New Submission for Review</b>', '',
+      `👤 <b>Name:</b> ${escHtml(name || '—')}`,
+      `💰 <b>Wallet:</b> <code>${escHtml(wallet || '—')}</code>`,
+      `🔗 <b>Link:</b> ${escHtml(link_url || '—')}`, '',
+      '📋 <a href="https://app.temptationtoken.io/admin">Open Admin Dashboard →</a>',
+    ].join('\n')
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+      })
+      const d = await r.json()
+      if (!d.ok) console.error('notify Telegram error:', d)
+      return res.status(200).json({ ok: d.ok })
+    } catch (e) {
+      console.error('notify error:', e)
+      return res.status(500).json({ error: e.message })
+    }
+  }
 
   // ── Delete tweet: { _delete_tweet: "TWEET_ID" } ─────────────────────────────
   if (body._delete_tweet) {
