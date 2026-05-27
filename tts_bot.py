@@ -275,10 +275,23 @@ def broadcaster():
         api2("sendMessage", {"chat_id":COMMUNITY, "text":msg,"parse_mode":"Markdown"})
         print(f"Broadcast sent day {day}"); day += 1
 
+def heartbeat():
+    """POST to /api/bot-health every 5 minutes so the admin dashboard can show bot liveness."""
+    url = APP + "/api/bot-health"
+    while True:
+        try:
+            req = urllib.request.Request(url, data=b'{}', method="POST",
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=10)
+        except Exception as e:
+            print(f"Heartbeat failed: {e}")
+        time.sleep(300)
+
 def run():
     init_db()
     print(f"TTS Bot v2 starting... token={TOKEN[:8]}...")
     threading.Thread(target=broadcaster, daemon=True).start()
+    threading.Thread(target=heartbeat, daemon=True).start()
     offset = 0
     while True:
         try:

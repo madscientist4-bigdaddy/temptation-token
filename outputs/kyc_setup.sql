@@ -39,14 +39,25 @@ ALTER TABLE verified_wallet_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE age_acknowledgments   ENABLE ROW LEVEL SECURITY;
 
 -- Allow frontend to read own row (wallet_address lookup is sufficient filtering)
-CREATE POLICY "anon_read_verified_submitters"   ON verified_submitters   FOR SELECT USING (true);
-CREATE POLICY "anon_read_verified_wallet_links" ON verified_wallet_links FOR SELECT USING (true);
-CREATE POLICY "anon_read_age_acknowledgments"   ON age_acknowledgments   FOR SELECT USING (true);
+-- DROP IF EXISTS guards make these CREATE POLICY calls idempotent (safe to re-run)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='verified_submitters'   AND policyname='anon_read_verified_submitters')   THEN
+    CREATE POLICY "anon_read_verified_submitters"   ON verified_submitters   FOR SELECT USING (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='verified_wallet_links' AND policyname='anon_read_verified_wallet_links') THEN
+    CREATE POLICY "anon_read_verified_wallet_links" ON verified_wallet_links FOR SELECT USING (true); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='age_acknowledgments'   AND policyname='anon_read_age_acknowledgments')   THEN
+    CREATE POLICY "anon_read_age_acknowledgments"   ON age_acknowledgments   FOR SELECT USING (true); END IF;
+END $$;
 
 -- Only service role can write (all writes go through API routes with SUPABASE_SERVICE_KEY)
-CREATE POLICY "service_write_verified_submitters"   ON verified_submitters   FOR ALL  USING (auth.role() = 'service_role');
-CREATE POLICY "service_write_verified_wallet_links" ON verified_wallet_links FOR ALL  USING (auth.role() = 'service_role');
-CREATE POLICY "service_write_age_acknowledgments"   ON age_acknowledgments   FOR ALL  USING (auth.role() = 'service_role');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='verified_submitters'   AND policyname='service_write_verified_submitters')   THEN
+    CREATE POLICY "service_write_verified_submitters"   ON verified_submitters   FOR ALL USING (auth.role() = 'service_role'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='verified_wallet_links' AND policyname='service_write_verified_wallet_links') THEN
+    CREATE POLICY "service_write_verified_wallet_links" ON verified_wallet_links FOR ALL USING (auth.role() = 'service_role'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='age_acknowledgments'   AND policyname='service_write_age_acknowledgments')   THEN
+    CREATE POLICY "service_write_age_acknowledgments"   ON age_acknowledgments   FOR ALL USING (auth.role() = 'service_role'); END IF;
+END $$;
 
 -- Indexes for the hot query paths
 CREATE INDEX IF NOT EXISTS idx_vs_wallet   ON verified_submitters   (wallet_address, status);

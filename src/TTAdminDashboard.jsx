@@ -1706,16 +1706,41 @@ function WalletsScreen() {
 }
 
 const V3_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6';
+const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+async function fetchSettlementTransfers(txHash, winnerWallet) {
+  try {
+    const receipt = await rpcCall('eth_getTransactionReceipt', [txHash]);
+    if (!receipt?.logs) return [];
+    const v3Lower = V3_ADDRESS.toLowerCase();
+    return receipt.logs
+      .filter(log =>
+        log.topics[0]?.toLowerCase() === ERC20_TRANSFER_TOPIC &&
+        log.topics[1] &&
+        ('0x' + log.topics[1].slice(26)).toLowerCase() === v3Lower
+      )
+      .map(log => {
+        const to = ('0x' + log.topics[2].slice(26)).toLowerCase();
+        const amount = log.data ? Number(BigInt('0x' + log.data.slice(2).replace(/^0+/, '') || '0')) / 1e18 : 0;
+        let label = 'Unknown';
+        if (to === CHARITY_WALLET.toLowerCase()) label = 'Polaris Project (10%)';
+        else if (to === HOUSE_WALLET.toLowerCase()) label = 'House / Blockchain Ent. (20%)';
+        else if (winnerWallet && to === winnerWallet.toLowerCase()) label = 'Winning Profile (35%)';
+        else label = 'Top Voter (35%)';
+        return { to, amount, label };
+      });
+  } catch { return []; }
+}
 
 function PayoutsScreen({ showToast }) {
   const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [roundInfo, setRoundInfo] = useState(null);
+  const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
     async function load() {
       try {
-        // Use eth_getLogs via our RPC proxy — no API key needed
         const logs = await rpcCall('eth_getLogs', [{
           address: V3_ADDRESS,
           topics: [ROUND_SETTLED_TOPIC],
@@ -1723,22 +1748,34 @@ function PayoutsScreen({ showToast }) {
           toBlock: 'latest',
         }]);
         if (Array.isArray(logs) && logs.length > 0) {
-          const parsed = [...logs].reverse().slice(0, 20).map(log => ({
-            roundId: log.topics[1] ? parseInt(log.topics[1], 16) : '?',
-            txHash: log.transactionHash,
-            blockNumber: parseInt(log.blockNumber, 16),
-            // pool is last 32 bytes of non-indexed data
-            pool: log.data && log.data.length >= 66
-              ? (Number(BigInt('0x' + log.data.slice(-64))) / 1e18).toFixed(0)
-              : '—',
-            timestamp: '—',
-          }));
-          // Fetch block timestamps
+          const parsed = [...logs].reverse().slice(0, 20).map(log => {
+            // data layout: [winnerProfileId (dynamic string) ?, winnerWallet, pool]
+            // For V3b: topics[1]=roundId (indexed), data=abi-encoded(pool) last 32 bytes
+            // winnerWallet may be topics[2] if indexed in V3b
+            const winnerWallet = log.topics[2]
+              ? '0x' + log.topics[2].slice(26)
+              : null;
+            return {
+              roundId: log.topics[1] ? parseInt(log.topics[1], 16) : '?',
+              txHash: log.transactionHash,
+              blockNumber: parseInt(log.blockNumber, 16),
+              pool: log.data && log.data.length >= 66
+                ? (Number(BigInt('0x' + log.data.slice(-64))) / 1e18).toFixed(0)
+                : '—',
+              winnerWallet,
+              timestamp: '—',
+              transfers: [],
+            };
+          });
           await Promise.all(parsed.map(async (s) => {
             try {
               const blk = await rpcCall('eth_getBlockByNumber', ['0x' + s.blockNumber.toString(16), false]);
               if (blk?.timestamp) s.timestamp = new Date(parseInt(blk.timestamp, 16) * 1000).toLocaleDateString();
             } catch {}
+          }));
+          // Fetch transfers for all settlements in parallel
+          await Promise.all(parsed.map(async (s) => {
+            s.transfers = await fetchSettlementTransfers(s.txHash, s.winnerWallet);
           }));
           setSettlements(parsed);
         }
@@ -1764,7 +1801,7 @@ function PayoutsScreen({ showToast }) {
           <a href={`https://basescan.org/address/${V3_ADDRESS}#events`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'0.65rem' }}>View all on BaseScan →</a>
         </div>
         {loading ? (
-          <div style={{ padding: 20, color: 'var(--muted)', fontSize: '.8rem' }}>Loading from BaseScan...</div>
+          <div style={{ padding: 20, color: 'var(--muted)', fontSize: '.8rem' }}>Loading from chain…</div>
         ) : settlements.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">📋</span>
@@ -1777,21 +1814,66 @@ function PayoutsScreen({ showToast }) {
         ) : (
           <table className="adm-table">
             <thead>
-              <tr><th>Round</th><th>Date</th><th>Pool</th><th>Block</th><th>TX</th></tr>
+              <tr><th>Round</th><th>Date</th><th>Pool</th><th>Block</th><th>TX</th><th>Breakdown</th></tr>
             </thead>
             <tbody>
               {settlements.map((s, i) => (
-                <tr key={i}>
-                  <td style={{ fontFamily:'var(--font-display)', color:'var(--gold-light)', fontSize:'1rem' }}>Round {s.roundId}</td>
-                  <td style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{s.timestamp}</td>
-                  <td style={{ fontFamily:'var(--font-display)', color:'var(--gold)', fontSize:'.9rem' }}>{Number(s.pool).toLocaleString()} $TTS</td>
-                  <td style={{ fontFamily:'monospace', fontSize:'0.6rem' }}>{s.blockNumber.toLocaleString()}</td>
-                  <td>
-                    <a href={`https://basescan.org/tx/${s.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'0.6rem', fontFamily:'monospace' }}>
-                      {s.txHash ? s.txHash.slice(0,10)+'…' : '—'}
-                    </a>
-                  </td>
-                </tr>
+                <React.Fragment key={i}>
+                  <tr>
+                    <td style={{ fontFamily:'var(--font-display)', color:'var(--gold-light)', fontSize:'1rem' }}>Round {s.roundId}</td>
+                    <td style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{s.timestamp}</td>
+                    <td style={{ fontFamily:'var(--font-display)', color:'var(--gold)', fontSize:'.9rem' }}>{Number(s.pool).toLocaleString()} $TTS</td>
+                    <td style={{ fontFamily:'monospace', fontSize:'0.6rem' }}>{s.blockNumber.toLocaleString()}</td>
+                    <td>
+                      <a href={`https://basescan.org/tx/${s.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'0.6rem', fontFamily:'monospace' }}>
+                        {s.txHash ? s.txHash.slice(0,10)+'…' : '—'}
+                      </a>
+                    </td>
+                    <td>
+                      {s.transfers.length > 0 ? (
+                        <button onClick={() => setExpanded(e => ({ ...e, [i]: !e[i] }))}
+                          style={{ background:'none', border:'1px solid var(--border-gold)', borderRadius:4, color:'var(--gold-dim)', padding:'2px 8px', fontSize:'.6rem', cursor:'pointer' }}>
+                          {expanded[i] ? '▲ Hide' : '▼ Show'}
+                        </button>
+                      ) : s.pool === '0' || s.pool === '—' ? (
+                        <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>0 votes</span>
+                      ) : (
+                        <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                  {expanded[i] && s.transfers.length > 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ padding:'8px 12px 12px', background:'rgba(201,169,86,.04)' }}>
+                        <div style={{ fontSize:'.62rem', fontWeight:700, color:'var(--gold)', marginBottom:6, textTransform:'uppercase', letterSpacing:'.08em' }}>Prize Distribution</div>
+                        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                          <thead>
+                            <tr style={{ fontSize:'.58rem', color:'var(--muted)', textAlign:'left' }}>
+                              <th style={{ padding:'3px 8px' }}>Recipient</th>
+                              <th style={{ padding:'3px 8px' }}>Address</th>
+                              <th style={{ padding:'3px 8px', textAlign:'right' }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {s.transfers.map((t, ti) => (
+                              <tr key={ti} style={{ borderTop:'1px solid var(--border2)' }}>
+                                <td style={{ padding:'4px 8px', fontSize:'.65rem', color:'var(--text)' }}>{t.label}</td>
+                                <td style={{ padding:'4px 8px', fontFamily:'monospace', fontSize:'.6rem', color:'var(--muted)' }}>
+                                  <a href={`https://basescan.org/address/${t.to}`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)' }}>
+                                    {t.to.slice(0,10)}…{t.to.slice(-6)}
+                                  </a>
+                                </td>
+                                <td style={{ padding:'4px 8px', textAlign:'right', fontFamily:'var(--font-display)', fontSize:'.75rem', color:'var(--gold)' }}>
+                                  {t.amount.toLocaleString(undefined, { maximumFractionDigits:0 })} $TTS
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -1950,14 +2032,37 @@ function ReferralScreen({ showToast }) {
 
   React.useEffect(() => {
     sb.get('referral_settings','id=eq.1&select=*').then(d => { if(Array.isArray(d)&&d.length>0) setSettings(d[0]) }).catch(()=>{})
-    sb.get('users','select=referred_by').then(d => {
-      if(Array.isArray(d)) {
-        const counts = {}
-        d.forEach(u => { if(u.referred_by) counts[u.referred_by]=(counts[u.referred_by]||0)+1 })
-        setReferrers(Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([code,count])=>({code,count,earned:count*settings.referrer_bonus})))
+
+    // Load referrer counts from users table AND actual paid amounts from referral_credits
+    Promise.all([
+      sb.get('users','select=referred_by').catch(()=>[]),
+      sb.get('referral_credits','select=referral_code,amount_tts,tx_hash').catch(()=>[]),
+    ]).then(([users, credits]) => {
+      const counts = {}
+      if (Array.isArray(users)) {
+        users.forEach(u => { if(u.referred_by) counts[u.referred_by]=(counts[u.referred_by]||0)+1 })
       }
+      // Sum actual paid TTS per referral_code from referral_credits table
+      const paid = {}
+      const paidCount = {}
+      if (Array.isArray(credits)) {
+        credits.forEach(c => {
+          if (c.referral_code) {
+            paid[c.referral_code] = (paid[c.referral_code]||0) + (Number(c.amount_tts)||0)
+            paidCount[c.referral_code] = (paidCount[c.referral_code]||0) + 1
+          }
+        })
+      }
+      const allCodes = new Set([...Object.keys(counts), ...Object.keys(paid)])
+      const rows = [...allCodes].map(code => ({
+        code,
+        count: counts[code]||0,
+        earned: paid[code]||0,          // actual TTS disbursed (from referral_credits)
+        pending: (counts[code]||0) - (paidCount[code]||0), // referred but not yet credited
+      })).sort((a,b)=>b.count-a.count).slice(0,10)
+      setReferrers(rows)
       setLoading(false)
-    }).catch(()=>setLoading(false))
+    })
     loadClubs()
   },[])
 
@@ -2132,17 +2237,24 @@ function ReferralScreen({ showToast }) {
       <button className="login-btn" onClick={save} disabled={saving} style={{marginBottom:36,minWidth:220}}>
         {saving?"Saving...":"Save Referral Settings"}
       </button>
-      <div style={{fontSize:".82rem",fontWeight:700,color:"var(--text)",marginBottom:12,textTransform:"uppercase",letterSpacing:".08em"}}>Top Referrers</div>
+      <div style={{fontSize:".82rem",fontWeight:700,color:"var(--text)",marginBottom:4,textTransform:"uppercase",letterSpacing:".08em"}}>Top Referrers</div>
+      <div style={{fontSize:".68rem",color:"var(--muted)",marginBottom:12}}>Actual $TTS paid from <code style={{fontSize:".65rem",color:"var(--gold-dim)"}}>referral_credits</code> table — not estimated. Pending = referred users not yet credited.</div>
       {loading?<div style={{color:"var(--muted)",fontSize:".85rem",padding:"20px 0"}}>Loading...</div>
       :referrers.length===0?<div className="empty-state"><span className="empty-icon">🔗</span>No referrals yet.</div>
       :<table className="data-table" style={{width:"100%"}}>
-        <thead><tr><th>#</th><th>Referral Code</th><th>Users Referred</th><th>$TTS Earned</th></tr></thead>
+        <thead><tr><th>#</th><th>Referral Code</th><th>Referred</th><th>Paid $TTS</th><th>Pending</th></tr></thead>
         <tbody>{referrers.map((r,i)=>(
           <tr key={r.code}>
             <td style={{color:"var(--muted)"}}>#{i+1}</td>
             <td><span style={{fontFamily:"monospace",fontSize:".82rem"}}>{r.code}</span></td>
             <td><span className="badge badge-success">{r.count}</span></td>
-            <td style={{color:"var(--gold)",fontWeight:700}}>{r.earned.toLocaleString()} $TTS</td>
+            <td style={{color:"var(--gold)",fontWeight:700}}>{r.earned > 0 ? r.earned.toLocaleString(undefined,{maximumFractionDigits:0})+' $TTS' : '—'}</td>
+            <td>
+              {r.pending > 0
+                ? <span style={{color:"#f39c12",fontWeight:700,fontSize:".78rem"}}>{r.pending} pending</span>
+                : <span style={{color:"var(--green)",fontSize:".78rem"}}>✓ all paid</span>
+              }
+            </td>
           </tr>
         ))}</tbody>
       </table>}
@@ -2489,6 +2601,10 @@ function SettingsScreen() {
 // ─── SYSTEM HEALTH SCREEN ─────────────────────────────────────────────────────
 const VOTING_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'; // TTSVotingV3b
 const CHAINLINK_REGISTRY = '0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743';
+// TODO(post-V3c): Cancel all 4 upkeeps below at automation.chain.link to recover ~27.4 LINK.
+// Then register ONE new Custom Logic upkeep pointing at TTSKeeper2V2, fund with 10 LINK.
+// Replace this array with: [{ name: 'TTS Game Keeper V2', known: 10, id: '<NEW_UPKEEP_ID_FROM_CHAINLINK_UI>' }]
+// Step-by-step: outputs/v3c_v2_deployment_runbook.md §7 and outputs/chainlink_automation_runbook.md
 const UPKEEPS = [
   { name: 'TTS Link Reserve Monitor', known: 7.11, id: '43621180820595228289765408559964550834819164637810952818427682374779443797241' },
   { name: 'TTS Settle Or Rollover',   known: 6.2, id: '37237305312459454425630512539791531504862369275836338221195918127936604287744' },
@@ -3135,6 +3251,7 @@ function SocialScreen({ showToast }) {
   const [liveStats, setLiveStats] = useState({});
   const [statsLoading, setStatsLoading] = useState(false);
   const [lastStatsRefresh, setLastStatsRefresh] = useState(null);
+  const [botHealth, setBotHealth] = useState(null);
   const [dmLog, setDmLog] = useState(() => {
     try { return JSON.parse(localStorage.getItem('tt_dm_log') || '[]'); } catch { return []; }
   });
@@ -3167,11 +3284,19 @@ function SocialScreen({ showToast }) {
     setStatsLoading(false);
   };
 
-  const handleRefreshStats = () => { fetchTg(); fetchSocialStats(); };
+  const fetchBotHealth = async () => {
+    try {
+      const d = await fetch('/api/bot-health').then(r => r.json());
+      setBotHealth(d);
+    } catch { setBotHealth({ alive: false, lastSeen: null, secAgo: null }); }
+  };
+
+  const handleRefreshStats = () => { fetchTg(); fetchSocialStats(); fetchBotHealth(); };
 
   useEffect(() => {
     fetchTg();
     fetchSocialStats();
+    fetchBotHealth();
     // Round info for templates
     getRoundInfo().then(setRoundInfo).catch(()=>{});
     // Calendar posts this week
@@ -3179,9 +3304,10 @@ function SocialScreen({ showToast }) {
     sb.get('scheduled_posts', `week_start=eq.${ws}&status=in.(pending,approved)&order=scheduled_at.asc&select=*`).then(d => {
       if(Array.isArray(d)) setCalPosts(d.slice(0,6));
     }).catch(()=>{});
-    const tgTimer    = setInterval(fetchTg, 60_000);
-    const statsTimer = setInterval(fetchSocialStats, 300_000);
-    return () => { clearInterval(tgTimer); clearInterval(statsTimer); };
+    const tgTimer     = setInterval(fetchTg, 60_000);
+    const statsTimer  = setInterval(fetchSocialStats, 300_000);
+    const healthTimer = setInterval(fetchBotHealth, 60_000);
+    return () => { clearInterval(tgTimer); clearInterval(statsTimer); clearInterval(healthTimer); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveStats = (newStats) => { setStats(newStats); localStorage.setItem('tt_social_stats', JSON.stringify(newStats)); };
@@ -3334,6 +3460,61 @@ function SocialScreen({ showToast }) {
             <input value={stats.last_ig||''} onChange={e=>saveStats({...stats,last_ig:e.target.value})}
               placeholder="e.g. Apr 26"
               style={{ width:'100%', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 10px', color:'var(--text)', fontFamily:'var(--font-body)', fontSize:'.8rem', outline:'none' }} />
+          </div>
+
+          {/* Telegram Bot Health */}
+          <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+              <span style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)' }}>@TTSGameBot Health</span>
+              {botHealth && (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background: botHealth.alive ? '#22c55e' : '#e8405a', display:'inline-block', flexShrink:0 }} />
+                  <span style={{ fontSize:'.5rem', color: botHealth.alive ? '#22c55e' : '#e8405a', fontWeight:700 }}>{botHealth.alive ? 'ALIVE' : 'STALE'}</span>
+                </span>
+              )}
+            </div>
+            {botHealth == null ? (
+              <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>Checking…</div>
+            ) : botHealth.lastSeen ? (
+              <>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'1rem', color: botHealth.alive ? 'var(--gold-light)' : 'var(--rose)' }}>
+                  {botHealth.alive ? '✓ Online' : '✗ Offline'}
+                </div>
+                <div style={{ fontSize:'.55rem', color:'var(--muted)', marginTop:3 }}>
+                  Last seen {Math.floor(botHealth.secAgo / 60)}m ago · {new Date(botHealth.lastSeen).toLocaleTimeString()}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize:'.7rem', color:'var(--rose)' }}>No heartbeat received</div>
+            )}
+          </div>
+
+          {/* X Token Validity */}
+          <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--border2)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+              <span style={{ fontSize:'.55rem', letterSpacing:'.14em', textTransform:'uppercase', color:'var(--muted)' }}>X OAuth Status</span>
+              {liveStats.x_followers != null || liveStats.x_error ? (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background: liveStats.x_followers != null ? '#22c55e' : '#e8405a', display:'inline-block', flexShrink:0 }} />
+                  <span style={{ fontSize:'.5rem', color: liveStats.x_followers != null ? '#22c55e' : '#e8405a', fontWeight:700 }}>
+                    {liveStats.x_followers != null ? 'VALID' : 'INVALID'}
+                  </span>
+                </span>
+              ) : null}
+            </div>
+            {liveStats.x_followers != null ? (
+              <>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'1rem', color:'var(--gold-light)' }}>✓ Token Valid</div>
+                <div style={{ fontSize:'.55rem', color:'var(--muted)', marginTop:3 }}>@temptationtoken · auto-refresh 5m</div>
+              </>
+            ) : liveStats.x_error ? (
+              <>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'1rem', color:'var(--rose)' }}>✗ 401 / Error</div>
+                <div style={{ fontSize:'.55rem', color:'var(--rose)', marginTop:3 }}>Regenerate TTS_X_ACCESS_TOKEN in Vercel</div>
+              </>
+            ) : (
+              <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>Refresh to check</div>
+            )}
           </div>
 
         </div>
