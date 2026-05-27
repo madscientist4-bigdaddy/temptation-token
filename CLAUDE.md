@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: May 24, 2026 — KYC/age verification system added.
+Last verified: May 26, 2026 — dashboard Q/O/R workstreams complete, API consolidated to 12 functions, deployed.
 
 ## Operating Mode
 
@@ -54,12 +54,13 @@ node scripts/check-prize-split.mjs  # CI: check for canonical-value violations
    - `/api/social-post.js` — Posts to X and/or Telegram; `{type,data}` template mode, `{platform:'telegram',content}` direct Telegram, `{platform:'x_tts',content}` direct @temptationtoken X post
    - `/api/scheduler.js` — Fires at 00, 13, 18, 19 UTC daily (4 Vercel crons): fires approved scheduled_posts + 19:00 Telegram round status + auto-correction alerts
    - `/api/content-generator.js` — Monday 8am UTC: generates @temptationtoken 21 posts for the week (templates, status=approved). POST `{force:true}` or `{tts_bootstrap:true}` to regenerate. @CryptoFitJim posts manually — no auto-generation.
-   - `/api/kyc-session.js` — POST `{ walletAddress }`: creates Persona inquiry, returns `{ inquiryId, personaUrl }`. Upserts pending row in `verified_submitters`. Requires `PERSONA_API_KEY` + `PERSONA_TEMPLATE_ID`.
-   - `/api/kyc-webhook.js` — POST (Persona webhook): updates `verified_submitters` on `inquiry.approved/declined/failed`. Verifies `Persona-Signature` header with `PERSONA_WEBHOOK_SECRET`. Set webhook URL in Persona dashboard.
-   - `/api/kyc-status.js` — GET `?wallet=0x...`: returns `{ status, source }` checking `verified_submitters`, `wallet_verifications` (legacy), and `verified_wallet_links`.
-   - `/api/age-acknowledge.js` — POST `{ walletAddress }` / GET `?wallet=0x...`: records/checks 18+ acknowledgment in `age_acknowledgments`.
+   - `/api/kyc.js` — Combined KYC + age-verify handler (replaces kyc-session, kyc-webhook, kyc-status, age-acknowledge). Original URLs preserved via vercel.json rewrites:
+     - `POST /api/kyc-session` (`?action=session`): creates Persona inquiry. Requires `PERSONA_API_KEY` + `PERSONA_TEMPLATE_ID`.
+     - `POST /api/kyc-webhook` (`?action=webhook`): updates `verified_submitters`. Verifies `Persona-Signature` header. Set webhook URL in Persona dashboard.
+     - `GET /api/kyc-status?wallet=0x...` (`?action=status`): returns `{ status, source }`.
+     - `GET/POST /api/age-acknowledge` (`?action=age`): records/checks 18+ acknowledgment.
    - `/api/referral-credit.js` — Credits referrer wallet on new user signup. Uses `referral_credits` table.
-   - `/api/community-stats.js` — Returns Telegram community member count via bot API
+   - `/api/community-stats.js` — Returns Telegram community member count, X stats, engagement. Also handles bot heartbeat: `GET/POST /api/bot-health` → `?action=heartbeat` via vercel.json rewrite.
    - `/api/signup-bonus.js` — POST `{ walletAddress }`: sends fixed TTS amount (default 500, admin-configurable via `admin_config` table) from Marketing wallet on first connect. 20/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY` in Vercel env.
    - `/api/vote-match.js` — POST `{ walletAddress, voteAmount, txHash }`: matches first-ever vote up to cap (default 1,000 TTS, admin-configurable) from Marketing wallet. 50/day rate limit. Records in `bonus_claims` table. Requires `MARKETING_WALLET_PRIVATE_KEY`.
 
@@ -303,11 +304,12 @@ V3b voting contract has wrong multipliers (Diamond=1.75x, VIP=2x). **V3c fixes t
 
 ## Admin Config Table (Supabase)
 
-`admin_config` table controls bonus amounts. Keys:
+`admin_config` table controls bonus amounts and runtime config. Keys:
 - `signup_bonus_tts` — TTS sent on first wallet connect (default: 500)
 - `vote_match_cap_tts` — max TTS matched on first vote (default: 1000)
 - `vote_match_ratio_numerator` — match ratio numerator (default: 1)
 - `vote_match_ratio_denominator` — match ratio denominator (default: 1)
+- `bot_last_heartbeat` — ISO timestamp of last @TTSGameBot heartbeat (written by tts_bot.py every 5 min, read by /api/bot-health → community-stats)
 
 Dashboard settings path: Admin Dashboard → Settings → Bonus Configuration.
 
@@ -521,7 +523,7 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 ---
 
-## Pending Actions (priority order — May 21, 2026)
+## Pending Actions (priority order — May 26, 2026)
 
 ### 🚨 CRITICAL — Blocking Round 2 and V3c deployment
 
@@ -572,7 +574,7 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 17. **DexScreener manual submission** — pair not indexed. Submit at dexscreener.com/update-token-info.
 
-18. **Age verification system** — full implementation complete May 15. Awaiting Jim to manually copy files + run SQL + create Supabase storage bucket + deploy.
+18. **Age verification system** — full implementation complete May 15. ✅ KYC API routes deployed May 26 (via api/kyc.js combined handler). Remaining: Jim to run `outputs/kyc_setup.sql` in Supabase SQL Editor + create Supabase storage bucket + set Persona env vars (PERSONA_API_KEY, PERSONA_TEMPLATE_ID, PERSONA_WEBHOOK_SECRET).
 
 ### 🟢 NEXT-PHASE (not launch blockers)
 
@@ -789,6 +791,32 @@ Fix document: `outputs/wordpress_meta_fixes.md`
 ---
 
 ## Completed History
+
+### May 26, 2026 (Workstreams N/O/P/Q/R)
+- ✅ N1: LP lock verified — Team.Finance `0x4f0fd563...` holds 231.3007 LP tokens (balanceOf confirms lock intact). Lock TX decoded for amount/timestamp.
+- ⚠️ N2: "7 labeled distribution wallets" investor claim UNSUPPORTED on-chain — only 3 operational wallets found (Bank/Marketing/Polaris). The 55% Bank concentration is the GoPlus flag. Investor materials should be updated to reflect actual 3-wallet structure.
+- ⚠️ N3: TTSVotingV2 NOT source-verified on BaseScan (contract exists 15,469 bytes but no source). Low priority — V2 is deprecated.
+- ✅ N4: Chainlink upkeeps verified on-chain via registry `0xf4bAb6A...` — 4 upkeeps total, 27.39 LINK confirmed.
+- ✅ N5: X OAuth confirmed valid (test tweet published + immediately deleted, tweet ID 2059443388059980247).
+- ✅ N6: Telegram bot operational on Railway (polling loop confirmed in tts_bot.py).
+- ✅ O1: `outputs/wp_admin_checklist_jim.md` created — 12-item click-by-click WP admin fix list; items 1–7 are release-blockers.
+- ✅ O4: V3c C-1 fix confirmed at lines 513–515 (vote cap skipped when only one profile has votes). PASS.
+- ✅ O5: Runbook Step 8 (J3 HALT forwarder check) is current and final gate. Runbook revised 2026-05-21. PASS.
+- ✅ P1: Runbook reflects correct Chainlink flow — cancel 4 old upkeeps, register 1 new Custom Logic. PASS.
+- ✅ P4: V3c compiles 0 errors/warnings, 47.4% of EIP-170 (12,260 deploy / 11,640 deployed bytes). PASS.
+- ✅ Q1: UPKEEPS TODO comment added to TTAdminDashboard.jsx — documents post-V3c migration path.
+- ✅ Q2: PayoutsScreen updated — decodes ERC20 Transfer events from each settlement TX, displays 4-way prize split with expandable per-recipient table (winner/voter/charity/house with addresses + amounts).
+- ✅ Q3: ReferralScreen updated — Top Referrers now shows actual paid $TTS from `referral_credits` table (not estimated), plus pending vs paid column.
+- ✅ Q4: Bot heartbeat system deployed — `tts_bot.py` adds 5-minute heartbeat POST; SocialScreen shows bot alive/stale indicator + X OAuth validity badge; heartbeat stored in `admin_config` key `bot_last_heartbeat`.
+- ✅ R1: `outputs/kyc_setup.sql` CREATE POLICY statements made idempotent via DO/IF NOT EXISTS guards.
+- ✅ R2–R4: KYC API files confirmed committed and deployed.
+- ✅ API consolidation: 6 endpoint files merged into 3 + vercel.json rewrites; function count dropped from 17 → 12 (Hobby plan limit). Original URLs all preserved.
+- ✅ Deployed to Vercel production (commit 05d59f0).
+
+### May 24, 2026 (KYC + age verification)
+- ✅ KYC system committed: api/kyc-session.js, api/kyc-webhook.js, api/kyc-status.js, api/age-acknowledge.js
+- ✅ `outputs/kyc_setup.sql` written (3 tables: verified_submitters, verified_wallet_links, age_acknowledgments)
+- ✅ CLAUDE.md updated with KYC system docs
 
 ### May 21, 2026 (Workstreams J/K/M)
 - ✅ J1: V3c + Keeper2V2 deployment runbook COMPLETELY REWRITTEN — `outputs/v3c_v2_deployment_runbook.md`. 13 steps, each with post-step verification + rollback. houseWallet corrected to Marketing wallet `0x7a9ff2f...` throughout. setForwarder documented as CRITICAL ROOT-CAUSE FIX (Step 8). Gas estimates, LINK acquisition guide, forwarder code-size check all included.
