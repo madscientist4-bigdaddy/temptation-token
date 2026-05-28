@@ -100,7 +100,7 @@ export default async function handler(req, res) {
       }
     } catch {}
 
-    let inquiryId, sessionToken
+    let inquiryId, sessionToken, _debugPersonaBody
     try {
       const r = await fetch(`${PERSONA_API}/inquiries`, {
         method: 'POST',
@@ -120,21 +120,28 @@ export default async function handler(req, res) {
           },
         }),
       })
+      const rawText = await r.text()
+      _debugPersonaBody = rawText
       if (!r.ok) {
-        const errBody = await r.text()
-        console.error('Persona inquiry creation failed:', r.status, errBody)
-        return res.status(502).json({ error: 'Failed to create verification session' })
+        console.error('Persona inquiry creation failed:', r.status, rawText)
+        return res.status(502).json({ error: 'Failed to create verification session', _personaStatus: r.status, _personaBody: rawText })
       }
-      const data = await r.json()
+      let data
+      try { data = JSON.parse(rawText) } catch { data = {} }
       inquiryId    = data.data?.id
       sessionToken = data.data?.attributes?.['session-token']
+      // Template ID type diagnosis: itmpl_ = inquiry template, wfl_ = workflow, flow_ = dynamic flow
+      const tmplPrefix = templateId?.split('_')[0]
+      if (!inquiryId || !sessionToken) {
+        console.error('Persona missing fields — tmplPrefix:', tmplPrefix, 'body:', rawText)
+        return res.status(502).json({
+          error: 'Invalid response from KYC provider',
+          _debug: { tmplPrefix, inquiryId, hasSessionToken: !!sessionToken, personaBody: rawText },
+        })
+      }
     } catch (e) {
       console.error('Persona API error:', e.message)
-      return res.status(502).json({ error: 'KYC provider unreachable' })
-    }
-
-    if (!inquiryId || !sessionToken) {
-      return res.status(502).json({ error: 'Invalid response from KYC provider' })
+      return res.status(502).json({ error: 'KYC provider unreachable', _debug: e.message })
     }
 
     await sbFetch('/verified_submitters', {
