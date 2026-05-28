@@ -100,7 +100,7 @@ export default async function handler(req, res) {
       }
     } catch {}
 
-    let inquiryId, sessionToken, _debugPersonaBody
+    let inquiryId, personaUrl
     try {
       const r = await fetch(`${PERSONA_API}/inquiries`, {
         method: 'POST',
@@ -120,28 +120,45 @@ export default async function handler(req, res) {
           },
         }),
       })
-      const rawText = await r.text()
-      _debugPersonaBody = rawText
       if (!r.ok) {
-        console.error('Persona inquiry creation failed:', r.status, rawText)
-        return res.status(502).json({ error: 'Failed to create verification session', _personaStatus: r.status, _personaBody: rawText })
+        const errBody = await r.text()
+        console.error('Persona inquiry creation failed:', r.status, errBody)
+        return res.status(502).json({ error: 'Failed to create verification session' })
       }
-      let data
-      try { data = JSON.parse(rawText) } catch { data = {} }
-      inquiryId    = data.data?.id
-      sessionToken = data.data?.attributes?.['session-token']
-      // Template ID type diagnosis: itmpl_ = inquiry template, wfl_ = workflow, flow_ = dynamic flow
-      const tmplPrefix = templateId?.split('_')[0]
-      if (!inquiryId || !sessionToken) {
-        console.error('Persona missing fields — tmplPrefix:', tmplPrefix, 'body:', rawText)
-        return res.status(502).json({
-          error: 'Invalid response from KYC provider',
-          _debug: { tmplPrefix, inquiryId, hasSessionToken: !!sessionToken, personaBody: rawText },
-        })
+      const data = await r.json()
+      inquiryId = data.data?.id
+
+      // session-token lives in data.meta (not data.data.attributes) per Persona API v1
+      const sessionToken = data.meta?.['session-token']
+
+      if (sessionToken) {
+        // Session token present — use hosted-flow URL directly
+        personaUrl = `https://withpersona.com/verify?inquiry-id=${inquiryId}&session-token=${sessionToken}`
+      } else if (inquiryId) {
+        // Session token null (common for API-created inquiries) — generate a one-time-link
+        try {
+          const linkR = await fetch(`${PERSONA_API}/inquiries/${inquiryId}/generate-one-time-link`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Persona-Version': PERSONA_VERSION,
+              'Content-Type': 'application/json',
+            },
+          })
+          const linkData = await linkR.json()
+          personaUrl = linkData.meta?.['one-time-link'] ||
+                       linkData.data?.attributes?.['one-time-link']
+        } catch (e) {
+          console.error('Persona generate-one-time-link error:', e.message)
+        }
       }
     } catch (e) {
       console.error('Persona API error:', e.message)
-      return res.status(502).json({ error: 'KYC provider unreachable', _debug: e.message })
+      return res.status(502).json({ error: 'KYC provider unreachable' })
+    }
+
+    if (!inquiryId || !personaUrl) {
+      return res.status(502).json({ error: 'Failed to generate verification URL' })
     }
 
     await sbFetch('/verified_submitters', {
@@ -158,7 +175,6 @@ export default async function handler(req, res) {
       }),
     }).catch(e => console.error('Supabase upsert failed:', e.message))
 
-    const personaUrl = `https://withpersona.com/verify?inquiry-id=${inquiryId}&session-token=${sessionToken}`
     return res.status(200).json({ inquiryId, personaUrl })
   }
 
