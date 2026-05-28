@@ -310,5 +310,50 @@ export default async function handler(req, res) {
     return res.status(405).end()
   }
 
+  // ── /api/kyc?action=account — Persona account status + last webhook ────────
+  if (action === 'account') {
+    if (req.method !== 'GET') return res.status(405).end()
+
+    // Last webhook received: most recent non-pending row (set by Persona webhooks)
+    let lastWebhook = null
+    try {
+      const r = await sbFetch(
+        '/verified_submitters?status=in.(approved,declined,needs_review)' +
+        '&select=verified_at,created_at,status&order=created_at.desc&limit=1'
+      )
+      const rows = await r.json()
+      if (Array.isArray(rows) && rows.length > 0) {
+        lastWebhook = rows[0].verified_at || rows[0].created_at
+      }
+    } catch {}
+
+    const apiKey = process.env.PERSONA_API_KEY
+    if (!apiKey) {
+      return res.status(200).json({ ok: false, configured: false, lastWebhook })
+    }
+
+    try {
+      const r = await fetch('https://withpersona.com/api/v1/accounts', {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Persona-Version': PERSONA_VERSION,
+          Accept: 'application/json',
+        },
+      })
+      if (!r.ok) {
+        const errText = await r.text()
+        console.error('Persona GET /accounts failed:', r.status, errText)
+        return res.status(200).json({ ok: false, configured: true, personaError: r.status, lastWebhook })
+      }
+      const data = await r.json()
+      // Persona wraps account data in { data: { attributes: {...} } }
+      const attrs = data?.data?.attributes || data?.attributes || data || {}
+      return res.status(200).json({ ok: true, configured: true, account: attrs, lastWebhook })
+    } catch (e) {
+      console.error('Persona account fetch error:', e.message)
+      return res.status(200).json({ ok: false, configured: true, personaError: e.message, lastWebhook })
+    }
+  }
+
   return res.status(400).json({ error: 'Missing or unknown action' })
 }

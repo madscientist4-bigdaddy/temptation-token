@@ -1296,6 +1296,9 @@ function VerificationsScreen({ showToast }) {
   const [linkWallet, setLinkWallet] = useState('');
   const [linkTarget, setLinkTarget] = useState(null);
   const [linking, setLinking] = useState(false);
+  const [personaStatus, setPersonaStatus] = useState(null);
+  const [personaRefreshing, setPersonaRefreshing] = useState(false);
+  const [personaLastRefresh, setPersonaLastRefresh] = useState(null);
 
   const loadAll = () => {
     setLoading(true);
@@ -1311,7 +1314,22 @@ function VerificationsScreen({ showToast }) {
     }).catch(() => setLoading(false));
   };
 
-  useEffect(() => { loadAll(); }, []);
+  const fetchPersonaStatus = async () => {
+    setPersonaRefreshing(true);
+    try {
+      const d = await fetch('/api/kyc?action=account').then(r => r.json());
+      setPersonaStatus(d);
+      setPersonaLastRefresh(new Date().toLocaleTimeString());
+    } catch { setPersonaStatus({ ok: false, configured: false }); }
+    setPersonaRefreshing(false);
+  };
+
+  useEffect(() => {
+    loadAll();
+    fetchPersonaStatus();
+    const t = setInterval(fetchPersonaStatus, 60_000);
+    return () => clearInterval(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const overrideApprove = async row => {
     await sb.patch('verified_submitters', `id=eq.${row.id}`, {
@@ -1367,6 +1385,113 @@ function VerificationsScreen({ showToast }) {
         <div className="gold-rule" />
         <div className="page-sub">Identity verifications via Persona · Age acknowledgments · Wallet links · Profiles cannot be approved for unverified wallets</div>
       </div>
+
+      {/* ── Persona Account Status Card ─────────────────────────────────────── */}
+      {(() => {
+        const ps = personaStatus;
+        const acct = ps?.account || {};
+        // Persona attribute keys vary by plan; we surface whatever comes back
+        const usedKey = Object.keys(acct).find(k => /inquir.*count|used|verif.*count/i.test(k));
+        const limitKey = Object.keys(acct).find(k => /limit|quota|max|alloc/i.test(k));
+        const trialKey = Object.keys(acct).find(k => /trial.*end|trial.*expir|expir.*at|plan.*end/i.test(k));
+        const planKey  = Object.keys(acct).find(k => /^plan$|plan.*name|subscri/i.test(k));
+        const used  = usedKey  ? acct[usedKey]  : null;
+        const limit = limitKey ? acct[limitKey] : null;
+        const trial = trialKey ? new Date(acct[trialKey]).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : null;
+        const plan  = planKey  ? acct[planKey]  : null;
+        const lastWebhookStr = ps?.lastWebhook
+          ? new Date(ps.lastWebhook).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+          : 'No webhook activity yet';
+        const remaining = (used != null && limit != null) ? limit - used : null;
+
+        return (
+          <div className="table-card" style={{ marginBottom:20 }}>
+            <div className="table-head">
+              <div className="table-head-title">🔐 Persona Account</div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                {personaLastRefresh && <span style={{ fontSize:'.58rem', color:'var(--muted)' }}>Updated {personaLastRefresh}</span>}
+                <button onClick={fetchPersonaStatus} disabled={personaRefreshing}
+                  style={{ background:'var(--surface2)', border:'1px solid var(--border)', color:'var(--text)', padding:'4px 10px', borderRadius:5, cursor:personaRefreshing?'not-allowed':'pointer', fontSize:'.58rem', fontWeight:600, fontFamily:'var(--font-body)', opacity:personaRefreshing?.7:1 }}>
+                  {personaRefreshing ? '⟳ …' : '⟳ Refresh'}
+                </button>
+              </div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:0 }}>
+
+              {/* Configured / plan status */}
+              <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>API Status</div>
+                {ps == null ? (
+                  <div style={{ fontSize:'.8rem', color:'var(--muted)' }}>Loading…</div>
+                ) : !ps.configured ? (
+                  <>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color:'var(--rose)' }}>Not Configured</div>
+                    <div style={{ fontSize:'.58rem', color:'var(--rose)', marginTop:3 }}>Set PERSONA_API_KEY in Vercel env</div>
+                  </>
+                ) : ps.personaError ? (
+                  <>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color:'var(--rose)' }}>API Error</div>
+                    <div style={{ fontSize:'.58rem', color:'var(--rose)', marginTop:3 }}>
+                      {typeof ps.personaError === 'number' ? `HTTP ${ps.personaError}` : String(ps.personaError).slice(0,50)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color:'var(--green)' }}>✓ Connected</div>
+                    {plan && <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:3, textTransform:'capitalize' }}>{String(plan)}</div>}
+                  </>
+                )}
+              </div>
+
+              {/* Verifications used */}
+              <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Used This Period</div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>
+                  {used != null ? Number(used).toLocaleString() : (ps?.ok ? '—' : '—')}
+                </div>
+                {limit != null && <div style={{ fontSize:'.58rem', color:'var(--muted)', marginTop:2 }}>of {Number(limit).toLocaleString()} limit</div>}
+              </div>
+
+              {/* Remaining */}
+              <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Remaining</div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color: remaining != null && remaining < 10 ? 'var(--rose)' : 'var(--gold-light)' }}>
+                  {remaining != null ? Number(remaining).toLocaleString() : '—'}
+                </div>
+                {remaining != null && remaining < 20 && <div style={{ fontSize:'.58rem', color:'var(--rose)', marginTop:2 }}>⚠ Running low</div>}
+              </div>
+
+              {/* Trial / plan expiry */}
+              <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Trial Expires</div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color: trial ? 'var(--gold-light)' : 'var(--muted)' }}>
+                  {trial || (ps?.ok ? 'No expiry' : '—')}
+                </div>
+                {trialKey && trial && (() => {
+                  const daysLeft = Math.ceil((new Date(acct[trialKey]) - Date.now()) / 86400000);
+                  return daysLeft <= 7
+                    ? <div style={{ fontSize:'.58rem', color:'var(--rose)', marginTop:2 }}>⚠ {daysLeft}d remaining</div>
+                    : <div style={{ fontSize:'.58rem', color:'var(--muted)', marginTop:2 }}>{daysLeft}d remaining</div>;
+                })()}
+              </div>
+
+              {/* Last webhook received */}
+              <div style={{ padding:'14px 16px' }}>
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Last Webhook Received</div>
+                <div style={{ fontSize:'.85rem', color: ps?.lastWebhook ? 'var(--text)' : 'var(--muted)' }}>
+                  {lastWebhookStr}
+                </div>
+                {ps?.lastWebhook && (
+                  <div style={{ fontSize:'.55rem', color:'var(--muted)', marginTop:2 }}>
+                    {Math.floor((Date.now() - new Date(ps.lastWebhook).getTime()) / 60000)}m ago
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ display:'flex', gap:8, marginBottom:20 }}>
         <button style={tabStyle('kyc')} onClick={() => setActiveTab('kyc')}>KYC Verifications <span style={{ marginLeft:6, background:'rgba(255,255,255,.15)', borderRadius:10, padding:'1px 6px' }}>{kycRows.length}</span></button>
