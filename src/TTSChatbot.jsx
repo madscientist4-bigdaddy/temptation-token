@@ -1,37 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-
-const TTS_SYSTEM_PROMPT = `You are the official Temptation Token ($TTS) support assistant. Friendly, direct, punchy — users are on mobile.
-
-PERSONALITY: If someone is sexually crude or inappropriate, shut it down with a witty one-liner then redirect. Examples: "Nice try Romeo — I only get hot about token prices." or "This is a crypto game not a dating app. Though you CAN compete on here..." Never mean, always clever. One line max, then back to being helpful. If someone is rude, match their confidence: "Bold strategy. Now try staking some TTS." Always stay classy.
-
-CORE KNOWLEDGE:
-- Temptation Token ($TTS) is a crypto-powered "Hot or Not" voting game on Base blockchain
-- Players vote real $TTS tokens on profiles each week. Winners split prize pool: 35% winning profile, 35% top voter, 10% Polaris Project (anti-trafficking nonprofit), 20% house (Blockchain Entertainment LLC)
-- Losing votes (on non-winning profiles) are burned to 0x000...dEaD at settlement — TTS is deflationary
-- Only the winning profile's vote pool is distributed as prizes. Losing-profile votes burn entirely.
-- New users receive 500 TTS sign-up bonus (admin-configurable)
-- First vote is matched 1:1 up to 1,000 TTS from the marketing wallet
-- Submission fee: 5 TTS per profile submitted
-- App: app.temptationtoken.io | Website: temptationtoken.io
-
-CONTRACT ADDRESSES (Base Mainnet):
-- TTS Token: 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
-- Voting (TTSVotingV3b, active): 0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6
-- Staking: 0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc
-- NFT: 0x0768e862D3AB14d85213BfeF8f1D012E77721da2
-
-SUBMISSION FEE: 5 TTS per profile, max 3 submissions per wallet per week
-STAKING TIERS: Bronze $50+ 8% APR 1.1x boost | Silver $100+ 12% APR 1.25x | Gold $250+ 18% APR 1.5x | Diamond $1000+ 32% APR 2x | VIP $5000+ 45% APR 3x. TTS equivalent shown live in app based on current price.
-REFERRALS: Referral bonus paid to referrer when they bring a new user (amount admin-configurable, default 100 TTS).
-BUY TTS: Uniswap on Base — app.uniswap.org — contract 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
-
-You have access to a web search tool. Use it to:
-1. Answer questions about current TTS price, trading volume, or market data
-2. Look up current crypto/Base network news if relevant
-3. Fetch latest info from temptationtoken.io if asked about website content
-4. Answer wallet or MetaMask troubleshooting questions with current info
-
-Do NOT give financial advice or price predictions. If unsure, suggest support@temptationtoken.io.`
+import { ASKTTS_SYSTEM_PROMPT } from './lib/asktts-prompt.js'
 
 const STORAGE_KEY = 'tts_chat_history'
 const MAX_STORED = 20
@@ -56,7 +24,7 @@ export default function TTSChatbot() {
   const [msgs, setMsgs] = useState([
     { role: 'assistant', content: history.length > 0
       ? `Welcome back! I remember our previous conversation. How can I help you with Temptation Token today?`
-      : `Hey! I'm the TTS support bot. I can search for real-time info, answer questions about the game, wallet setup, staking, and more.`
+      : `Hey! I'm the TTS assistant. Ask me about the game, how to win, wallet setup, staking, or anything TTS.`
     },
     ...history
   ])
@@ -83,12 +51,10 @@ export default function TTSChatbot() {
     setMsgs(newMsgs)
     setLoading(true)
 
-    // Save user message to history
     const historyMsgs = newMsgs.filter(m => m.role !== 'assistant' || newMsgs.indexOf(m) > 0)
     saveHistory(historyMsgs.slice(-MAX_STORED))
 
     try {
-      // First call with web search tool
       setSearching(false)
       const apiMsgs = newMsgs.map(m => ({ role: m.role, content: m.content }))
 
@@ -96,19 +62,16 @@ export default function TTSChatbot() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: TTS_SYSTEM_PROMPT,
+          system: ASKTTS_SYSTEM_PROMPT,
           messages: apiMsgs
         })
       })
 
       const data = await res.json()
 
-      // Check if tool use happened
       const toolUse = data.content?.find(b => b.type === 'tool_use')
       if (toolUse) {
         setSearching(true)
-        // Continue conversation with tool result
-        const toolResult = data.content?.find(b => b.type === 'tool_result' || b.type === 'text')
         const finalText = data.content?.filter(b => b.type === 'text').map(b => b.text).join(' ')
         if (finalText) {
           const assistantMsg = { role: 'assistant', content: finalText, searched: true }
@@ -116,12 +79,11 @@ export default function TTSChatbot() {
           setMsgs(finalMsgs)
           saveHistory(finalMsgs.slice(1).slice(-MAX_STORED))
         } else {
-          // Need second call with tool results
           const followRes = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              system: TTS_SYSTEM_PROMPT,
+              system: ASKTTS_SYSTEM_PROMPT,
               messages: [...apiMsgs, { role: 'assistant', content: data.content }]
             })
           })
@@ -149,16 +111,15 @@ export default function TTSChatbot() {
 
   const clearHistory = () => {
     localStorage.removeItem(STORAGE_KEY)
-    setMsgs([{ role: 'assistant', content: "Chat history cleared. How can I help you?" }])
+    setMsgs([{ role: 'assistant', content: "History cleared. How can I help?" }])
   }
 
   const onKey = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }
 
   const S = `
-    .tts-fab{position:fixed;bottom:24px;right:24px;z-index:9999;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#c0253a,#8b1a2a);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(192,37,58,.4);transition:transform .2s}
-    .tts-fab:hover{transform:scale(1.08)}
-    .tts-fab svg{width:26px;height:26px;fill:#fff}
-    .tts-panel{position:fixed;bottom:92px;right:24px;z-index:9998;width:340px;max-width:calc(100vw - 32px);background:#0c0c14;border:1px solid rgba(212,175,55,.2);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6);max-height:500px}
+    .tts-fab{position:fixed;bottom:24px;right:24px;z-index:99999;height:48px;padding:0 20px;border-radius:24px;background:linear-gradient(135deg,#c0253a,#8b1a2a);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(192,37,58,.4);transition:transform .2s;font-size:14px;font-weight:800;color:#fff;letter-spacing:.04em;font-family:inherit;white-space:nowrap}
+    .tts-fab:hover{transform:scale(1.05)}
+    .tts-panel{position:fixed;bottom:84px;right:24px;z-index:99998;width:340px;max-width:calc(100vw - 32px);background:#0c0c14;border:1px solid rgba(212,175,55,.2);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6);max-height:500px}
     .tts-head{background:linear-gradient(135deg,#1a0a0e,#0c0c14);border-bottom:1px solid rgba(212,175,55,.15);padding:12px 14px;display:flex;align-items:center;gap:10px}
     .tts-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#c0253a,#8b1a2a);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
     .tts-title{font-size:.8rem;font-weight:700;color:#f0d060;letter-spacing:.04em}
@@ -167,22 +128,21 @@ export default function TTSChatbot() {
     .tts-icon-btn{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.35);font-size:14px;padding:4px;line-height:1;transition:color .2s}
     .tts-icon-btn:hover{color:#fff}
     .tts-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
-    .tts-msg{max-width:88%;font-size:.8rem;line-height:1.6;padding:9px 12px;border-radius:12px}
-    .tts-user{align-self:flex-end;background:rgba(192,37,58,.25);color:#f5ede0;border-bottom-right-radius:4px}
-    .tts-bot{align-self:flex-start;background:rgba(255,255,255,.06);color:#d8d0c8;border-bottom-left-radius:4px}
-    .tts-search-badge{font-size:.6rem;color:rgba(240,208,96,.6);margin-top:4px;display:block}
-    .tts-typing{align-self:flex-start;background:rgba(255,255,255,.06);padding:9px 13px;border-radius:12px;border-bottom-left-radius:4px}
+    .tts-msg{max-width:88%;font-size:13px;line-height:1.6;padding:9px 12px;border-radius:12px;word-wrap:break-word}
+    .tts-user{align-self:flex-end;background:rgba(192,37,58,.25);color:#f5ede0;border-bottom-right-radius:3px}
+    .tts-bot{align-self:flex-start;background:rgba(255,255,255,.06);color:#d8d0c8;border-bottom-left-radius:3px}
+    .tts-search-badge{font-size:10px;color:rgba(240,208,96,.55);margin-top:3px;display:block}
+    .tts-typing{align-self:flex-start;background:rgba(255,255,255,.06);padding:9px 13px;border-radius:12px;border-bottom-left-radius:3px}
     .tts-typing span{display:inline-block;width:6px;height:6px;border-radius:50%;background:rgba(240,208,96,.5);margin:0 2px;animation:tts-b .9s infinite}
     .tts-typing span:nth-child(2){animation-delay:.15s}
     .tts-typing span:nth-child(3){animation-delay:.3s}
     @keyframes tts-b{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
-    .tts-bar{border-top:1px solid rgba(255,255,255,.07);padding:9px 11px;display:flex;gap:8px;align-items:flex-end}
-    .tts-input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 11px;color:#f5ede0;font-size:.78rem;resize:none;outline:none;font-family:inherit;line-height:1.5;max-height:100px;min-height:36px}
+    .tts-bar{border-top:1px solid rgba(255,255,255,.07);padding:9px 11px;display:flex;gap:7px;align-items:flex-end}
+    .tts-input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:8px 11px;color:#f5ede0;font-size:13px;resize:none;outline:none;font-family:inherit;line-height:1.5;max-height:80px;min-height:34px}
     .tts-input::placeholder{color:rgba(255,255,255,.22)}
     .tts-input:focus{border-color:rgba(212,175,55,.4)}
-    .tts-send{width:34px;height:34px;border-radius:9px;flex-shrink:0;background:linear-gradient(135deg,#c0253a,#8b1a2a);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .2s}
+    .tts-send{height:36px;padding:0 14px;border-radius:9px;flex-shrink:0;background:linear-gradient(135deg,#c0253a,#8b1a2a);border:none;cursor:pointer;font-size:.75rem;font-weight:700;color:#fff;letter-spacing:.04em;white-space:nowrap;font-family:inherit}
     .tts-send:disabled{opacity:.4;cursor:not-allowed}
-    .tts-send svg{width:15px;height:15px;fill:#fff}
   `
 
   return (
@@ -194,7 +154,7 @@ export default function TTSChatbot() {
             <div className="tts-avatar">🔥</div>
             <div>
               <div className="tts-title">TTS Support</div>
-              <div className="tts-sub">AI · Web search · Remembers you</div>
+              <div className="tts-sub">AI · web search · remembers you</div>
             </div>
             <div className="tts-head-btns">
               <button className="tts-icon-btn" title="Clear history" onClick={clearHistory}>🗑</button>
@@ -205,30 +165,25 @@ export default function TTSChatbot() {
             {msgs.map((m,i) => (
               <div key={i} className={`tts-msg ${m.role === 'user' ? 'tts-user' : 'tts-bot'}`}>
                 {m.content}
-                {m.searched && <span className="tts-search-badge">🔍 Searched the web</span>}
+                {m.searched && <span className="tts-search-badge">🔍 searched web</span>}
               </div>
             ))}
             {loading && (
               <div className="tts-typing">
                 <span/><span/><span/>
-                {searching && <span style={{fontSize:'.65rem',color:'rgba(240,208,96,.5)',marginLeft:6}}>searching...</span>}
+                {searching && <span style={{fontSize:'10px',color:'rgba(240,208,96,.5)',marginLeft:6}}>searching...</span>}
               </div>
             )}
             <div ref={bottomRef}/>
           </div>
           <div className="tts-bar">
             <textarea ref={inputRef} className="tts-input" placeholder="Ask anything about TTS..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKey} rows={1}/>
-            <button className="tts-send" onClick={send} disabled={loading || !input.trim()}>
-              <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
-            </button>
+            <button className="tts-send" onClick={send} disabled={loading || !input.trim()}>Submit</button>
           </div>
         </div>
       )}
       <button className="tts-fab" onClick={() => setOpen(o => !o)} aria-label="Open TTS support">
-        {open
-          ? <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-          : <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
-        }
+        {open ? '✕ Close' : '🔥 Ask TTS'}
       </button>
     </>
   )
