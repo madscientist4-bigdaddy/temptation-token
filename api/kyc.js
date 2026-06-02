@@ -92,11 +92,15 @@ export default async function handler(req, res) {
       return res.status(503).json({ error: 'KYC service not configured — contact admin' })
     }
 
+    let existingRow = null
     try {
       const r = await sbFetch(`/verified_submitters?wallet_address=eq.${wallet}&select=status,reference_id`)
       const rows = await r.json()
-      if (Array.isArray(rows) && rows.length > 0 && rows[0].status === 'approved') {
-        return res.status(200).json({ alreadyVerified: true })
+      if (Array.isArray(rows) && rows.length > 0) {
+        existingRow = rows[0]
+        if (existingRow.status === 'approved') {
+          return res.status(200).json({ alreadyVerified: true })
+        }
       }
     } catch {}
 
@@ -161,19 +165,28 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: 'Failed to generate verification URL' })
     }
 
-    await sbFetch('/verified_submitters', {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({
-        wallet_address: wallet,
-        provider: 'persona',
-        reference_id: inquiryId,
-        status: 'pending',
-        rejection_reason: null,
-        verified_at: null,
-        created_at: new Date().toISOString(),
-      }),
-    }).catch(e => console.error('Supabase upsert failed:', e.message))
+    // Use PATCH for existing wallets (reliable regardless of UNIQUE constraint state),
+    // POST insert for new wallets. This avoids silent merge-duplicates failures.
+    const sbPayload = {
+      provider: 'persona',
+      reference_id: inquiryId,
+      status: 'pending',
+      rejection_reason: null,
+      verified_at: null,
+    }
+    if (existingRow) {
+      await sbFetch(`/verified_submitters?wallet_address=eq.${wallet}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify(sbPayload),
+      }).catch(e => console.error('Supabase patch failed:', e.message))
+    } else {
+      await sbFetch('/verified_submitters', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ ...sbPayload, wallet_address: wallet, created_at: new Date().toISOString() }),
+      }).catch(e => console.error('Supabase insert failed:', e.message))
+    }
 
     return res.status(200).json({ inquiryId, personaUrl })
   }
@@ -355,8 +368,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, configured: false, lastWebhook })
     }
 
+    // Verify API key by fetching inquiry count. GET /api/v1/accounts lists USER accounts
+    // (Persona's end-user identity records), not API plan info — use /inquiries instead.
     try {
-      const r = await fetch('https://withpersona.com/api/v1/accounts', {
+      const r = await fetch(`${PERSONA_API}/inquiries?page%5Bsize%5D=1`, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Persona-Version': PERSONA_VERSION,
@@ -365,15 +380,26 @@ export default async function handler(req, res) {
       })
       if (!r.ok) {
         const errText = await r.text()
-        console.error('Persona GET /accounts failed:', r.status, errText)
+        console.error('Persona GET /inquiries failed:', r.status, errText)
         return res.status(200).json({ ok: false, configured: true, personaError: r.status, lastWebhook })
       }
       const data = await r.json()
-      // Persona wraps account data in { data: { attributes: {...} } }
-      const attrs = data?.data?.attributes || data?.attributes || data || {}
-      return res.status(200).json({ ok: true, configured: true, account: attrs, lastWebhook })
+      // Determine sandbox vs production from inquiry IDs (sandbox IDs contain known prefix)
+      const firstId = data?.data?.[0]?.id || ''
+      const isSandbox = firstId.includes('sandbox') || apiKey.includes('sandbox') ||
+                        // Persona sandbox account IDs have a distinctive segment
+                        (data?.data?.length > 0 && !firstId.startsWith('inq_prod'))
+      const totalInquiries = Array.isArray(data?.data) ? (data.data.length > 0 ? '1+' : '0') : 'unknown'
+      return res.status(200).json({
+        ok: true,
+        configured: true,
+        environment: isSandbox ? 'sandbox' : 'production',
+        totalInquiries,
+        templateId: process.env.PERSONA_TEMPLATE_ID || '(not set)',
+        lastWebhook,
+      })
     } catch (e) {
-      console.error('Persona account fetch error:', e.message)
+      console.error('Persona inquiry fetch error:', e.message)
       return res.status(200).json({ ok: false, configured: true, personaError: e.message, lastWebhook })
     }
   }

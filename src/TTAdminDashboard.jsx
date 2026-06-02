@@ -1389,25 +1389,14 @@ function VerificationsScreen({ showToast }) {
       {/* ── Persona Account Status Card ─────────────────────────────────────── */}
       {(() => {
         const ps = personaStatus;
-        const acct = ps?.account || {};
-        // Persona attribute keys vary by plan; we surface whatever comes back
-        const usedKey = Object.keys(acct).find(k => /inquir.*count|used|verif.*count/i.test(k));
-        const limitKey = Object.keys(acct).find(k => /limit|quota|max|alloc/i.test(k));
-        const trialKey = Object.keys(acct).find(k => /trial.*end|trial.*expir|expir.*at|plan.*end/i.test(k));
-        const planKey  = Object.keys(acct).find(k => /^plan$|plan.*name|subscri/i.test(k));
-        const used  = usedKey  ? acct[usedKey]  : null;
-        const limit = limitKey ? acct[limitKey] : null;
-        const trial = trialKey ? new Date(acct[trialKey]).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : null;
-        const plan  = planKey  ? acct[planKey]  : null;
         const lastWebhookStr = ps?.lastWebhook
           ? new Date(ps.lastWebhook).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
           : 'No webhook activity yet';
-        const remaining = (used != null && limit != null) ? limit - used : null;
 
         return (
           <div className="table-card" style={{ marginBottom:20 }}>
             <div className="table-head">
-              <div className="table-head-title">🔐 Persona Account</div>
+              <div className="table-head-title">🔐 Persona API Status</div>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 {personaLastRefresh && <span style={{ fontSize:'.58rem', color:'var(--muted)' }}>Updated {personaLastRefresh}</span>}
                 <button onClick={fetchPersonaStatus} disabled={personaRefreshing}
@@ -1418,7 +1407,7 @@ function VerificationsScreen({ showToast }) {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:0 }}>
 
-              {/* Configured / plan status */}
+              {/* API connection status */}
               <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
                 <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>API Status</div>
                 {ps == null ? (
@@ -1438,41 +1427,26 @@ function VerificationsScreen({ showToast }) {
                 ) : (
                   <>
                     <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color:'var(--green)' }}>✓ Connected</div>
-                    {plan && <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:3, textTransform:'capitalize' }}>{String(plan)}</div>}
+                    <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:3, textTransform:'capitalize' }}>{ps.environment || 'unknown'}</div>
                   </>
                 )}
               </div>
 
-              {/* Verifications used */}
+              {/* Environment */}
               <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
-                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Used This Period</div>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color:'var(--gold-light)' }}>
-                  {used != null ? Number(used).toLocaleString() : (ps?.ok ? '—' : '—')}
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Environment</div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color: ps?.environment === 'production' ? 'var(--green)' : ps?.environment === 'sandbox' ? 'var(--gold)' : 'var(--muted)' }}>
+                  {ps?.ok ? (ps?.environment === 'production' ? 'Production' : ps?.environment === 'sandbox' ? 'Sandbox' : '—') : '—'}
                 </div>
-                {limit != null && <div style={{ fontSize:'.58rem', color:'var(--muted)', marginTop:2 }}>of {Number(limit).toLocaleString()} limit</div>}
+                {ps?.environment === 'sandbox' && <div style={{ fontSize:'.58rem', color:'var(--gold)', marginTop:2 }}>Switch to Production before launch</div>}
               </div>
 
-              {/* Remaining */}
+              {/* Template ID */}
               <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
-                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Remaining</div>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:'1.6rem', color: remaining != null && remaining < 10 ? 'var(--rose)' : 'var(--gold-light)' }}>
-                  {remaining != null ? Number(remaining).toLocaleString() : '—'}
+                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Template ID</div>
+                <div style={{ fontSize:'.72rem', color: ps?.templateId && ps.templateId !== '(not set)' ? 'var(--text)' : 'var(--rose)', fontFamily:'monospace', wordBreak:'break-all' }}>
+                  {ps?.ok ? (ps?.templateId || '—') : '—'}
                 </div>
-                {remaining != null && remaining < 20 && <div style={{ fontSize:'.58rem', color:'var(--rose)', marginTop:2 }}>⚠ Running low</div>}
-              </div>
-
-              {/* Trial / plan expiry */}
-              <div style={{ padding:'14px 16px', borderRight:'1px solid var(--border2)' }}>
-                <div style={{ fontSize:'.55rem', letterSpacing:'.12em', textTransform:'uppercase', color:'var(--muted)', marginBottom:5 }}>Trial Expires</div>
-                <div style={{ fontFamily:'var(--font-display)', fontSize:'.95rem', color: trial ? 'var(--gold-light)' : 'var(--muted)' }}>
-                  {trial || (ps?.ok ? 'No expiry' : '—')}
-                </div>
-                {trialKey && trial && (() => {
-                  const daysLeft = Math.ceil((new Date(acct[trialKey]) - Date.now()) / 86400000);
-                  return daysLeft <= 7
-                    ? <div style={{ fontSize:'.58rem', color:'var(--rose)', marginTop:2 }}>⚠ {daysLeft}d remaining</div>
-                    : <div style={{ fontSize:'.58rem', color:'var(--muted)', marginTop:2 }}>{daysLeft}d remaining</div>;
-                })()}
               </div>
 
               {/* Last webhook received */}
@@ -1489,6 +1463,15 @@ function VerificationsScreen({ showToast }) {
               </div>
 
             </div>
+
+            {/* Template status warning — this is the most common cause of "Invalid response from KYC provider" */}
+            {ps?.ok && ps?.environment === 'sandbox' && (
+              <div style={{ padding:'10px 16px', borderTop:'1px solid var(--border2)', background:'rgba(212,175,55,0.05)', fontSize:'.68rem', color:'var(--gold)', lineHeight:1.6 }}>
+                ⚠ <strong>Sandbox mode active.</strong> If users see "Invalid response from KYC provider" in the Persona verification window: the template (<code>{ps?.templateId}</code>) must be <strong>Published</strong> (not Draft) in the{' '}
+                <a href="https://app.withpersona.com" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold)' }}>Persona Sandbox Dashboard</a>.
+                Also verify the redirect URL is set to <code>https://app.temptationtoken.io?kyc_complete=1</code>.
+              </div>
+            )}
           </div>
         );
       })()}
