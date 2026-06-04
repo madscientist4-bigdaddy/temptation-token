@@ -444,9 +444,13 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         }
 
         Profile storage winner = _profiles[roundId][winnerId];
-        uint256 pool = winner.rawVotes;
-        if (pool == 0 || winner.wallet == address(0)) return;
+        if (winner.rawVotes == 0 || winner.wallet == address(0)) return;
+        _distributePayouts(roundId, winnerId, winner);
+    }
 
+    // Extracted from fulfillRandomWords to stay within Solidity's 16-slot stack limit.
+    function _distributePayouts(uint256 roundId, string memory winnerId, Profile storage winner) private {
+        uint256 pool = winner.rawVotes;
         uint256 profileShare = pool * 35 / 100;
         uint256 voterShare   = pool * 35 / 100;
         uint256 charityShare = pool * 10 / 100;
