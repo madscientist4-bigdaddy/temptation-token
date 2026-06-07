@@ -1,0 +1,158 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1749340800000,
+  "meta": {
+    "name": "TTS setTaxExempt — 5 distribution wallets",
+    "description": "setTaxExempt(addr, true) for 5 distribution recipients: Founder (Jim Ledger), Investor Reserve (Gnosis Safe), Development (Dr. Mike), Ecosystem (Chantea), Team (Son). selector=0x1dc61040 confirmed from BaseScan. FOUR entries are placeholders — replace address in contractInputsValues before submitting. See _note fields.",
+    "txBuilderVersion": "1.16.5",
+    "createdFromSafeAddress": "0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86",
+    "createdFromOwnerAddress": ""
+  },
+  "transactions": [
+    {
+      "_label": "1 of 5 — Founder (Jim Ledger)",
+      "_note": "PLACEHOLDER — open this transaction in TX Builder, replace 0x0000...0001 with Jim's Ledger hardware wallet address from Notes",
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x0000000000000000000000000000000000000001",
+        "exempt": "true"
+      }
+    },
+    {
+      "_label": "2 of 5 — Investor Reserve (Gnosis Safe 2/2) — address confirmed, no edit needed",
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc61040000000000000000000000000efb59d88179edc49bda60b43249722ea0de6fb860000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86",
+        "exempt": "true"
+      }
+    },
+    {
+      "_label": "3 of 5 — Development (Dr. Mike)",
+      "_note": "PLACEHOLDER — replace 0x0000...0002 with Dr. Mike's wallet address from Notes",
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x0000000000000000000000000000000000000002",
+        "exempt": "true"
+      }
+    },
+    {
+      "_label": "4 of 5 — Ecosystem (Chantea)",
+      "_note": "PLACEHOLDER — replace 0x0000...0003 with Chantea's wallet address from Notes",
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x0000000000000000000000000000000000000003",
+        "exempt": "true"
+      }
+    },
+    {
+      "_label": "5 of 5 — Team (Son)",
+      "_note": "PLACEHOLDER — replace 0x0000...0004 with Son's wallet address from Notes",
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x0000000000000000000000000000000000000004",
+        "exempt": "true"
+      }
+    }
+  ]
+}
