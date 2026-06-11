@@ -31,6 +31,12 @@ Could you please:
 I can provide proof of project ownership (BaseScan deployer TX, Gnosis Safe
 admin key, or any other verification you require).
 
+For additional context: the project has recently completed a public token
+distribution of 33B TTS across 6 on-chain transactions (verifiable on BaseScan
+for token 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9). Round 1 of the voting
+game has settled. V3c (updated contracts) is ready to deploy. All critical and
+high audit findings remain fixed as previously reported.
+
 Thank you,
 Jim Goetz
 Blockchain Entertainment LLC
@@ -52,4 +58,4 @@ jgoetz@functionised.com
 
 ---
 
-*Generated: 2026-05-21*
+*Generated: 2026-05-21. Reviewed 2026-06-01 — no stale facts; added distribution completion note.*
