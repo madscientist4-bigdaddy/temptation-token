@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Compile in Remix: Solidity 0.8.20, optimizer 200, via IR ENABLED
+// Compile in Remix: Solidity 0.8.20, optimizer 200, evmVersion paris — viaIR NOT required
 pragma solidity ^0.8.20;
-
-// contracts/TTSVotingV3c.sol
 
 // TTSVotingV3c — Upgraded from V3b
 //
@@ -451,16 +449,35 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         _distributePayouts(roundId, winnerId, winner);
     }
 
-    // Extracted from fulfillRandomWords to stay within Solidity's 16-slot stack limit.
+    // Settlement helpers — split into three private functions so the compiler
+    // stays within Solidity's 16-slot stack limit WITHOUT viaIR.
+    // Compile: Solidity 0.8.20, optimizer 200, evmVersion paris, viaIR=false.
+
     function _distributePayouts(uint256 roundId, string memory winnerId, Profile storage winner) private {
-        uint256 pool = winner.rawVotes;
+        uint256 pool         = winner.rawVotes;
+        address topVoterAddr = winner.topVoter != address(0) ? winner.topVoter : winner.wallet;
+        uint256 voteCount    = pool / 1e18;
+        _payShares(roundId, winnerId, winner.wallet, topVoterAddr, pool);
+        _mintNFTs(roundId, winnerId, winner.wallet, topVoterAddr, voteCount);
+        uint256 remaining = ttsToken.balanceOf(address(this));
+        if (remaining > 0) {
+            ttsToken.safeTransfer(0x000000000000000000000000000000000000dEaD, remaining);
+        }
+        emit RoundSettled(roundId, winnerId, winner.wallet, pool);
+    }
+
+    function _payShares(
+        uint256 roundId,
+        string memory winnerId,
+        address winnerWallet,
+        address topVoterAddr,
+        uint256 pool
+    ) private {
         uint256 profileShare = pool * 35 / 100;
         uint256 voterShare   = pool * 35 / 100;
         uint256 charityShare = pool * 10 / 100;
-
         string memory clubCode = profileClub[winnerId];
-        address clubWallet = bytes(clubCode).length > 0 ? clubWallets[clubCode] : address(0);
-
+        address clubWallet     = bytes(clubCode).length > 0 ? clubWallets[clubCode] : address(0);
         uint256 clubShare  = 0;
         uint256 houseShare;
         if (clubWallet != address(0)) {
@@ -469,33 +486,27 @@ contract TTSVotingV3c is Ownable, VRFConsumerBaseV2Plus {
         } else {
             houseShare = pool - profileShare - voterShare - charityShare;
         }
-
-        address topVoterAddr = winner.topVoter != address(0) ? winner.topVoter : winner.wallet;
-
-        ttsToken.safeTransfer(winner.wallet, profileShare);
+        ttsToken.safeTransfer(winnerWallet, profileShare);
         ttsToken.safeTransfer(topVoterAddr, voterShare);
         ttsToken.safeTransfer(charityWallet, charityShare);
         ttsToken.safeTransfer(houseWallet, houseShare);
-
         if (clubShare > 0) {
             ttsToken.safeTransfer(clubWallet, clubShare);
             emit ClubPayoutSent(roundId, clubCode, clubWallet, clubShare);
         }
+    }
 
-        // V3c: three NFT mints — winning profile, top voter, BE LLC archive (houseWallet)
-        if (nftContract != address(0)) {
-            uint256 voteCount = pool / 1e18;
-            try ITTSRoundNFT(nftContract).mint{gas: 200000}(winner.wallet, roundId, winnerId, voteCount) {} catch {}
-            try ITTSRoundNFT(nftContract).mint{gas: 200000}(topVoterAddr, roundId, winnerId, voteCount) {} catch {}
-            try ITTSRoundNFT(nftContract).mint{gas: 200000}(houseWallet, roundId, winnerId, voteCount) {} catch {}
-        }
-
-        uint256 remaining = ttsToken.balanceOf(address(this));
-        if (remaining > 0) {
-            ttsToken.safeTransfer(0x000000000000000000000000000000000000dEaD, remaining);
-        }
-
-        emit RoundSettled(roundId, winnerId, winner.wallet, pool);
+    function _mintNFTs(
+        uint256 roundId,
+        string memory winnerId,
+        address winnerWallet,
+        address topVoterAddr,
+        uint256 voteCount
+    ) private {
+        if (nftContract == address(0)) return;
+        try ITTSRoundNFT(nftContract).mint{gas: 200000}(winnerWallet,  roundId, winnerId, voteCount) {} catch {}
+        try ITTSRoundNFT(nftContract).mint{gas: 200000}(topVoterAddr,  roundId, winnerId, voteCount) {} catch {}
+        try ITTSRoundNFT(nftContract).mint{gas: 200000}(houseWallet,   roundId, winnerId, voteCount) {} catch {}
     }
 
     // -------------------------------------------------------------------------
