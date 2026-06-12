@@ -31,11 +31,14 @@ Could you please:
 I can provide proof of project ownership (BaseScan deployer TX, Gnosis Safe
 admin key, or any other verification you require).
 
-For additional context: the project has recently completed a public token
-distribution of 33B TTS across 6 on-chain transactions (verifiable on BaseScan
-for token 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9). Round 1 of the voting
-game has settled. V3c (updated contracts) is ready to deploy. All critical and
-high audit findings remain fixed as previously reported.
+For additional context since the audit was completed: a fully public token
+distribution of 33B TTS to labeled wallets was executed 2026-06-01 (6 TX hashes
+on BaseScan for 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9). Named recipients:
+TTS Treasury (28.99%), Founder (14.49%), Ecosystem/Chantea (8.70%),
+Development/Dr. Mike (7.25%), Team/Son (2.90%). UPGRADER_ROLE has been revoked
+from the deployer wallet via the Gnosis Safe (single-EOA upgrade risk resolved).
+Round 1 of the voting game has settled on-chain. V3c (updated voting contracts)
+is ready to deploy. All critical and high audit findings remain fixed.
 
 Thank you,
 Jim Goetz
@@ -58,4 +61,4 @@ jgoetz@functionised.com
 
 ---
 
-*Generated: 2026-05-21. Reviewed 2026-06-01 — no stale facts; added distribution completion note.*
+*Generated: 2026-05-21. Updated 2026-06-01 — distribution complete, wallets labeled, UPGRADER_ROLE revoked.*
