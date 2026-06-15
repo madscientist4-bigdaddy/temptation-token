@@ -17,7 +17,7 @@
  * are resolved from the project's existing node_modules.
  */
 
-import { createPublicClient, createWalletClient, http, encodeFunctionData, parseAbi, concat, pad, toHex } from '../node_modules/viem/_esm/index.js'
+import { createPublicClient, createWalletClient, http, parseAbi, pad } from '../node_modules/viem/_esm/index.js'
 import { privateKeyToAccount } from '../node_modules/viem/_esm/accounts/index.js'
 
 // ── Addresses ────────────────────────────────────────────────────────────────
@@ -25,8 +25,29 @@ import { privateKeyToAccount } from '../node_modules/viem/_esm/accounts/index.js
 const V3C_ADDR  = '0x916984DBaBFDF9B1c95b7507386330Bb37626112'
 const NFT_ADDR  = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2'
 const BANK_ADDR = '0xb1e991bf617459b58964eef7756b350e675c53b5'
-const RPC_URL   = 'https://mainnet.base.org'
+const RPC_URL   = process.env.BASE_RPC_URL || 'https://rpc.ankr.com/base'
 const CHAIN_ID  = 8453
+
+console.log(`  RPC: ${RPC_URL}`)
+
+// ── Retry helper: 6 attempts, exponential backoff from 1s, catches 429 ───────
+
+async function withRetry(fn, label) {
+  const MAX = 6
+  for (let i = 0; i < MAX; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      const is429 = e?.status === 429 || /429|rate.?limit|over_rate_limit/i.test(String(e))
+      if (!is429 || i === MAX - 1) throw e
+      const delay = 1000 * Math.pow(2, i)
+      console.warn(`  429 on ${label} — retry ${i + 1}/${MAX - 1} in ${delay}ms`)
+      await sleep(delay)
+    }
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 // ── ABIs ─────────────────────────────────────────────────────────────────────
 
@@ -64,18 +85,18 @@ const BASE = {
 const DRY_RUN = process.argv.includes('--dry-run')
 
 async function main() {
-  const publicClient = createPublicClient({ chain: BASE, transport: http(RPC_URL) })
+  const transport = http(RPC_URL, { retryCount: 3, retryDelay: 1000 })
+  const publicClient = createPublicClient({ chain: BASE, transport })
 
-  // ── Pre-flight read ───────────────────────────────────────────────────────
+  // ── Pre-flight reads (sequential with 250ms gap to avoid 429) ───────────
   console.log('\n══ PRE-FLIGHT READS ════════════════════════════════════════')
-  const [nftBefore, ownerBefore, admin, houseWallet, charityWallet, roundId] = await Promise.all([
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'nftContract' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'admin' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'houseWallet' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'charityWallet' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'currentRoundId' }),
-  ])
+  const read = (fn) => withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: fn }), fn)
+  const nftBefore    = await read('nftContract');    await sleep(250)
+  const ownerBefore  = await read('owner');          await sleep(250)
+  const admin        = await read('admin');          await sleep(250)
+  const houseWallet  = await read('houseWallet');    await sleep(250)
+  const charityWallet= await read('charityWallet');  await sleep(250)
+  const roundId      = await read('currentRoundId')
   console.log(`  V3c address:   ${V3C_ADDR}`)
   console.log(`  owner:         ${ownerBefore}`)
   console.log(`  admin:         ${admin}`)
@@ -114,22 +135,20 @@ async function main() {
   }
   console.log(`\n  Signer confirmed: ${account.address}`)
 
-  const walletClient = createWalletClient({ account, chain: BASE, transport: http(RPC_URL) })
+  const walletClient = createWalletClient({ account, chain: BASE, transport })
 
   // ── Step 1: setNFTContract ────────────────────────────────────────────────
   console.log('\n══ STEP 1: setNFTContract ══════════════════════════════════')
   if (nftBefore.toLowerCase() === NFT_ADDR.toLowerCase()) {
     console.log('  Already set — skipping')
   } else {
-    const tx1 = await walletClient.writeContract({
-      address: V3C_ADDR,
-      abi: V3C_ABI,
-      functionName: 'setNFTContract',
-      args: [NFT_ADDR],
-    })
+    const tx1 = await withRetry(() => walletClient.writeContract({
+      address: V3C_ADDR, abi: V3C_ABI, functionName: 'setNFTContract', args: [NFT_ADDR],
+    }), 'setNFTContract')
     console.log(`  TX: ${tx1}`)
     await publicClient.waitForTransactionReceipt({ hash: tx1 })
-    const nftAfter = await publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'nftContract' })
+    await sleep(500)
+    const nftAfter = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'nftContract' }), 'nftContract readback')
     if (nftAfter.toLowerCase() !== NFT_ADDR.toLowerCase()) {
       console.error(`  FAIL: nftContract reads ${nftAfter}`); process.exit(1)
     }
@@ -142,20 +161,21 @@ async function main() {
   const constructorArg = pad(V3C_ADDR.toLowerCase(), { size: 32 })
   const deployData = `${KEEPER_BYTECODE}${constructorArg.slice(2)}`
 
-  const tx2 = await walletClient.sendTransaction({ data: deployData, gas: 1_000_000n })
+  const tx2 = await withRetry(() => walletClient.sendTransaction({ data: deployData, gas: 1_000_000n }), 'deploy Keeper2V2')
   console.log(`  Deploy TX: ${tx2}`)
   const receipt2 = await publicClient.waitForTransactionReceipt({ hash: tx2 })
   const KEEPER_ADDR = receipt2.contractAddress
   if (!KEEPER_ADDR) { console.error('  FAIL: no contract address in receipt'); process.exit(1) }
   console.log(`  TTSKeeper2V2 deployed: ${KEEPER_ADDR}`)
 
-  // Verify
-  const vcAddr = await publicClient.readContract({
+  await sleep(500)
+  const vcAddr = await withRetry(() => publicClient.readContract({
     address: KEEPER_ADDR, abi: KEEPER_ABI, functionName: 'votingContract'
-  })
-  const keeperOwner = await publicClient.readContract({
+  }), 'votingContract readback')
+  await sleep(250)
+  const keeperOwner = await withRetry(() => publicClient.readContract({
     address: KEEPER_ADDR, abi: KEEPER_ABI, functionName: 'owner'
-  })
+  }), 'keeper owner readback')
   if (vcAddr.toLowerCase() !== V3C_ADDR.toLowerCase()) {
     console.error(`  FAIL: votingContract reads ${vcAddr}`); process.exit(1)
   }
@@ -164,36 +184,35 @@ async function main() {
 
   // ── Step 3: transferOwnership ─────────────────────────────────────────────
   console.log('\n══ STEP 3: V3c.transferOwnership ═══════════════════════════')
-  const currentOwner = await publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' })
+  await sleep(250)
+  const currentOwner = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' }), 'owner pre-check')
   if (currentOwner.toLowerCase() === KEEPER_ADDR.toLowerCase()) {
     console.log('  Already transferred — skipping')
   } else {
-    const tx3 = await walletClient.writeContract({
-      address: V3C_ADDR,
-      abi: V3C_ABI,
-      functionName: 'transferOwnership',
-      args: [KEEPER_ADDR],
-    })
+    const tx3 = await withRetry(() => walletClient.writeContract({
+      address: V3C_ADDR, abi: V3C_ABI, functionName: 'transferOwnership', args: [KEEPER_ADDR],
+    }), 'transferOwnership')
     console.log(`  TX: ${tx3}`)
     await publicClient.waitForTransactionReceipt({ hash: tx3 })
-    const newOwner = await publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' })
+    await sleep(500)
+    const newOwner = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' }), 'owner readback')
     if (newOwner.toLowerCase() !== KEEPER_ADDR.toLowerCase()) {
       console.error(`  FAIL: owner reads ${newOwner}`); process.exit(1)
     }
     console.log(`  ✓ V3c.owner() = ${newOwner}`)
   }
-  const adminAfter = await publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'admin' })
+  await sleep(250)
+  const adminAfter = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'admin' }), 'admin readback')
   console.log(`  ✓ V3c.admin() still = ${adminAfter} (Bank)`)
 
   // ── Final summary ─────────────────────────────────────────────────────────
   console.log('\n══ FINAL STATE ══════════════════════════════════════════════')
   console.log(`  TTSVotingV3c:    ${V3C_ADDR}`)
   console.log(`  TTSKeeper2V2:    ${KEEPER_ADDR}`)
-  const [nftFinal, ownerFinal, adminFinal] = await Promise.all([
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'nftContract' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' }),
-    publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'admin' }),
-  ])
+  await sleep(250)
+  const nftFinal   = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'nftContract' }), 'nftContract final'); await sleep(250)
+  const ownerFinal = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'owner' }), 'owner final');       await sleep(250)
+  const adminFinal = await withRetry(() => publicClient.readContract({ address: V3C_ADDR, abi: V3C_ABI, functionName: 'admin' }), 'admin final')
   console.log(`  V3c.nftContract: ${nftFinal}`)
   console.log(`  V3c.owner():     ${ownerFinal}`)
   console.log(`  V3c.admin():     ${adminFinal}`)
