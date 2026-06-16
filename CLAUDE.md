@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 15, 2026 — V3c + Keeper2V2 fully wired on-chain; owner() confirmed = Keeper2V2; Chainlink + Safe + frontend remaining.
+Last verified: June 15, 2026 — V3c fully wired: NFT set, Keeper2V2 deployed + owns V3c, VRF consumer added, setTaxExempt done. Remaining: Chainlink upkeep + frontend cutover.
 
 ## Operating Mode
 
@@ -119,19 +119,25 @@ Deployment audit executed 2026-06-12; wiring completed 2026-06-15 via `outputs/w
 - `keyHash`        = `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` ✓
 - `subscriptionId` = `58222014484560539249027457203866883376041731162442592604288474822166186263722` ✓
 - `stakingContract` = `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` ✓
-- `owner`          = `0x24107a47D24443D263bc4B06d11C61fCE98C3964` ✓ (Keeper2V2 — confirmed by Jim)
-- `admin`          = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank — unchanged)
+- `owner`          = `0x24107a47D24443D263bc4B06d11C61fCE98C3964` ✓ (Keeper2V2)
+- `admin`          = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
 - `nftContract`    = `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` ✓ (TTSRoundNFT)
-- `currentRoundId` = 0 ⚠️ (Round 2 not started — pending Chainlink + Safe steps below)
+- `isTaxExempt`    = `true` ✓ (Gnosis Safe batch 2026-06-15)
+- VRF consumer     = ✓ added 2026-06-15
+- `currentRoundId` = 0 ⚠️ (Round 2 not started — Chainlink upkeep pending)
 - Keeper2V2.`votingContract` = `0x916984DBaBFDF9B1c95b7507386330Bb37626112` ✓
 
-**REMAINING WIRING (Chainlink + Safe — NOT done by wire_v3c.mjs):**
-4. `Keeper2V2.setForwarder(<upkeep_forwarder>)` — after Chainlink upkeep registration
-5. Add V3c to VRF consumer list at vrf.chain.link/base
-6. Register Chainlink Custom Logic upkeep at automation.chain.link/base → note forwarder
-7. Gnosis Safe: `setTaxExempt(V3c, true)` — required before any votes settle
-8. Call `Keeper2V2.manualExecute(1)` to start Round 2
-9. `V3c.batchApproveProfiles(ids[], wallets[])` — approved profiles from Supabase
+**Additional TX hashes (2026-06-15):**
+| Step | TX Hash |
+|---|---|
+| VRF consumer add | `0x9a93bb973723c1925fc7830873303d1d38c070a2ec211ce97e381d41b572d856` |
+| Gnosis Safe batch (setTaxExempt V3c) | `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` |
+
+**REMAINING TO START ROUND 2:**
+1. **Chainlink** — cancel 4 old upkeeps (TTSKeeper2 era), register 1 new Custom Logic upkeep targeting `0x24107a47D24443D263bc4B06d11C61fCE98C3964`, then `Keeper2V2.setForwarder(<forwarder>)` from Bank wallet. See `outputs/chainlink_automation_runbook.md`.
+2. **Round start** — Chainlink automation will call `manualExecute(1)` on the first Monday 04:00 UTC tick. If missed, Bank wallet calls `Keeper2V2.manualExecute(1)` manually.
+3. **Frontend cutover** — replace V3b address with V3c in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`.
+4. **batchApproveProfiles** — after Round 2 starts, call with approved Supabase profiles.
 
 **DO NOT USE — ORPHANED DUPLICATE DEPLOYS (all from 2026-06-12, same constructor args, never wired):**
 | Orphan Address | Deploy TX |
@@ -595,20 +601,22 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 2c. ✅ **DONE — transferOwnership** — TX `0x8ea8d2fc58698e1f30ee0ba44cb5dfff14994d2bcb9ffcedd25e85e530a4cba9` (2026-06-15). `V3c.owner()` = Keeper2V2 confirmed by Jim.
 
-2d. **V3c wiring — step 4 (Bank wallet):** Register Chainlink Custom Logic upkeep at automation.chain.link/base, targeting `0x24107a47D24443D263bc4B06d11C61fCE98C3964`. Note the Forwarder address from the UI. Then call `Keeper2V2.setForwarder(FORWARDER_ADDRESS)` from Bank wallet.
+2d. ✅ **DONE — VRF consumer added** — TX `0x9a93bb973723c1925fc7830873303d1d38c070a2ec211ce97e381d41b572d856` (2026-06-15). V3c added to subscription `58222014...` at vrf.chain.link/base.
 
-2e. **V3c wiring — step 5 (VRF UI):** Add `0x916984DBaBFDF9B1c95b7507386330Bb37626112` as consumer at vrf.chain.link/base (subscription `58222014...`).
+2e. ✅ **DONE — setTaxExempt(V3c, true)** — Gnosis Safe 3-action batch TX `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` (2026-06-15). V3c settlement unblocked.
 
-3. **Update VOTING_ADDRESS in frontend** — replace `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` in:
+3. **🚨 NEXT — Chainlink upkeep (Bank wallet):** Cancel 4 old TTSKeeper2-era upkeeps, register 1 new Custom Logic upkeep targeting `0x24107a47D24443D263bc4B06d11C61fCE98C3964`, then call `Keeper2V2.setForwarder(<forwarder>)` from Bank wallet. Runbook: `outputs/chainlink_automation_runbook.md`.
+
+4. **Round 2 start** — automation fires `manualExecute(1)` on first Monday 04:00 UTC tick after Chainlink wired. If missed, Bank wallet calls `Keeper2V2.manualExecute(1)` directly.
+
+5. **Frontend cutover** — replace `0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6` (V3b) with `0x916984DBaBFDF9B1c95b7507386330Bb37626112` (V3c) in:
    - `src/App.jsx` (VOTING_ADDRESS constant)
    - `src/TTAdminDashboard.jsx` (V3_ADDRESS / VOTING_ADDRESS + screens config)
    - `api/approve-profile.js` (V3_ADDRESS constant)
 
-4. **Add V3c to tax-exempt batch and execute** — Gnosis Safe must call `setTaxExempt(0x916984DBaBFDF9B1c95b7507386330Bb37626112, true)`. REQUIRED before any votes can settle. Add to `outputs/gnosis_setTaxExempt_batch.json` (selector `0x1dc61040`). Execute (2/2 sign).
+6. **batchApproveProfiles on V3c** — after Round 2 starts. Pull wallet addresses from Supabase (`SELECT id::text, payout_wallet FROM submissions WHERE status = 'approved' ORDER BY approved_at`). Ensure payout wallets are real user wallets — not Bank/Deployer.
 
-5. **batchApproveProfiles on V3c** — call after Round 2 starts. Pull wallet addresses from Supabase (`SELECT id::text, payout_wallet FROM submissions WHERE status = 'approved' ORDER BY approved_at`). Ensure payout wallets are real user wallets — not Bank/Deployer.
-
-6. **Deploy TTSStakingV2** — fixes `getStakingTier()` interface mismatch and corrects Diamond/VIP multipliers. Bank wallet calls `upgradeTo(newImpl)` then `initializeV2(thresholds)` on staking proxy `0xaA12B889...`. No Gnosis Safe needed (BANK holds UPGRADER_ROLE solo). Diff report: `outputs/staking_v2_diff.md`. Current-price thresholds (at ~$0.014/TTS, ETH=$3k): Bronze 3,571 / Silver 7,143 / Gold 17,857 / Diamond 71,429 / VIP 357,143 TTS — recalculate at deploy time.
+7. **Deploy TTSStakingV2** — fixes `getStakingTier()` interface mismatch and corrects Diamond/VIP multipliers. Bank wallet calls `upgradeTo(newImpl)` then `initializeV2(thresholds)` on staking proxy `0xaA12B889...`. No Gnosis Safe needed (BANK holds UPGRADER_ROLE solo). Diff report: `outputs/staking_v2_diff.md`. Current-price thresholds (at ~$0.014/TTS, ETH=$3k): Bronze 3,571 / Silver 7,143 / Gold 17,857 / Diamond 71,429 / VIP 357,143 TTS — recalculate at deploy time.
 
 ### ⚠️ HIGH — Security scanner remediation
 
