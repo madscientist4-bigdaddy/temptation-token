@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 15, 2026 — V3c fully wired: NFT set, Keeper2V2 deployed + owns V3c, VRF consumer added, setTaxExempt done. Remaining: Chainlink upkeep + frontend cutover.
+Last verified: June 15, 2026 — Chainlink upkeep registered; setForwarder pending Bank wallet TX. Frontend cutover + batchApproveProfiles remain.
 
 ## Operating Mode
 
@@ -103,6 +103,8 @@ Deployment audit executed 2026-06-12; wiring completed 2026-06-15 via `outputs/w
 |---|---|---|---|
 | **TTSVotingV3c (CANONICAL)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** | `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc` | ✅ Deployed + wired |
 | **TTSKeeper2V2** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** | `0xbe3e00b4bf4eb30b6fa6017d6ebf87fae142aef63d649afa27a1667cf17b7747` | ✅ Deployed + owns V3c |
+| **Chainlink Forwarder** | **`0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71`** | — | ✅ Live contract (743 bytes) — setForwarder pending |
+| **Chainlink Upkeep ID** | `107234397534438678165344999422920520488294344698573062791612853656108534823641` | — | ✅ Registered |
 
 **Wiring TX hashes (all Bank wallet, 2026-06-15):**
 | Step | TX Hash |
@@ -124,18 +126,26 @@ Deployment audit executed 2026-06-12; wiring completed 2026-06-15 via `outputs/w
 - `nftContract`    = `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` ✓ (TTSRoundNFT)
 - `isTaxExempt`    = `true` ✓ (Gnosis Safe batch 2026-06-15)
 - VRF consumer     = ✓ added 2026-06-15
-- `currentRoundId` = 0 ⚠️ (Round 2 not started — Chainlink upkeep pending)
+- `currentRoundId` = 0 ⚠️ (Round 2 not started — awaiting first Chainlink tick after setForwarder)
 - Keeper2V2.`votingContract` = `0x916984DBaBFDF9B1c95b7507386330Bb37626112` ✓
+- Keeper2V2.`s_forwarder`   = ⚠️ pending — run `DEPLOYER_PRIVATE_KEY=0x<key> node outputs/set_forwarder.mjs`
+- Chainlink upkeep ID: `107234397534438678165344999422920520488294344698573062791612853656108534823641`
+- Chainlink forwarder: `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` (743 bytes — confirmed live)
 
 **Additional TX hashes (2026-06-15):**
 | Step | TX Hash |
 |---|---|
 | VRF consumer add | `0x9a93bb973723c1925fc7830873303d1d38c070a2ec211ce97e381d41b572d856` |
 | Gnosis Safe batch (setTaxExempt V3c) | `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` |
+| `setForwarder(0x68Ae2a7d...)` | ⚠️ PENDING — Bank wallet TX not yet sent |
 
 **REMAINING TO START ROUND 2:**
-1. **Chainlink** — cancel 4 old upkeeps (TTSKeeper2 era), register 1 new Custom Logic upkeep targeting `0x24107a47D24443D263bc4B06d11C61fCE98C3964`, then `Keeper2V2.setForwarder(<forwarder>)` from Bank wallet. See `outputs/chainlink_automation_runbook.md`.
-2. **Round start** — Chainlink automation will call `manualExecute(1)` on the first Monday 04:00 UTC tick. If missed, Bank wallet calls `Keeper2V2.manualExecute(1)` manually.
+1. **⚠️ setForwarder — Bank wallet TX required:**
+   ```
+   DEPLOYER_PRIVATE_KEY=0x<key> node outputs/set_forwarder.mjs
+   ```
+   Script calls `Keeper2V2.setForwarder(0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71)`, verifies readback, confirms forwarder bytecode > 0.
+2. **Round start** — after setForwarder, Chainlink will fire `checkUpkeep` → sees `currentRoundId==0` → calls `performUpkeep(ACTION_START_ROUND)` → `V3c.startRound(604740)`. If the next Monday 04:00 UTC tick is far, call `Keeper2V2.manualExecute(1)` from Bank wallet to start immediately.
 3. **Frontend cutover** — replace V3b address with V3c in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`.
 4. **batchApproveProfiles** — after Round 2 starts, call with approved Supabase profiles.
 
@@ -605,7 +615,9 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 2e. ✅ **DONE — setTaxExempt(V3c, true)** — Gnosis Safe 3-action batch TX `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` (2026-06-15). V3c settlement unblocked.
 
-3. **🚨 NEXT — Chainlink upkeep (Bank wallet):** Cancel 4 old TTSKeeper2-era upkeeps, register 1 new Custom Logic upkeep targeting `0x24107a47D24443D263bc4B06d11C61fCE98C3964`, then call `Keeper2V2.setForwarder(<forwarder>)` from Bank wallet. Runbook: `outputs/chainlink_automation_runbook.md`.
+3. ✅ **DONE — Chainlink upkeep registered** — Upkeep ID `107234397534438678165344999422920520488294344698573062791612853656108534823641`. Forwarder `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` (743 bytes, live on Base).
+
+3a. **⚠️ NEXT — setForwarder (Bank wallet):** `DEPLOYER_PRIVATE_KEY=0x<key> node outputs/set_forwarder.mjs` — sends `Keeper2V2.setForwarder(0x68Ae2a7d...)`, verifies readback.
 
 4. **Round 2 start** — automation fires `manualExecute(1)` on first Monday 04:00 UTC tick after Chainlink wired. If missed, Bank wallet calls `Keeper2V2.manualExecute(1)` directly.
 
