@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 12, 2026 — V3c deployment audit complete; canonical V3c address established; wiring pending Jim.
+Last verified: June 15, 2026 — V3c + Keeper2V2 fully wired on-chain; owner() confirmed = Keeper2V2; Chainlink + Safe + frontend remaining.
 
 ## Operating Mode
 
@@ -95,30 +95,37 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 ---
 
-### ⚠️ CANONICAL ADDRESSES (FINAL — June 12, 2026)
+### ✅ CANONICAL ADDRESSES (FINAL — June 15, 2026)
 
-Deployment audit executed 2026-06-12. Jim deployed TTSVotingV3c 6 times in rapid succession; all 6 have correct constructor values. **Canonical = most recent deploy.** No TTSKeeper2V2 has been deployed yet — pending Jim.
+Deployment audit executed 2026-06-12; wiring completed 2026-06-15 via `outputs/wire_v3c.mjs`. Jim deployed TTSVotingV3c 6 times; canonical = most recent. **All three wiring transactions confirmed on-chain.**
 
 | Contract | CANONICAL Address | Deploy TX | Status |
 |---|---|---|---|
-| **TTSVotingV3c (CANONICAL)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** | `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc` | ✅ Deployed — wiring incomplete (see below) |
-| **TTSKeeper2V2** | **NOT YET DEPLOYED** | — | ⚠️ Jim must deploy from Remix: `contracts/TTSKeeper2V2.sol`, constructor arg = V3c address above |
+| **TTSVotingV3c (CANONICAL)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** | `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc` | ✅ Deployed + wired |
+| **TTSKeeper2V2** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** | `0xbe3e00b4bf4eb30b6fa6017d6ebf87fae142aef63d649afa27a1667cf17b7747` | ✅ Deployed + owns V3c |
 
-**Verified on-chain (canonical V3c):**
-- `houseWallet`  = `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` ✓ (Marketing)
-- `charityWallet` = `0xf7dD429D679CB61231e73785fD1737E60138ABa3` ✓ (Polaris)
-- `ttsToken`     = `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` ✓
-- `keyHash`      = `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` ✓
+**Wiring TX hashes (all Bank wallet, 2026-06-15):**
+| Step | TX Hash |
+|---|---|
+| V3c deploy | `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc` |
+| `setNFTContract(0x0768e862...)` | `0xf06c9aa986ebfdf89afdefcdcb78007d574fcf5ec3583cff6090ec8da7d937c1` |
+| Deploy TTSKeeper2V2 | `0xbe3e00b4bf4eb30b6fa6017d6ebf87fae142aef63d649afa27a1667cf17b7747` |
+| `transferOwnership(Keeper2V2)` | `0x8ea8d2fc58698e1f30ee0ba44cb5dfff14994d2bcb9ffcedd25e85e530a4cba9` |
+
+**Verified on-chain (canonical V3c — post-wiring state):**
+- `houseWallet`    = `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` ✓ (Marketing)
+- `charityWallet`  = `0xf7dD429D679CB61231e73785fD1737E60138ABa3` ✓ (Polaris)
+- `ttsToken`       = `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` ✓
+- `keyHash`        = `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` ✓
 - `subscriptionId` = `58222014484560539249027457203866883376041731162442592604288474822166186263722` ✓
 - `stakingContract` = `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` ✓
-- `owner` = Bank wallet ✓ (not yet transferred to Keeper)
-- `nftContract` = `address(0)` ⚠️ (not set — step 1 below)
-- `currentRoundId` = 0 ⚠️ (no round started yet)
+- `owner`          = `0x24107a47D24443D263bc4B06d11C61fCE98C3964` ✓ (Keeper2V2 — confirmed by Jim)
+- `admin`          = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank — unchanged)
+- `nftContract`    = `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` ✓ (TTSRoundNFT)
+- `currentRoundId` = 0 ⚠️ (Round 2 not started — pending Chainlink + Safe steps below)
+- Keeper2V2.`votingContract` = `0x916984DBaBFDF9B1c95b7507386330Bb37626112` ✓
 
-**WIRING STILL REQUIRED (all Bank wallet txs — Jim executes):**
-1. `V3c.setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")` — admin call, Bank wallet
-2. Deploy `TTSKeeper2V2(0x916984DBaBFDF9B1c95b7507386330Bb37626112)` — Bank wallet deploys
-3. `V3c.transferOwnership(<keeper2v2_address>)` — owner call, Bank wallet
+**REMAINING WIRING (Chainlink + Safe — NOT done by wire_v3c.mjs):**
 4. `Keeper2V2.setForwarder(<upkeep_forwarder>)` — after Chainlink upkeep registration
 5. Add V3c to VRF consumer list at vrf.chain.link/base
 6. Register Chainlink Custom Logic upkeep at automation.chain.link/base → note forwarder
@@ -144,9 +151,9 @@ Deployment audit executed 2026-06-12. Jim deployed TTSVotingV3c 6 times in rapid
 | TTSVotingV2 (deprecated) | `0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA` |
 | TTSVotingV3 (deprecated) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
 | **TTSVotingV3b (ACTIVE — Round 1 settled, superseded by V3c)** | **`0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`** |
-| **TTSVotingV3c (CANONICAL — deployed 2026-06-12, wiring incomplete)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** |
+| **TTSVotingV3c (CANONICAL — deployed + wired 2026-06-15)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
-| **TTSKeeper2V2 (NOT YET DEPLOYED — pending Jim)** | `contracts/TTSKeeper2V2.sol` |
+| **TTSKeeper2V2 (DEPLOYED 2026-06-15 — owns V3c)** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
 | **TTSRoundNFT** | **`0x0768e862D3AB14d85213BfeF8f1D012E77721da2`** |
 | TTSStaking (proxy) | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` |
@@ -582,13 +589,13 @@ Fix if 401: regenerate API Key & Secret → update `X_API_KEY` + `X_API_SECRET` 
 
 2. **✅ DONE — V3c deployed** — canonical address `0x916984DBaBFDF9B1c95b7507386330Bb37626112` (TX `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc`, 2026-06-12). All constructor args verified correct. 5 orphaned duplicate deploys — DO NOT USE (see CANONICAL ADDRESSES block above). **Compile: Solidity 0.8.20, optimizer 200, evmVersion paris — viaIR NOT required** (use `outputs/v3c_flattened.sol`).
 
-2a. **V3c wiring — step 1 (Bank wallet, Remix / cast):** Call `setNFTContract("0x0768e862D3AB14d85213BfeF8f1D012E77721da2")` on `0x916984DBaBFDF9B1c95b7507386330Bb37626112`. `admin` = Bank wallet. This is an `onlyAdmin` call.
+2a. ✅ **DONE — setNFTContract** — TX `0xf06c9aa986ebfdf89afdefcdcb78007d574fcf5ec3583cff6090ec8da7d937c1` (2026-06-15). `nftContract` = `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` confirmed on-chain.
 
-2b. **V3c wiring — step 2 (Bank wallet, Remix):** Deploy `TTSKeeper2V2("0x916984DBaBFDF9B1c95b7507386330Bb37626112")` using `contracts/TTSKeeper2V2.sol` (solc 0.8.20, 200 runs, paris, viaIR=false). Note the deployed address as `KEEPER2V2_ADDRESS`. Update CLAUDE.md canonical addresses block.
+2b. ✅ **DONE — Deploy TTSKeeper2V2** — `0x24107a47D24443D263bc4B06d11C61fCE98C3964`, TX `0xbe3e00b4bf4eb30b6fa6017d6ebf87fae142aef63d649afa27a1667cf17b7747` (2026-06-15). `votingContract()` = V3c confirmed.
 
-2c. **V3c wiring — step 3 (Bank wallet, Remix / cast):** Call `transferOwnership(KEEPER2V2_ADDRESS)` on `0x916984...`. This is an `onlyOwner` call (owner = Bank). After this, only the Keeper can call `startRound`, `settleRound`, `rolloverRound`.
+2c. ✅ **DONE — transferOwnership** — TX `0x8ea8d2fc58698e1f30ee0ba44cb5dfff14994d2bcb9ffcedd25e85e530a4cba9` (2026-06-15). `V3c.owner()` = Keeper2V2 confirmed by Jim.
 
-2d. **V3c wiring — step 4 (Bank wallet):** Register Chainlink Custom Logic upkeep at automation.chain.link/base, targeting `KEEPER2V2_ADDRESS`. Note the Forwarder address from the UI. Then call `Keeper2V2.setForwarder(FORWARDER_ADDRESS)` from Bank wallet.
+2d. **V3c wiring — step 4 (Bank wallet):** Register Chainlink Custom Logic upkeep at automation.chain.link/base, targeting `0x24107a47D24443D263bc4B06d11C61fCE98C3964`. Note the Forwarder address from the UI. Then call `Keeper2V2.setForwarder(FORWARDER_ADDRESS)` from Bank wallet.
 
 2e. **V3c wiring — step 5 (VRF UI):** Add `0x916984DBaBFDF9B1c95b7507386330Bb37626112` as consumer at vrf.chain.link/base (subscription `58222014...`).
 
@@ -663,8 +670,8 @@ TTSVotingV3c: (DEPLOYED — do not redeploy; use 0x916984DBaBFDF9B1c95b750738633
   _charityWallet:   "0xf7dd429d679cb61231e73785fd1737e60138aba3"
   _houseWallet:     "0x7a9ff2f584248744cBbA32c737D660ED6f077fCB"  ← Marketing wallet (verified on-chain ✓)
 
-TTSKeeper2V2: (NOT YET DEPLOYED — Jim deploys next)
-  _votingContract:  "0x916984DBaBFDF9B1c95b7507386330Bb37626112"
+TTSKeeper2V2: (DEPLOYED 2026-06-15 — do not redeploy; use 0x24107a47D24443D263bc4B06d11C61fCE98C3964)
+  _votingContract:  "0x916984DBaBFDF9B1c95b7507386330Bb37626112"  ← confirmed on-chain
 
 Remix settings: Solidity 0.8.20 · optimizer ON (200 runs) · evmVersion paris · via IR OFF · Base mainnet (8453)
 Source: outputs/v3c_flattened.sol (V3c) and contracts/TTSKeeper2V2.sol (Keeper)
