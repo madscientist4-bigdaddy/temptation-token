@@ -18,3 +18,20 @@ solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
 via_ir = false
+
+# v3d profile: same scope as v3c but targets V3d + Keeper3 contracts/tests.
+[profile.v3d]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+solc = "0.8.20"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+evm_version = "paris"
+remappings = [
+  "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/"
+]
