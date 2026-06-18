@@ -154,7 +154,8 @@ Deployment audit executed 2026-06-12; wiring completed 2026-06-15 via `outputs/w
 - `contracts/TTSVotingV3d.sol` — V3c + one added function: `adminTransferOwnership(address to) external onlyAdmin`
 - `contracts/TTSKeeper3.sol` — Calendar-aware keeper; `s_nextSettleTarget` advances by `WEEK` (604800) after each round start
 - `test/TTSVotingV3d.t.sol` — 20/20 tests PASS (9 V3d + 11 Keeper3, including 5-week zero-drift assertion)
-- `outputs/v3d_flattened.sol` — Flattened for Remix/BaseScan verification
+- `outputs/v3d_flattened.sol` — TTSVotingV3d flattened for Remix/BaseScan verification
+- `outputs/keeper3_flattened.sol` — TTSKeeper3 flattened for Remix/BaseScan verification
 - `outputs/deploy_v3d.mjs` — Deploy script (Jim runs once with `DEPLOYER_PRIVATE_KEY=0x<key>`)
 
 **First settle target:** `1782709140` = Mon Jun 29, 2026 04:59:00 UTC = Sun Jun 28, 2026 23:59 EDT

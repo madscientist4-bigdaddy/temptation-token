@@ -27,3 +27,4 @@ dist-ssr
 # Foundry build artifacts
 out/
 cache/
+.env*.local
