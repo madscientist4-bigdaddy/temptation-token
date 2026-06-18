@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 17, 2026 — V3d + TTSKeeper3 built, tested (20/20 pass), deploy script ready. V3c/Keeper2V2 still running; V3d is calendar-pinned successor (not yet deployed).
+Last verified: June 17, 2026 — V3d + TTSKeeper3 DEPLOYED and fully wired on-chain. V3c/Keeper2V2 SUPERSEDED (still running live Round 1 — do not cancel upkeep until V3d cutover). V3d = 0x783b8cd80b586b723188c93ef94ee1beede617b4, Keeper3 = 0x363ce4960e3b459f5892587a37ae1ff2ed04442c.
 
 ## Operating Mode
 
@@ -95,106 +95,86 @@ The chatbot (`/api/chat.js`) uses `claude-haiku-4-5-20251001` with streaming dis
 
 ---
 
-### ✅ CANONICAL ADDRESSES (FINAL — June 15, 2026)
+### ✅ CANONICAL ADDRESSES — V3d ERA (June 17, 2026)
 
-Deployment audit executed 2026-06-12; wiring completed 2026-06-15 via `outputs/wire_v3c.mjs`. Jim deployed TTSVotingV3c 6 times; canonical = most recent. **All three wiring transactions confirmed on-chain.**
+V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDED** — keep running until V3d Chainlink cutover (do NOT cancel upkeep or stop V3c until then).
 
 | Contract | CANONICAL Address | Deploy TX | Status |
 |---|---|---|---|
-| **TTSVotingV3c (CANONICAL)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** | `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc` | ✅ Deployed + wired |
-| **TTSKeeper2V2** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** | `0xbe3e00b4bf4eb30b6fa6017d6ebf87fae142aef63d649afa27a1667cf17b7747` | ✅ Deployed + owns V3c |
-| **Chainlink Forwarder** | **`0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71`** | — | ✅ Live (743 bytes) — set on Keeper2V2 |
-| **Chainlink Upkeep ID** | `107234397534438678165344999422920520488294344698573062791612853656108534823641` | — | ✅ Registered + active |
+| **TTSVotingV3d (CANONICAL)** | **`0x783b8cd80b586b723188c93ef94ee1beede617b4`** | (2026-06-17) | ✅ Deployed + wired |
+| **TTSKeeper3** | **`0x363ce4960e3b459f5892587a37ae1ff2ed04442c`** | `0xfcc6119c...` | ✅ Deployed + owns V3d |
+| **TTSVotingV3c (SUPERSEDED)** | `0x916984DBaBFDF9B1c95b7507386330Bb37626112` | `0x551e6117...` | ⚠️ Still running live Round 1 — do NOT shut down yet |
+| **TTSKeeper2V2 (SUPERSEDED)** | `0x24107a47D24443D263bc4B06d11C61fCE98C3964` | `0xbe3e00b4...` | ⚠️ Still owns V3c / Chainlink upkeep active |
+| **Chainlink Forwarder (V3c upkeep)** | `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` | — | ⚠️ Set on Keeper2V2 — keep until V3d upkeep registered |
+| **Chainlink Upkeep ID (V3c)** | `107234397534438678165344999422920520488294344698573062791612853656108534823641` | — | ⚠️ Active — cancel only after V3d upkeep is live |
 
-**Wiring TX hashes (all Bank wallet, 2026-06-15):**
+**V3d wiring TX hashes (all Bank wallet, 2026-06-17):**
+| Step | TX Hash |
+|---|---|
+| V3d deploy + setNFTContract | (2026-06-17 session) |
+| Deploy TTSKeeper3 | `0xfcc6119c...` |
+| `adminTransferOwnership(Keeper3)` | `0x74a9d273...` |
+
+**Verified on-chain (V3d + Keeper3 — post-wiring state, 2026-06-17):**
+- V3d `houseWallet`    = `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` ✓ (Marketing)
+- V3d `charityWallet`  = `0xf7dD429D679CB61231e73785fD1737E60138ABa3` ✓ (Polaris)
+- V3d `nftContract`    = `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` ✓ (TTSRoundNFT)
+- V3d `owner`          = `0x363ce4960e3b459f5892587a37ae1ff2ed04442c` ✓ (Keeper3)
+- V3d `admin`          = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
+- Keeper3 `votingContract`      = `0x783b8cd80b586b723188c93ef94ee1beede617b4` ✓ (V3d)
+- Keeper3 `s_nextSettleTarget`  = `1782709140` ✓ (Mon Jun 29 2026 04:59:00 UTC = Sun Jun 28 23:59 EST)
+- Keeper3 `owner`               = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
+- Keeper3 `s_forwarder`         = `0x0000000000000000000000000000000000000000` ⚠️ (not yet set — pending Chainlink upkeep registration)
+
+**V3c wiring TX hashes (Bank wallet, 2026-06-15) — kept for audit trail:**
 | Step | TX Hash |
 |---|---|
 | V3c deploy | `0x551e6117ba57b6cca67735bce536ea9d508992d80e81b7ec84156eb8fd63c7dc` |
 | `setNFTContract(0x0768e862...)` | `0xf06c9aa986ebfdf89afdefcdcb78007d574fcf5ec3583cff6090ec8da7d937c1` |
 | Deploy TTSKeeper2V2 | `0xbe3e00b4bf4eb30b6fa6017d6ebf87fae142aef63d649afa27a1667cf17b7747` |
 | `transferOwnership(Keeper2V2)` | `0x8ea8d2fc58698e1f30ee0ba44cb5dfff14994d2bcb9ffcedd25e85e530a4cba9` |
-
-**Verified on-chain (canonical V3c — post-wiring state):**
-- `houseWallet`    = `0x7a9ff2f584248744cBbA32c737D660ED6f077fCB` ✓ (Marketing)
-- `charityWallet`  = `0xf7dD429D679CB61231e73785fD1737E60138ABa3` ✓ (Polaris)
-- `ttsToken`       = `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` ✓
-- `keyHash`        = `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` ✓
-- `subscriptionId` = `58222014484560539249027457203866883376041731162442592604288474822166186263722` ✓
-- `stakingContract` = `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` ✓
-- `owner`          = `0x24107a47D24443D263bc4B06d11C61fCE98C3964` ✓ (Keeper2V2)
-- `admin`          = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
-- `nftContract`    = `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` ✓ (TTSRoundNFT)
-- `isTaxExempt`    = `true` ✓ (Gnosis Safe batch 2026-06-15)
-- VRF consumer     = ✓ added 2026-06-15
-- `currentRoundId` = 0 ⚠️ (Round 2 not started — awaiting first Chainlink tick after setForwarder)
-- Keeper2V2.`votingContract` = `0x916984DBaBFDF9B1c95b7507386330Bb37626112` ✓
-- Keeper2V2.`s_forwarder`   = `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` ✓ (confirmed on-chain)
-- Chainlink upkeep ID: `107234397534438678165344999422920520488294344698573062791612853656108534823641` ✓
-- Chainlink forwarder: `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` (743 bytes — live on Base) ✓
-
-**Additional TX hashes (2026-06-15):**
-| Step | TX Hash |
-|---|---|
 | VRF consumer add | `0x9a93bb973723c1925fc7830873303d1d38c070a2ec211ce97e381d41b572d856` |
 | Gnosis Safe batch (setTaxExempt V3c) | `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` |
 | `setForwarder(0x68Ae2a7d...)` | `0x1041eee5ceda42d5e8a14b996e171318f47d6d88d72b895f56aaf4ca4823bde5` |
 
-**✅ CHAINLINK AUTOMATION COMPLETE. Remaining to start Round 2:**
-1. **Round start** — Chainlink polls `checkUpkeep` → sees `currentRoundId==0` → fires `performUpkeep(ACTION_START_ROUND)` → `V3c.startRound(604740)`. If no Chainlink tick before next Monday 04:00 UTC, call `Keeper2V2.manualExecute(1)` from Bank wallet.
-2. **Frontend cutover** — replace V3b address with V3c in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`.
-3. **batchApproveProfiles** — after Round 2 starts, call with approved Supabase profiles.
+**✅ V3d WIRING COMPLETE. Remaining steps before V3d goes live:**
+1. **Add V3d as VRF consumer** — at vrf.chain.link/base, Sub ID `58222014484560539249027457203866883376041731162442592604288474822166186263722`
+2. **Gnosis Safe: `setTaxExempt(0x783b8cd8..., true)`** — required before first V3d settlement
+3. **Register new Chainlink Custom Logic upkeep** — target: Keeper3 `0x363ce496...`, 10 LINK, 500000 gas limit
+4. **`Keeper3.setForwarder(<new_forwarder>)`** — Bank wallet, after upkeep registration
+5. **Cancel old Chainlink upkeep** `107234397534438678...` (V3c) — only AFTER V3d upkeep is confirmed live
+6. **Frontend cutover** — replace V3b/V3c address with V3d in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`
+7. **`batchApproveProfiles`** on V3d after first round starts
 
 ---
 
-### 🗓 TTSVotingV3d + TTSKeeper3 — Calendar-Pinned Round System (BUILT — not yet deployed)
+### ✅ TTSVotingV3d + TTSKeeper3 — Calendar-Pinned Round System (DEPLOYED 2026-06-17)
+
+**Addresses:**
+- **TTSVotingV3d:** `0x783b8cd80b586b723188c93ef94ee1beede617b4`
+- **TTSKeeper3:** `0x363ce4960e3b459f5892587a37ae1ff2ed04442c`
 
 **Purpose:** Zero-drift calendar-pinned rounds. Each round ends exactly on Monday 04:59:00 UTC (= Sunday 23:59 EST, UTC-5 fixed, no DST). `s_nextSettleTarget` in Keeper3 holds the next calendar anchor; `endTime = s_nextSettleTarget` at start time, never `block.timestamp + duration`.
 
 **Source files:**
-- `contracts/TTSVotingV3d.sol` — V3c + one added function: `adminTransferOwnership(address to) external onlyAdmin`
+- `contracts/TTSVotingV3d.sol` — V3c + `adminTransferOwnership(address to) external onlyAdmin`
 - `contracts/TTSKeeper3.sol` — Calendar-aware keeper; `s_nextSettleTarget` advances by `WEEK` (604800) after each round start
 - `test/TTSVotingV3d.t.sol` — 20/20 tests PASS (9 V3d + 11 Keeper3, including 5-week zero-drift assertion)
 - `outputs/v3d_flattened.sol` — TTSVotingV3d flattened for Remix/BaseScan verification
 - `outputs/keeper3_flattened.sol` — TTSKeeper3 flattened for Remix/BaseScan verification
-- `outputs/deploy_v3d.mjs` — Deploy script (Jim runs once with `DEPLOYER_PRIVATE_KEY=0x<key>`)
+- `outputs/deploy_v3d.mjs` — Full deploy script (already ran; kept for reference)
+- `outputs/finish_v3d_wiring.mjs` — Steps 3-4 resume script (already ran; kept for reference)
 
-**First settle target:** `1782709140` = Mon Jun 29, 2026 04:59:00 UTC = Sun Jun 28, 2026 23:59 EDT
+**First settle target:** `1782709140` = Mon Jun 29, 2026 04:59:00 UTC = Sun Jun 28, 2026 23:59 EST
 
-**V3c/Keeper2V2 cutover plan:**
-- Keep V3c + Keeper2V2 + Chainlink upkeep running until current round settles
-- Deploy V3d via `outputs/deploy_v3d.mjs` (Bank wallet signs)
-- Cancel old Chainlink upkeep → register new Custom Logic upkeep targeting Keeper3 with 10 LINK
-- Call `Keeper3.setForwarder(<new_forwarder>)` after upkeep registration
-- Gnosis Safe: `setTaxExempt(V3d_addr, true)` — required before first settlement
-- Update `VOTING_ADDRESS` in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`
-- Add V3d as VRF consumer at vrf.chain.link/base (Sub ID 58222014484560539249027457203866883376041731162442592604288474822166186263722)
+**Remix settings for BaseScan verification:** Solidity 0.8.20 · optimizer ON (200 runs) · via IR ✗ (false) · evmVersion paris · Base mainnet (8453)
 
-**Constructor args for V3d (same as V3c):**
-```
-TTSVotingV3d:
-  _ttsToken:        "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9"
-  vrfCoordinator_:  "0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634"
-  _keyHash:         "0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70"
-  _subscriptionId:  58222014484560539249027457203866883376041731162442592604288474822166186263722
-  _stakingContract: "0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc"
-  _charityWallet:   "0xf7dd429d679cb61231e73785fd1737e60138aba3"
-  _houseWallet:     "0x7a9ff2f584248744cBbA32c737D660ED6f077fCB"  ← Marketing wallet
+**DO NOT USE — DEAD ADDRESSES (reverted TX — no bytecode ever deployed):**
+| Dead Address | Reason | Reverted TX |
+|---|---|---|
+| `0xc447b6263b9344d6ef05eddb3a6ff65c70030c0b` | Keeper3 deploy reverted (corrupted initcode) | `0x0ce8cbb63b9244be366d1bc50a18e06fd56442d97dfa44969c0b8296debc0b58` |
 
-TTSKeeper3:
-  _votingContract:  <V3d address — filled after deploy>
-  _nextSettleTarget: 1782709140  (Mon Jun 29 2026 04:59:00 UTC)
-
-Remix settings: Solidity 0.8.20 · optimizer ON (200 runs) · via IR ✗ (false) · evmVersion paris · Base mainnet (8453)
-```
-
-**Run command:**
-```bash
-DEPLOYER_PRIVATE_KEY=0x<bank_key> node outputs/deploy_v3d.mjs
-# Dry-run (no txs):
-node outputs/deploy_v3d.mjs --dry-run
-```
-
-**DO NOT USE — ORPHANED DUPLICATE DEPLOYS (all from 2026-06-12, same constructor args, never wired):**
+**DO NOT USE — ORPHANED V3d DUPLICATE DEPLOYS (all from 2026-06-12, same constructor args, never wired):**
 | Orphan Address | Deploy TX |
 |---|---|
 | `0xCf0BbC27D2639Ce332D6910dd1004fe4Df773756` | `0x21cbf60a69ba4b73517ab493698a48b53bbc742dbe92300dfce68c9c52a31aec` |
@@ -212,11 +192,11 @@ node outputs/deploy_v3d.mjs --dry-run
 | TTSVotingV2 (deprecated) | `0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA` |
 | TTSVotingV3 (deprecated) | `0x49385909a23C97142c600f8d28D11Ba63410b65C` |
 | **TTSVotingV3b (ACTIVE — Round 1 settled, superseded by V3c)** | **`0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6`** |
-| **TTSVotingV3c (CANONICAL — deployed + wired 2026-06-15, being superseded by V3d)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** |
-| **TTSVotingV3d (COMPILED — calendar-pinned successor to V3c, not yet deployed)** | `contracts/TTSVotingV3d.sol` |
+| **TTSVotingV3c (SUPERSEDED — deployed 2026-06-15, still running live Round 1)** | **`0x916984DBaBFDF9B1c95b7507386330Bb37626112`** |
+| **TTSVotingV3d (CANONICAL — deployed + wired 2026-06-17, calendar-pinned)** | **`0x783b8cd80b586b723188c93ef94ee1beede617b4`** |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
-| **TTSKeeper2V2 (DEPLOYED 2026-06-15 — owns V3c, keep running until V3d cutover)** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** |
-| **TTSKeeper3 (COMPILED — calendar-aware keeper for V3d, not yet deployed)** | `contracts/TTSKeeper3.sol` |
+| **TTSKeeper2V2 (SUPERSEDED — deployed 2026-06-15, still owns V3c, keep running)** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** |
+| **TTSKeeper3 (DEPLOYED 2026-06-17 — owns V3d, awaiting Chainlink upkeep registration)** | **`0x363ce4960e3b459f5892587a37ae1ff2ed04442c`** |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
 | **TTSRoundNFT** | **`0x0768e862D3AB14d85213BfeF8f1D012E77721da2`** |
 | TTSStaking (proxy) | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` |
