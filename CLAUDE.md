@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 17, 2026 — V3d + TTSKeeper3 DEPLOYED and fully wired on-chain. V3c/Keeper2V2 SUPERSEDED (still running live Round 1 — do not cancel upkeep until V3d cutover). V3d = 0x783b8cd80b586b723188c93ef94ee1beede617b4, Keeper3 = 0x363ce4960e3b459f5892587a37ae1ff2ed04442c.
+Last verified: June 19, 2026 — V3d + TTSKeeper3 DEPLOYED and fully wired. Keeper3 Chainlink upkeep REGISTERED 2026-06-18 (ID: 113446314522587151772280129999432062856069985411437977877707978564657748455208, TX: 0x1183793582033432a03d1aae93ee96e1b83db6941953085de8275da6c3c8caa3, 10 LINK). Forwarder pending DON assignment — check getForwarder, then Bank calls setForwarder. V3c/Keeper2V2 still running live Round 1 — do NOT cancel until V3d upkeep confirmed live.
 
 ## Operating Mode
 
@@ -105,8 +105,9 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 | **TTSKeeper3** | **`0x363ce4960e3b459f5892587a37ae1ff2ed04442c`** | `0xfcc6119c...` | ✅ Deployed + owns V3d |
 | **TTSVotingV3c (SUPERSEDED)** | `0x916984DBaBFDF9B1c95b7507386330Bb37626112` | `0x551e6117...` | ⚠️ Still running live Round 1 — do NOT shut down yet |
 | **TTSKeeper2V2 (SUPERSEDED)** | `0x24107a47D24443D263bc4B06d11C61fCE98C3964` | `0xbe3e00b4...` | ⚠️ Still owns V3c / Chainlink upkeep active |
-| **Chainlink Forwarder (V3c upkeep)** | `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` | — | ⚠️ Set on Keeper2V2 — keep until V3d upkeep registered |
-| **Chainlink Upkeep ID (V3c)** | `107234397534438678165344999422920520488294344698573062791612853656108534823641` | — | ⚠️ Active — cancel only after V3d upkeep is live |
+| **Chainlink Forwarder (V3c upkeep)** | `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` | — | ⚠️ Set on Keeper2V2 — keep until V3d upkeep live |
+| **Chainlink Upkeep ID (V3c)** | `107234397534438678165344999422920520488294344698573062791612853656108534823641` | — | ⚠️ Active — cancel only after V3d upkeep confirmed live |
+| **Chainlink Upkeep ID (Keeper3 / V3d)** | `113446314522587151772280129999432062856069985411437977877707978564657748455208` | `0x1183793...` | ✅ Registered 2026-06-18, 10 LINK, forwarder pending DON assignment |
 
 **V3d wiring TX hashes (all Bank wallet, 2026-06-17):**
 | Step | TX Hash |
@@ -124,7 +125,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 - Keeper3 `votingContract`      = `0x783b8cd80b586b723188c93ef94ee1beede617b4` ✓ (V3d)
 - Keeper3 `s_nextSettleTarget`  = `1782709140` ✓ (Mon Jun 29 2026 04:59:00 UTC = Sun Jun 28 23:59 EST)
 - Keeper3 `owner`               = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
-- Keeper3 `s_forwarder`         = `0x0000000000000000000000000000000000000000` ⚠️ (not yet set — pending Chainlink upkeep registration)
+- Keeper3 `s_forwarder`         = `0x0000000000000000000000000000000000000000` ⚠️ (not yet set — upkeep registered 2026-06-18, forwarder pending DON assignment; Bank must call `setForwarder` once assigned)
 
 **V3c wiring TX hashes (Bank wallet, 2026-06-15) — kept for audit trail:**
 | Step | TX Hash |
@@ -137,12 +138,15 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 | Gnosis Safe batch (setTaxExempt V3c) | `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` |
 | `setForwarder(0x68Ae2a7d...)` | `0x1041eee5ceda42d5e8a14b996e171318f47d6d88d72b895f56aaf4ca4823bde5` |
 
-**✅ V3d WIRING COMPLETE. Remaining steps before V3d goes live:**
+**V3d WIRING + UPKEEP STATUS (as of 2026-06-18/19):**
+- ✅ Step 3 DONE — Keeper3 upkeep registered 2026-06-18. ID: `113446314522587151772280129999432062856069985411437977877707978564657748455208`. TX: `0x1183793582033432a03d1aae93ee96e1b83db6941953085de8275da6c3c8caa3`. Balance: 10 LINK. Admin: Bank. Target: Keeper3. Active ✓.
+
+**Remaining steps before V3d goes live:**
 1. **Add V3d as VRF consumer** — at vrf.chain.link/base, Sub ID `58222014484560539249027457203866883376041731162442592604288474822166186263722`
 2. **Gnosis Safe: `setTaxExempt(0x783b8cd8..., true)`** — required before first V3d settlement
-3. **Register new Chainlink Custom Logic upkeep** — target: Keeper3 `0x363ce496...`, 10 LINK, 500000 gas limit
-4. **`Keeper3.setForwarder(<new_forwarder>)`** — Bank wallet, after upkeep registration
-5. **Cancel old Chainlink upkeep** `107234397534438678...` (V3c) — only AFTER V3d upkeep is confirmed live
+3. ✅ DONE — Upkeep registered (see above)
+4. **`Keeper3.setForwarder(<forwarder>)`** — Bank wallet. First: `Registry.getForwarder(113446314522587151772280129999432062856069985411437977877707978564657748455208)` via selector `0xb657bc9c` on `0xf4bab6a129164aba9b113cb96ba4266df49f8743`. When non-zero address with bytecode appears, Bank calls `setForwarder`. Script: `outputs/register_keeper3_upkeep.mjs` (set-forwarder-only path — rerun after forwarder assigned).
+5. **Cancel old Chainlink upkeep** `107234397534438678...` (V3c) — only AFTER V3d upkeep confirmed live + forwarder set
 6. **Frontend cutover** — replace V3b/V3c address with V3d in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`
 7. **`batchApproveProfiles`** on V3d after first round starts
 
@@ -196,7 +200,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 | **TTSVotingV3d (CANONICAL — deployed + wired 2026-06-17, calendar-pinned)** | **`0x783b8cd80b586b723188c93ef94ee1beede617b4`** |
 | TTSKeeper2 | `0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48` |
 | **TTSKeeper2V2 (SUPERSEDED — deployed 2026-06-15, still owns V3c, keep running)** | **`0x24107a47D24443D263bc4B06d11C61fCE98C3964`** |
-| **TTSKeeper3 (DEPLOYED 2026-06-17 — owns V3d, awaiting Chainlink upkeep registration)** | **`0x363ce4960e3b459f5892587a37ae1ff2ed04442c`** |
+| **TTSKeeper3 (DEPLOYED 2026-06-17 — owns V3d, upkeep registered 2026-06-18, forwarder pending)** | **`0x363ce4960e3b459f5892587a37ae1ff2ed04442c`** |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` |
 | **TTSRoundNFT** | **`0x0768e862D3AB14d85213BfeF8f1D012E77721da2`** |
 | TTSStaking (proxy) | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` |
