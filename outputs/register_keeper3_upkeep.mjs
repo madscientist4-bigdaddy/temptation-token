@@ -2,25 +2,31 @@
 /**
  * outputs/register_keeper3_upkeep.mjs
  *
- * Registers TTSKeeper3 as a new Classic v2.3 Custom Logic upkeep on Base mainnet,
- * then calls Keeper3.setForwarder(<new_forwarder>).
+ * Registers TTSKeeper3 as a new Classic v2.3 Custom Logic upkeep on Base mainnet.
+ *
+ * CALLING CONVENTION (v2.3):
+ *   LINK.transferAndCall(registrar, amount, abi.encode(RegistrationParams))
+ *   — NOT approve + registerUpkeep. Direct registerUpkeep does not work on v2.3.
+ *
+ * v2.3 RegistrationParams struct (decoded from actual Keeper2V2 registration TX):
+ *   { upkeepContract, amount, adminAddress, gasLimit, triggerType, billingToken,
+ *     name, encryptedEmail, checkData, triggerConfig, offchainConfig }
+ *   billingToken = LINK token address (NEW v2.3 field absent from old docs)
  *
  * Prerequisites:
- *   - Bank wallet must hold >= 10 LINK (classic upkeeps don't allow partial withdrawal
- *     from the Keeper2V2 upkeep — you must fund Bank from an external source)
- *   - Do NOT cancel the Keeper2V2 upkeep before running this — V3c Round 1 still live
+ *   - Bank wallet must hold >= 10 LINK (currently 10.87 LINK — sufficient)
+ *   - Do NOT cancel Keeper2V2 upkeep — V3c Round 1 still running (~Jun 23 settle)
  *
  * Run:
  *   BASE_RPC_URL=https://... DEPLOYER_PRIVATE_KEY=0x<bank_key> node outputs/register_keeper3_upkeep.mjs
  *
  * Exit codes:
  *   0 = success
- *   1 = hard error (bad state, tx reverted unexpectedly)
- *   2 = registration blocked by on-chain guard (pivot to CRE)
- *   3 = registerUpkeep tx reverted (pivot to CRE)
+ *   1 = hard error (wrong signer, insufficient LINK, bad Keeper3 state, tx reverted)
+ *   2 = transferAndCall simulation reverted (registration blocked — investigate or pivot to CRE)
  */
 
-import { createPublicClient, createWalletClient, http, parseAbi, formatEther } from '../node_modules/viem/_esm/index.js'
+import { createPublicClient, createWalletClient, http, parseAbi, formatEther, encodeAbiParameters } from '../node_modules/viem/_esm/index.js'
 import { privateKeyToAccount } from '../node_modules/viem/_esm/accounts/index.js'
 
 // ── Addresses ─────────────────────────────────────────────────────────────────
@@ -32,41 +38,15 @@ const KEEPER3    = '0x363ce4960e3b459f5892587a37ae1ff2ed04442c'
 const V3D        = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const BANK       = '0xb1e991bf617459b58964eef7756b350e675c53b5'
 
-const LINK_AMOUNT = 10n * 10n ** 18n   // 10 LINK in wei (uint96 fits)
+const LINK_AMOUNT = 10n * 10n ** 18n  // 10 LINK
 
 // ── ABIs ──────────────────────────────────────────────────────────────────────
 
+// LINK token is ERC677 — transferAndCall transfers tokens AND calls onTokenTransfer on recipient
 const LINK_ABI = parseAbi([
   'function balanceOf(address account) view returns (uint256)',
-  'function approve(address spender, uint256 amount) returns (bool)',
-  'function allowance(address owner, address spender) view returns (uint256)',
+  'function transferAndCall(address to, uint256 value, bytes calldata data) returns (bool)',
 ])
-
-// Full JSON ABI for registerUpkeep — parseAbi doesn't handle nested tuple structs cleanly
-const REGISTRAR_ABI = [
-  {
-    name: 'registerUpkeep',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{
-      name: 'requestParams',
-      type: 'tuple',
-      components: [
-        { name: 'name',           type: 'string'  },
-        { name: 'encryptedEmail', type: 'bytes'   },
-        { name: 'upkeepContract', type: 'address' },
-        { name: 'gasLimit',       type: 'uint32'  },
-        { name: 'adminAddress',   type: 'address' },
-        { name: 'triggerType',    type: 'uint8'   },
-        { name: 'checkData',      type: 'bytes'   },
-        { name: 'triggerConfig',  type: 'bytes'   },
-        { name: 'offchainConfig', type: 'bytes'   },
-        { name: 'amount',         type: 'uint96'  },
-      ],
-    }],
-    outputs: [{ name: 'id', type: 'uint256' }],
-  },
-]
 
 const REGISTRY_ABI = parseAbi([
   'function getForwarder(uint256 upkeepID) view returns (address forwarder)',
@@ -78,6 +58,25 @@ const KEEPER3_ABI = parseAbi([
   'function s_forwarder() view returns (address)',
   'function setForwarder(address _forwarder)',
 ])
+
+// v2.3 RegistrationParams — field order confirmed by decoding actual Keeper2V2 registration TX
+// billingToken is a new field absent from old docs
+const PARAMS_ABI = [{
+  type: 'tuple',
+  components: [
+    { name: 'upkeepContract',  type: 'address' },
+    { name: 'amount',          type: 'uint96'  },
+    { name: 'adminAddress',    type: 'address' },
+    { name: 'gasLimit',        type: 'uint32'  },
+    { name: 'triggerType',     type: 'uint8'   },
+    { name: 'billingToken',    type: 'address' },
+    { name: 'name',            type: 'string'  },
+    { name: 'encryptedEmail',  type: 'bytes'   },
+    { name: 'checkData',       type: 'bytes'   },
+    { name: 'triggerConfig',   type: 'bytes'   },
+    { name: 'offchainConfig',  type: 'bytes'   },
+  ],
+}]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -126,162 +125,120 @@ async function main() {
   console.log('\n══ STEP 1: PRE-FLIGHT ═══════════════════════════════════════════')
 
   if (!eq(account.address, BANK)) {
-    console.error(`ABORT: key maps to ${account.address}, expected Bank ${BANK}`)
-    process.exit(1)
+    console.error(`ABORT: key maps to ${account.address}, expected Bank ${BANK}`); process.exit(1)
   }
   console.log(`  ✓ Signer: ${account.address} (Bank)`)
 
-  // LINK balance
   const linkBal = await withRetry(
     () => publicClient.readContract({ address: LINK_ADDR, abi: LINK_ABI, functionName: 'balanceOf', args: [BANK] }),
     'LINK balance'
   )
-  console.log(`  Bank LINK balance: ${fmt(linkBal)}`)
+  console.log(`  Bank LINK: ${fmt(linkBal)}`)
   if (linkBal < LINK_AMOUNT) {
-    console.error(`\n🚨 INSUFFICIENT LINK`)
-    console.error(`   Bank has ${fmt(linkBal)}, need 10 LINK.`)
-    console.error(`   Classic upkeeps do NOT support partial withdrawal from the Keeper2V2 upkeep.`)
-    console.error(`   You must send 10 LINK to Bank (${BANK}) from an exchange or external source.`)
+    console.error(`\n🚨 INSUFFICIENT LINK: Bank has ${fmt(linkBal)}, need 10 LINK.`)
     process.exit(1)
   }
-  console.log(`  ✓ Bank LINK sufficient`)
+  console.log(`  ✓ Sufficient LINK`)
 
-  // Keeper3 wiring
   const [k3Voting, k3Owner] = await Promise.all([
     withRetry(() => publicClient.readContract({ address: KEEPER3, abi: KEEPER3_ABI, functionName: 'votingContract' }), 'Keeper3.votingContract'),
     withRetry(() => publicClient.readContract({ address: KEEPER3, abi: KEEPER3_ABI, functionName: 'owner' }),          'Keeper3.owner'),
   ])
-  console.log(`  Keeper3.votingContract(): ${k3Voting}`)
-  console.log(`  Keeper3.owner():          ${k3Owner}`)
+  if (!eq(k3Voting, V3D))  { console.error(`ABORT: Keeper3.votingContract() = ${k3Voting}`); process.exit(1) }
+  if (!eq(k3Owner, BANK))  { console.error(`ABORT: Keeper3.owner() = ${k3Owner}`); process.exit(1) }
+  console.log(`  ✓ Keeper3.votingContract() = V3d`)
+  console.log(`  ✓ Keeper3.owner() = Bank`)
 
-  if (!eq(k3Voting, V3D)) {
-    console.error(`ABORT: Keeper3.votingContract() = ${k3Voting}, expected V3d ${V3D}`); process.exit(1)
-  }
-  if (!eq(k3Owner, BANK)) {
-    console.error(`ABORT: Keeper3.owner() = ${k3Owner}, expected Bank ${BANK}`); process.exit(1)
-  }
-  console.log(`  ✓ Keeper3 wiring verified (votingContract=V3d, owner=Bank)`)
-
-  // ── STEP 2: LINK.approve(registrar, 10 LINK) ─────────────────────────────
-  console.log('\n══ STEP 2: LINK.approve(registrar, 10 LINK) ════════════════════')
-
-  const allowanceBefore = await withRetry(
-    () => publicClient.readContract({ address: LINK_ADDR, abi: LINK_ABI, functionName: 'allowance', args: [BANK, REGISTRAR] }),
-    'allowance'
-  )
-  console.log(`  Current allowance: ${fmt(allowanceBefore)}`)
-
-  if (allowanceBefore >= LINK_AMOUNT) {
-    console.log(`  Allowance already sufficient — skipping approve tx`)
-  } else {
-    const approveTx = await withRetry(
-      () => walletClient.writeContract({ address: LINK_ADDR, abi: LINK_ABI, functionName: 'approve', args: [REGISTRAR, LINK_AMOUNT] }),
-      'approve'
-    )
-    console.log(`  TX: ${approveTx}`)
-    txHashes.approve = approveTx
-    const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTx, timeout: 60_000 })
-    if (approveReceipt.status !== 'success') {
-      console.error('ABORT: approve TX reverted'); process.exit(1)
-    }
-    console.log(`  Confirmed block: ${approveReceipt.blockNumber}`)
-  }
-
-  console.log('  Waiting 5s for RPC sync...')
-  await sleep(5000)
-
-  const allowanceAfter = await withRetry(
-    () => publicClient.readContract({ address: LINK_ADDR, abi: LINK_ABI, functionName: 'allowance', args: [BANK, REGISTRAR] }),
-    'verify allowance'
-  )
-  if (allowanceAfter < LINK_AMOUNT) {
-    console.error(`ABORT: allowance still insufficient after approve: ${fmt(allowanceAfter)}`); process.exit(1)
-  }
-  console.log(`  ✓ Allowance verified: ${fmt(allowanceAfter)}`)
-
-  // ── STEP 3: registerUpkeep ────────────────────────────────────────────────
-  console.log('\n══ STEP 3: registerUpkeep on v2.3 registrar ════════════════════')
-  console.log(`  upkeepContract: ${KEEPER3}`)
-  console.log(`  gasLimit:       500000`)
-  console.log(`  triggerType:    0 (custom logic)`)
-  console.log(`  amount:         10 LINK`)
+  // ── STEP 2: Encode RegistrationParams ────────────────────────────────────
+  console.log('\n══ STEP 2: Encode v2.3 RegistrationParams ══════════════════════')
 
   const regParams = {
-    name:           'TTS Game Keeper V3',
-    encryptedEmail: '0x',
-    upkeepContract: KEEPER3,
-    gasLimit:       500000,
-    adminAddress:   BANK,
-    triggerType:    0,
-    checkData:      '0x',
-    triggerConfig:  '0x',
-    offchainConfig: '0x',
-    amount:         LINK_AMOUNT,
+    upkeepContract:  KEEPER3,
+    amount:          LINK_AMOUNT,
+    adminAddress:    BANK,
+    gasLimit:        500000,
+    triggerType:     0,          // 0 = custom logic (checkUpkeep)
+    billingToken:    LINK_ADDR,  // v2.3 required field — LINK token address
+    name:            'TTS Game Keeper V3',
+    encryptedEmail:  '0x',
+    checkData:       '0x',
+    triggerConfig:   '0x',
+    offchainConfig:  '0x',
   }
 
-  // Simulate first — catches registration guard / paused errors before spending gas
-  console.log('  Simulating registerUpkeep...')
-  let simulatedId
+  // abi.encode(RegistrationParams) — the data payload for transferAndCall
+  const encodedParams = encodeAbiParameters(PARAMS_ABI, [regParams])
+  console.log(`  Encoded params: ${encodedParams.length / 2 - 1} bytes`)
+  console.log(`  upkeepContract:  ${regParams.upkeepContract} (Keeper3)`)
+  console.log(`  amount:          10 LINK`)
+  console.log(`  adminAddress:    ${regParams.adminAddress} (Bank)`)
+  console.log(`  gasLimit:        ${regParams.gasLimit}`)
+  console.log(`  triggerType:     0 (custom logic)`)
+  console.log(`  billingToken:    ${regParams.billingToken} (LINK)`)
+
+  // ── STEP 3: Simulate transferAndCall ─────────────────────────────────────
+  console.log('\n══ STEP 3: Simulate LINK.transferAndCall (pre-flight) ══════════')
   try {
-    const { result } = await publicClient.simulateContract({
-      address: REGISTRAR, abi: REGISTRAR_ABI, functionName: 'registerUpkeep',
-      args: [regParams], account,
+    await publicClient.simulateContract({
+      address:      LINK_ADDR,
+      abi:          LINK_ABI,
+      functionName: 'transferAndCall',
+      args:         [REGISTRAR, LINK_AMOUNT, encodedParams],
+      account,
     })
-    simulatedId = result
-    console.log(`  Simulation succeeded. Expected upkeepId: ${simulatedId.toString()}`)
+    console.log('  ✓ Simulation succeeded — registration is live')
   } catch (simErr) {
     const msg = simErr?.shortMessage || simErr?.message || String(simErr)
-    const lower = msg.toLowerCase()
-    if (lower.includes('paused') || lower.includes('not allowed') || lower.includes('disabled') ||
-        lower.includes('revert') || lower.includes('reverted')) {
-      console.error('\n🚨 REGISTRATION BLOCKED — registrar returned a revert/guard error:')
-      console.error('  ', msg)
-      console.error('\n  VERDICT: Classic v2.3 registration is disabled or paused on this registrar.')
-      console.error('  ACTION:  Pivot to CRE. Apply at https://chain.link/cre-early-access')
-      console.error('           Then use AutomationReceiver.sol bridge pattern with Keeper3 as target.')
-      process.exit(2)
-    }
-    throw new Error(`registerUpkeep simulation failed unexpectedly: ${msg}`)
+    console.error('\n🚨 SIMULATION REVERTED:')
+    console.error('  ', msg)
+    console.error('\n  If this is a registration-guard error, pivot to CRE:')
+    console.error('  Apply at https://chain.link/cre-early-access')
+    process.exit(2)
   }
 
-  // Send the real tx
-  console.log('  Sending registerUpkeep TX...')
+  // ── STEP 4: Send LINK.transferAndCall ────────────────────────────────────
+  console.log('\n══ STEP 4: LINK.transferAndCall(registrar, 10 LINK, params) ════')
+  console.log('  LINK token:  ', LINK_ADDR)
+  console.log('  Registrar:   ', REGISTRAR)
+  console.log('  Amount:      10 LINK')
+
   const registerTx = await withRetry(
     () => walletClient.writeContract({
-      address: REGISTRAR, abi: REGISTRAR_ABI, functionName: 'registerUpkeep', args: [regParams],
+      address:      LINK_ADDR,
+      abi:          LINK_ABI,
+      functionName: 'transferAndCall',
+      args:         [REGISTRAR, LINK_AMOUNT, encodedParams],
     }),
-    'registerUpkeep'
+    'transferAndCall'
   )
   console.log(`  TX: ${registerTx}`)
-  txHashes.registerUpkeep = registerTx
+  txHashes.register = registerTx
 
-  const registerReceipt = await publicClient.waitForTransactionReceipt({ hash: registerTx, timeout: 120_000 })
-  if (registerReceipt.status !== 'success') {
-    console.error('\n🚨 registerUpkeep TX REVERTED')
-    console.error(`   TX hash: ${registerTx}`)
-    console.error('   Check on BaseScan for the exact revert reason.')
-    console.error('   If the error is registration-related, pivot to CRE.')
-    process.exit(3)
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: registerTx, timeout: 120_000 })
+  if (receipt.status !== 'success') {
+    console.error(`\n🚨 transferAndCall TX REVERTED: ${registerTx}`)
+    process.exit(1)
   }
-  console.log(`  ✓ Confirmed block: ${registerReceipt.blockNumber}`)
+  console.log(`  ✓ Confirmed block: ${receipt.blockNumber}`)
 
-  // Parse upkeepId from registry logs (UpkeepRegistered event — topic[1] is indexed id)
-  let upkeepId = simulatedId
-  for (const log of registerReceipt.logs) {
+  // Parse upkeepId from registry logs — UpkeepRegistered event has indexed upkeepId in topic[1]
+  let upkeepId = null
+  for (const log of receipt.logs) {
     if (addr(log.address) === addr(REGISTRY) && log.topics.length >= 2) {
-      const fromLog = BigInt(log.topics[1])
-      if (fromLog > 0n) {
-        upkeepId = fromLog
-        console.log(`  ✓ upkeepId from registry log: ${upkeepId.toString()}`)
-        break
-      }
+      const candidate = BigInt(log.topics[1])
+      if (candidate > 0n) { upkeepId = candidate; break }
     }
   }
-  console.log(`  upkeepId (decimal): ${upkeepId.toString()}`)
-  console.log(`  Upkeep UI: https://automation.chain.link/base/${upkeepId.toString()}`)
+  if (!upkeepId) {
+    console.error('  Could not parse upkeepId from receipt logs. Check TX on BaseScan:')
+    console.error('  ', registerTx)
+    process.exit(1)
+  }
+  console.log(`  ✓ upkeepId (decimal): ${upkeepId.toString()}`)
+  console.log(`  ✓ Upkeep UI: https://automation.chain.link/base/${upkeepId.toString()}`)
 
-  // ── STEP 4: Get forwarder from registry ───────────────────────────────────
-  console.log('\n══ STEP 4: Get forwarder address ════════════════════════════════')
+  // ── STEP 5: Get forwarder from registry ───────────────────────────────────
+  console.log('\n══ STEP 5: Get forwarder ════════════════════════════════════════')
   console.log('  Waiting 5s for RPC sync...')
   await sleep(5000)
 
@@ -291,32 +248,27 @@ async function main() {
       () => publicClient.readContract({ address: REGISTRY, abi: REGISTRY_ABI, functionName: 'getForwarder', args: [upkeepId] }),
       'getForwarder'
     )
-    console.log(`  Registry.getForwarder(${upkeepId.toString().slice(0,12)}...): ${forwarder}`)
-
     if (!forwarder || eq(forwarder, zero)) {
-      console.warn('  ⚠️  getForwarder returned zero address')
-      console.warn('      The DON may not have deployed the forwarder yet.')
-      console.warn('      Re-check after the first performUpkeep fires.')
+      console.warn('  ⚠️  getForwarder returned zero — forwarder not yet deployed; set manually after first performUpkeep')
       forwarder = null
     } else {
-      const fwdCode = await publicClient.getBytecode({ address: forwarder }).catch(() => '0x')
-      const fwdSize = fwdCode ? (fwdCode.length - 2) / 2 : 0
-      if (fwdSize === 0) {
-        console.warn(`  ⚠️  Forwarder ${forwarder} has no bytecode yet — run setForwarder manually after first fire`)
+      const code = await publicClient.getBytecode({ address: forwarder }).catch(() => '0x')
+      const codeSize = code ? (code.length - 2) / 2 : 0
+      if (codeSize === 0) {
+        console.warn(`  ⚠️  Forwarder ${forwarder} has no bytecode yet — set manually after first performUpkeep`)
         forwarder = null
       } else {
-        console.log(`  ✓ Forwarder ${forwarder} — ${fwdSize} bytes bytecode`)
+        console.log(`  ✓ Forwarder: ${forwarder} (${codeSize} bytes)`)
       }
     }
   } catch (e) {
     console.warn(`  getForwarder() failed: ${e?.shortMessage || e?.message}`)
-    console.warn('  This is OK — forwarder is set by the DON on first performUpkeep.')
-    console.warn('  After first fire: read REGISTRY.getForwarder(upkeepId) then call Keeper3.setForwarder()')
+    console.warn('  Set forwarder manually after first performUpkeep fires')
   }
 
-  // ── STEP 5: Keeper3.setForwarder ─────────────────────────────────────────
+  // ── STEP 6: Keeper3.setForwarder ─────────────────────────────────────────
   if (forwarder) {
-    console.log(`\n══ STEP 5: Keeper3.setForwarder(${forwarder}) ═══`)
+    console.log(`\n══ STEP 6: Keeper3.setForwarder(${forwarder}) ══`)
     const setFwdTx = await withRetry(
       () => walletClient.writeContract({
         address: KEEPER3, abi: KEEPER3_ABI, functionName: 'setForwarder', args: [forwarder],
@@ -327,9 +279,7 @@ async function main() {
     txHashes.setForwarder = setFwdTx
 
     const setFwdReceipt = await publicClient.waitForTransactionReceipt({ hash: setFwdTx, timeout: 60_000 })
-    if (setFwdReceipt.status !== 'success') {
-      console.error('ABORT: setForwarder TX reverted'); process.exit(1)
-    }
+    if (setFwdReceipt.status !== 'success') { console.error('ABORT: setForwarder reverted'); process.exit(1) }
     console.log(`  Confirmed block: ${setFwdReceipt.blockNumber}`)
 
     console.log('  Waiting 5s for RPC sync...')
@@ -337,24 +287,21 @@ async function main() {
 
     const sForwarder = await withRetry(
       () => publicClient.readContract({ address: KEEPER3, abi: KEEPER3_ABI, functionName: 's_forwarder' }),
-      'verify s_forwarder'
+      's_forwarder'
     )
     if (!eq(sForwarder, forwarder)) {
-      console.error(`ABORT: s_forwarder mismatch: got ${sForwarder}, expected ${forwarder}`)
-      process.exit(1)
+      console.error(`ABORT: s_forwarder mismatch: got ${sForwarder}`); process.exit(1)
     }
     console.log(`  ✓ Keeper3.s_forwarder() = ${sForwarder}`)
   } else {
-    console.log('\n══ STEP 5: setForwarder DEFERRED ════════════════════════════════')
-    console.log('  Forwarder address not yet available (zero or no bytecode).')
-    console.log('  After the Chainlink DON fires the first performUpkeep:')
-    console.log('    1. node -e "...read REGISTRY.getForwarder(' + upkeepId.toString().slice(0,20) + '...)"')
-    console.log('    2. Bank wallet → Keeper3.setForwarder(<forwarder>)')
-    console.log('  Or re-run this script — it will skip registration if allowance already exists.')
+    console.log('\n══ STEP 6: setForwarder DEFERRED ════════════════════════════════')
+    console.log('  Forwarder not yet available — set manually after first performUpkeep:')
+    console.log('    read: Registry.getForwarder(' + upkeepId.toString().slice(0,16) + '...) ')
+    console.log('    then: Bank wallet → Keeper3.setForwarder(<addr>)')
   }
 
   // ── Final summary ─────────────────────────────────────────────────────────
-  const finalFwdState = await withRetry(
+  const finalFwd = await withRetry(
     () => publicClient.readContract({ address: KEEPER3, abi: KEEPER3_ABI, functionName: 's_forwarder' }),
     's_forwarder final'
   ).catch(() => '(read failed)')
@@ -363,31 +310,30 @@ async function main() {
 ══ REGISTRATION COMPLETE ════════════════════════════════════
 
   New upkeepId:        ${upkeepId.toString()}
-  Forwarder:           ${forwarder || '(not yet available — check after first fire)'}
-  Keeper3 s_forwarder: ${finalFwdState}
+  Forwarder:           ${forwarder ?? '(set after first performUpkeep)'}
+  Keeper3 s_forwarder: ${finalFwd}
 
   TX hashes:
-${txHashes.approve      ? `    approve:           ${txHashes.approve}` : '    approve:           (skipped — allowance already set)'}
-    registerUpkeep:    ${txHashes.registerUpkeep}
-${txHashes.setForwarder ? `    setForwarder:      ${txHashes.setForwarder}` : '    setForwarder:      (deferred — run after first performUpkeep)'}
+    transferAndCall:   ${txHashes.register}
+${txHashes.setForwarder ? `    setForwarder:      ${txHashes.setForwarder}` : '    setForwarder:      (deferred)'}
 
   View upkeep: https://automation.chain.link/base/${upkeepId.toString()}
 
 ══ NEXT STEPS ═══════════════════════════════════════════════
 
-  ✅ DO THESE NOW (no Bank tx required):
+  ✅ DO NOW (no Bank tx required):
   1. Add V3d 0x783b8cd80b586b723188c93ef94ee1beede617b4 as VRF consumer
-       at vrf.chain.link/base → Sub ID 58222014484560539249027457203866883376041731162442592604288474822166186263722
+       vrf.chain.link/base → Sub 58222014484560539249027457203866883376041731162442592604288474822166186263722
   2. Gnosis Safe: setTaxExempt(0x783b8cd80b586b723188c93ef94ee1beede617b4, true)
 
-  ⏳ WAIT until V3c Round 1 settles (~Jun 23):
-  3. Cancel old Keeper2V2 upkeep ID 107234397534438678165344999422920520488294344698573062791612853656108534823641
+  ⏳ AFTER V3c Round 1 settles (~Jun 23):
+  3. Cancel Keeper2V2 upkeep ID 107234397534438678165344999422920520488294344698573062791612853656108534823641
        → 33.12 LINK returned to Bank
 
-  🔧 AFTER first performUpkeep fires on new upkeep (if forwarder deferred):
-  4. Read Registry.getForwarder(upkeepId) → set on Keeper3
+  🔧 IF forwarder was deferred:
+  4. After first performUpkeep fires: Bank → Keeper3.setForwarder(<forwarder>)
 
-  🖥️  FRONTEND CUTOVER (after V3d round starts):
+  🖥️  FRONTEND CUTOVER (after V3d first round starts):
   5. Replace V3c address with V3d in: src/App.jsx, src/TTAdminDashboard.jsx, api/approve-profile.js
 
 ══════════════════════════════════════════════════════════════
