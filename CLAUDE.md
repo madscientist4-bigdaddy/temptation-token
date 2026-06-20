@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 19, 2026 — V3d + TTSKeeper3 DEPLOYED and fully wired. Keeper3 Chainlink upkeep REGISTERED 2026-06-18 (ID: 113446314522587151772280129999432062856069985411437977877707978564657748455208, TX: 0x1183793582033432a03d1aae93ee96e1b83db6941953085de8275da6c3c8caa3, 10 LINK). Forwarder pending DON assignment — check getForwarder, then Bank calls setForwarder. V3c/Keeper2V2 still running live Round 1 — do NOT cancel until V3d upkeep confirmed live.
+Last verified: June 20, 2026 — V3d + TTSKeeper3 DEPLOYED and fully wired. Keeper3 Chainlink upkeep REGISTERED 2026-06-18 (ID: 113446314522587151772280129999432062856069985411437977877707978564657748455208, TX: 0x1183793582033432a03d1aae93ee96e1b83db6941953085de8275da6c3c8caa3, 10 LINK). **Forwarder ASSIGNED by DON 2026-06-20: `0x1af4b2284bda534a54b6e9979dca250fe05ddd82` (has bytecode).** Keeper3.s_forwarder() still ZERO — NEXT ACTION: Bank calls `Keeper3.setForwarder(0x1af4b2284bda534a54b6e9979dca250fe05ddd82)` (calldata `0xb9998a240000000000000000000000001af4b2284bda534a54b6e9979dca250fe05ddd82`, to `0x363ce4960e3b459f5892587a37ae1ff2ed04442c`). V3c/Keeper2V2 still running live Round 1 — do NOT cancel until V3d upkeep confirmed live + V3d also still needs VRF-consumer add + setTaxExempt before first settlement.
 
 ## Operating Mode
 
@@ -125,7 +125,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 - Keeper3 `votingContract`      = `0x783b8cd80b586b723188c93ef94ee1beede617b4` ✓ (V3d)
 - Keeper3 `s_nextSettleTarget`  = `1782709140` ✓ (Mon Jun 29 2026 04:59:00 UTC = Sun Jun 28 23:59 EST)
 - Keeper3 `owner`               = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
-- Keeper3 `s_forwarder`         = `0x0000000000000000000000000000000000000000` ⚠️ (not yet set — upkeep registered 2026-06-18, forwarder pending DON assignment; Bank must call `setForwarder` once assigned)
+- Keeper3 `s_forwarder`         = `0x0000000000000000000000000000000000000000` ⚠️ (not yet set — DON forwarder `0x1af4b2284bda534a54b6e9979dca250fe05ddd82` assigned 2026-06-20; Bank must call `setForwarder` to wire it)
 
 **V3c wiring TX hashes (Bank wallet, 2026-06-15) — kept for audit trail:**
 | Step | TX Hash |
@@ -145,7 +145,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 1. **Add V3d as VRF consumer** — at vrf.chain.link/base, Sub ID `58222014484560539249027457203866883376041731162442592604288474822166186263722`
 2. **Gnosis Safe: `setTaxExempt(0x783b8cd8..., true)`** — required before first V3d settlement
 3. ✅ DONE — Upkeep registered (see above)
-4. **`Keeper3.setForwarder(<forwarder>)`** — Bank wallet. First: `Registry.getForwarder(113446314522587151772280129999432062856069985411437977877707978564657748455208)` via selector `0xb657bc9c` on `0xf4bab6a129164aba9b113cb96ba4266df49f8743`. When non-zero address with bytecode appears, Bank calls `setForwarder`. Script: `outputs/register_keeper3_upkeep.mjs` (set-forwarder-only path — rerun after forwarder assigned).
+4. **`Keeper3.setForwarder(0x1af4b2284bda534a54b6e9979dca250fe05ddd82)`** — Bank wallet. ✅ Forwarder ASSIGNED by DON 2026-06-20 (verified non-zero with bytecode). Lookup was via `Registry.getForwarder(uint256)` selector **`0x79ea9943`** on `0xf4bab6a129164aba9b113cb96ba4266df49f8743` (NOTE: prior CLAUDE.md said `0xb657bc9c` — that is `getMinBalanceForUpkeep`, NOT getForwarder). Bank tx: to `0x363ce4960e3b459f5892587a37ae1ff2ed04442c`, value 0, data `0xb9998a240000000000000000000000001af4b2284bda534a54b6e9979dca250fe05ddd82`. Script: `outputs/register_keeper3_upkeep.mjs` (set-forwarder-only path). **PENDING Jim's Bank signature.**
 5. **Cancel old Chainlink upkeep** `107234397534438678...` (V3c) — only AFTER V3d upkeep confirmed live + forwarder set
 6. **Frontend cutover** — replace V3b/V3c address with V3d in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`
 7. **`batchApproveProfiles`** on V3d after first round starts
