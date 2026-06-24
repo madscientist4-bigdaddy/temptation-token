@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Last verified: June 20, 2026 — V3d + TTSKeeper3 DEPLOYED and fully wired. Keeper3 Chainlink upkeep REGISTERED 2026-06-18. **Upkeep ID CONFIRMED via UpkeepRegistered event decode (2026-06-20): `113446314522587151772280129999432062856069985411437977877707978564657748455208` (hex `0xfad056ac000000000000000000000000beb8c51eb230bfb387eb031c4b252f28`, performGas 500000, admin Bank). It is NOT `12627456…235799` — that value is wrong, do not use it.** Registration TX: 0x1183793582033432a03d1aae93ee96e1b83db6941953085de8275da6c3c8caa3, 10 LINK. **Forwarder ASSIGNED by DON 2026-06-20: `0x1af4b2284bda534a54b6e9979dca250fe05ddd82` (has bytecode).** Keeper3.s_forwarder() still ZERO — NEXT ACTION: Bank calls `Keeper3.setForwarder(0x1af4b2284bda534a54b6e9979dca250fe05ddd82)` (calldata `0xb9998a240000000000000000000000001af4b2284bda534a54b6e9979dca250fe05ddd82`, to `0x363ce4960e3b459f5892587a37ae1ff2ed04442c`). V3c/Keeper2V2 still running live Round 1 — do NOT cancel until V3d upkeep confirmed live + V3d also still needs VRF-consumer add + setTaxExempt before first settlement.
+Last verified: June 23, 2026 — V3d + TTSKeeper3 DEPLOYED and FULLY WIRED + LIVE. Keeper3 Chainlink upkeep REGISTERED 2026-06-18. **Upkeep ID CONFIRMED via UpkeepRegistered event decode (2026-06-20): `113446314522587151772280129999432062856069985411437977877707978564657748455208` (hex `0xfad056ac000000000000000000000000beb8c51eb230bfb387eb031c4b252f28`, performGas 500000, admin Bank). It is NOT `12627456…235799` — that value is wrong, do not use it.** Registration TX: 0x1183793582033432a03d1aae93ee96e1b83db6941953085de8275da6c3c8caa3, 10 LINK. **Forwarder SET 2026-06-23 (Bank wallet): Keeper3.s_forwarder() = `0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82`. setForwarder TX `0x1936373b387a5d0288177de5eaf9ae9a9e116a940df4356bf6ab9cbadca4b320`, block 47736597. V3d/Keeper3 calendar-pinned automation FULLY ARMED — awaiting first performUpkeep to start V3d Round 1 (expected endTime 1782709140 = Sun 11:59 PM EST).** V3c/Keeper2V2 still running live Round 1 in parallel — do NOT cancel until V3d cutover confirmed live + V3d also still needs VRF-consumer add + setTaxExempt before first settlement.
 
 ## Operating Mode
 
@@ -107,7 +107,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 | **TTSKeeper2V2 (SUPERSEDED)** | `0x24107a47D24443D263bc4B06d11C61fCE98C3964` | `0xbe3e00b4...` | ⚠️ Still owns V3c / Chainlink upkeep active |
 | **Chainlink Forwarder (V3c upkeep)** | `0x68Ae2a7d8c9Ec360EFe2FeD40763D4F353C2fd71` | — | ⚠️ Set on Keeper2V2 — keep until V3d upkeep live |
 | **Chainlink Upkeep ID (V3c)** | `107234397534438678165344999422920520488294344698573062791612853656108534823641` | — | ⚠️ Active — cancel only after V3d upkeep confirmed live |
-| **Chainlink Upkeep ID (Keeper3 / V3d)** | `113446314522587151772280129999432062856069985411437977877707978564657748455208` | `0x1183793...` | ✅ Registered 2026-06-18, 10 LINK, forwarder pending DON assignment |
+| **Chainlink Upkeep ID (Keeper3 / V3d)** | `113446314522587151772280129999432062856069985411437977877707978564657748455208` | `0x1183793...` | ✅ Registered 2026-06-18, 10 LINK, forwarder SET 2026-06-23 (`0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82`) — FULLY ARMED |
 
 **V3d wiring TX hashes (all Bank wallet, 2026-06-17):**
 | Step | TX Hash |
@@ -125,7 +125,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 - Keeper3 `votingContract`      = `0x783b8cd80b586b723188c93ef94ee1beede617b4` ✓ (V3d)
 - Keeper3 `s_nextSettleTarget`  = `1782709140` ✓ (Mon Jun 29 2026 04:59:00 UTC = Sun Jun 28 23:59 EST)
 - Keeper3 `owner`               = `0xb1e991bf617459b58964eef7756b350e675c53b5` ✓ (Bank)
-- Keeper3 `s_forwarder`         = `0x0000000000000000000000000000000000000000` ⚠️ (not yet set — DON forwarder `0x1af4b2284bda534a54b6e9979dca250fe05ddd82` assigned 2026-06-20; Bank must call `setForwarder` to wire it)
+- Keeper3 `s_forwarder`         = `0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82` ✅ (SET 2026-06-23 via Bank `setForwarder`, TX `0x1936373b387a5d0288177de5eaf9ae9a9e116a940df4356bf6ab9cbadca4b320`, block 47736597 — automation fully armed)
 
 **V3c wiring TX hashes (Bank wallet, 2026-06-15) — kept for audit trail:**
 | Step | TX Hash |
@@ -145,7 +145,7 @@ V3d + Keeper3 fully deployed and wired 2026-06-17. V3c/Keeper2V2 are **SUPERSEDE
 1. **Add V3d as VRF consumer** — at vrf.chain.link/base, Sub ID `58222014484560539249027457203866883376041731162442592604288474822166186263722`
 2. **Gnosis Safe: `setTaxExempt(0x783b8cd8..., true)`** — required before first V3d settlement
 3. ✅ DONE — Upkeep registered (see above)
-4. **`Keeper3.setForwarder(0x1af4b2284bda534a54b6e9979dca250fe05ddd82)`** — Bank wallet. ✅ Forwarder ASSIGNED by DON 2026-06-20 (verified non-zero with bytecode, 743 bytes). Lookup via `Registry.getForwarder(uint256)` selector **`0x79ea9943`** on `0xf4bab6a129164aba9b113cb96ba4266df49f8743` (NOTE: prior CLAUDE.md said `0xb657bc9c` — that is `getMinBalanceForUpkeep`, NOT getForwarder). `getUpkeep` confirms target == Keeper3, balance 10 LINK, paused=false, maxValidBlocknumber == UINT32_MAX (not cancelled). Bank tx: to `0x363ce4960e3b459f5892587a37ae1ff2ed04442c`, value 0, data `0xb9998a240000000000000000000000001af4b2284bda534a54b6e9979dca250fe05ddd82`. **Dedicated script (setForwarder ONLY — never registers): `outputs/set_keeper3_forwarder.mjs`.** Run: `BASE_RPC_URL=https://... DEPLOYER_PRIVATE_KEY=0x<bank_key> node outputs/set_keeper3_forwarder.mjs`. **PENDING Jim's Bank signature.**
+4. ✅ **DONE — `Keeper3.setForwarder(0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82)`** — executed from Bank wallet 2026-06-23. setForwarder TX `0x1936373b387a5d0288177de5eaf9ae9a9e116a940df4356bf6ab9cbadca4b320`, block 47736597. `Keeper3.s_forwarder()` now returns the DON forwarder (confirmed non-zero). Automation FULLY ARMED — awaiting first performUpkeep to start V3d Round 1. Forwarder was assigned by DON 2026-06-20 (verified non-zero with bytecode, 743 bytes); lookup via `Registry.getForwarder(uint256)` selector `0x79ea9943` on `0xf4bab6a129164aba9b113cb96ba4266df49f8743`. Dedicated script used: `outputs/set_keeper3_forwarder.mjs` (setForwarder ONLY — never registers).
 5. **Cancel old Chainlink upkeep** `107234397534438678...` (V3c) — only AFTER V3d upkeep confirmed live + forwarder set
 6. **Frontend cutover** — replace V3b/V3c address with V3d in `src/App.jsx`, `src/TTAdminDashboard.jsx`, `api/approve-profile.js`
 7. **`batchApproveProfiles`** on V3d after first round starts
