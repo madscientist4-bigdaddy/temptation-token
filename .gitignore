@@ -28,6 +28,9 @@ dist-ssr
 out/
 cache/
 
+# Installed Foundry dependency (43MB) — not vendored
+lib/openzeppelin-contracts-upgradeable/
+
 # Secrets / env files — cover every variant (.env, .env.local, .env.save, .env.*)
 .env
 .env.*
