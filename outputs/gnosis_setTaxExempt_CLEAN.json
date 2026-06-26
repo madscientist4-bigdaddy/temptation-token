@@ -1,0 +1,230 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1779023575925,
+  "meta": {
+    "name": "TTS setTaxExempt — 8 addresses (CLEAN)",
+    "description": "setTaxExempt(addr, true) for 8 TTS ecosystem contracts. selector=0x1dc61040 confirmed from BaseScan. No V3c (not deployed). No placeholders.",
+    "txBuilderVersion": "1.16.5",
+    "createdFromSafeAddress": "0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86",
+    "createdFromOwnerAddress": ""
+  },
+  "transactions": [
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc610400000000000000000000000006d6ff6a0bd0a71d999ac1d593a941108a2be4bc60000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc610400000000000000000000000007a9ff2f584248744cbba32c737d660ed6f077fcb0000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x7a9ff2f584248744cBbA32c737D660ED6f077fCB",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc61040000000000000000000000000aa12b889ebcc32037bb8684b18df7ed09b2b30fc0000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc61040000000000000000000000000f7dd429d679cb61231e73785fd1737e60138aba30000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0xf7dD429D679CB61231e73785fD1737E60138ABa3",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc610400000000000000000000000000768e862d3ab14d85213bfef8f1d012e77721da20000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0x0768e862D3AB14d85213BfeF8f1D012E77721da2",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc61040000000000000000000000000b17b3842e2cff594d8886e77277f4b6fc7c61a480000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc61040000000000000000000000000e8006d8f36827c97fd8f2932d4d2198b833a432f0000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0xE8006d8F36827c97fd8f2932d4D2198B833A432F",
+        "exempt": "true"
+      }
+    },
+    {
+      "to": "0x5570eA97d53A53170e973894A9Fa7feb5785d3b9",
+      "value": "0",
+      "data": "0x1dc61040000000000000000000000000c3a3858a3777e4c9b542e60298c3161086c5faae0000000000000000000000000000000000000000000000000000000000000001",
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "exempt",
+            "type": "bool"
+          }
+        ],
+        "name": "setTaxExempt",
+        "payable": false,
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      "contractInputsValues": {
+        "account": "0xC3A3858A3777E4C9B542e60298c3161086c5Faae",
+        "exempt": "true"
+      }
+    }
+  ]
+}

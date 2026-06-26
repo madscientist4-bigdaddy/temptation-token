@@ -172,7 +172,7 @@ This pattern matches Blockaid's "Owner Privilege" category. The upgrade-capabili
 **Submit at:** https://report.blockaid.io
 
 > Note: submit AFTER Jim's Safe batch (UPGRADER_ROLE revocation) is confirmed on-chain.
-> Replace `[UPGRADER_REVOKE_TX]` with the actual transaction hash before sending.
+> Replace `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` with the actual transaction hash before sending.
 
 ```
 Token Address:   0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
@@ -221,7 +221,7 @@ The 6 distribution TX hashes (Base mainnet, verifiable on BaseScan):
 3. UUPS PROXY / UPGRADE RISK (RESOLVED):
 UPGRADER_ROLE was held by the Bank wallet (single EOA). We have revoked it
 via the Gnosis Safe (DEFAULT_ADMIN). UPGRADER_ROLE is now held exclusively
-by the 2/2 Gnosis Safe. Revocation TX: [UPGRADER_REVOKE_TX]
+by the 2/2 Gnosis Safe. Revocation TX: 0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277
 After revocation: upgradeTo() requires 2/2 Safe consensus minimum.
 
 4. MINT FUNCTION:
@@ -247,7 +247,7 @@ Contact: jim@temptationtoken.io
 
 **Submit to:** Telegram `@Goplusservice` OR email `service@gopluslabs.io`
 
-> Note: send AFTER the UPGRADER_ROLE revocation TX is confirmed. Replace `[UPGRADER_REVOKE_TX]` before sending.
+> Note: send AFTER the UPGRADER_ROLE revocation TX is confirmed. Replace `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277` before sending.
 
 ```
 Subject: Token Security Report Update Request — TTS on Base (0x5570eA97...)
@@ -265,7 +265,7 @@ from the Bank/deployer wallet in blocks 47212602–47214699 on Base mainnet.
 The creator wallet now holds 4,987,892,338 TTS = 7.23% of supply.
 
 Additionally, UPGRADER_ROLE has been revoked from the Bank wallet via our
-Gnosis Safe on 2026-06-01 (TX: [UPGRADER_REVOKE_TX]). The single-EOA upgrade
+Gnosis Safe on 2026-06-01 (TX: 0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277). The single-EOA upgrade
 risk no longer exists.
 
 COMPLETE VERIFIED HOLDER TABLE (live, 2026-06-01):
@@ -297,7 +297,7 @@ https://basescan.org/token/0x5570eA97d53A53170e973894A9Fa7feb5785d3b9#balances
 
 ADDITIONAL FACTS:
 - MINTER_ROLE: held by nobody. Supply fixed at 69B. Zero mint transactions ever.
-- UPGRADER_ROLE: revoked from Bank wallet 2026-06-01 (TX: [UPGRADER_REVOKE_TX]).
+- UPGRADER_ROLE: revoked from Bank wallet 2026-06-01 (TX: 0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277).
   Now held only by Gnosis Safe 2/2.
 - DEFAULT_ADMIN: held exclusively by Gnosis Safe 0xeFb59d88... (2/2 multisig)
 - LP: 100% locked on TeamFinance until May 5, 2027.
@@ -325,7 +325,7 @@ https://temptationtoken.io
 **To:** support@metamask.io  
 **Subject:** False Positive Update — TTS Token on Base (distribution completed + role remediation)
 
-> Note: send AFTER the UPGRADER_ROLE revocation TX is confirmed. Replace `[UPGRADER_REVOKE_TX]`.
+> Note: send AFTER the UPGRADER_ROLE revocation TX is confirmed. Replace `0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277`.
 
 ```
 Hello MetaMask Security Team,
@@ -368,7 +368,7 @@ Token details:
 
 2. UPGRADE RISK — RESOLVED:
   UPGRADER_ROLE has been revoked from the Bank wallet via the Gnosis Safe
-  (2026-06-01, TX: [UPGRADER_REVOKE_TX]). UPGRADER_ROLE is now held only
+  (2026-06-01, TX: 0x1f21ca9c651183bf14680805b29318a6d2d4f766c6562165d06fe4b4dbfea277). UPGRADER_ROLE is now held only
   by the Gnosis Safe 2/2 multisig. Single-EOA upgrade capability no longer
   exists. Any future upgrade requires consensus from 2 independent signers.
 
@@ -381,7 +381,7 @@ Token details:
   MINTER_ROLE held by nobody. Supply fixed at 69B, zero mint transactions.
 
 5. AUDIT:
-  SolidProof audit — ID 88b99f3a — all C/H/M findings resolved.
+  SolidProof audit — ID 88b99f3a — all C/H/M findings resolved in code; portal acknowledgment in progress.
   https://app.solidproof.io/projects/temptation-token
 
 We respectfully request a re-review and removal of the malicious classification.
