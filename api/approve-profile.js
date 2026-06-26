@@ -1,7 +1,7 @@
 // POST /api/approve-profile
 // Body: { submissionId: string }
 // 1. Updates Supabase submissions row to status=approved
-// 2. Reads wallet_address from Supabase row and calls batchApproveProfiles([submissionId], [wallet]) on TTSVotingV3b
+// 2. Reads wallet_address from Supabase row and calls batchApproveProfiles([submissionId], [wallet]) on TTSVotingV3d
 // 3. If submission has referral_code, calls setProfileClub(submissionId, referral_code) on contract
 // Requires env: DEPLOYER_PRIVATE_KEY
 
@@ -13,7 +13,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.s
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 
-const V3_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'
+const V3_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 
 const ABI = parseAbi([
   'function batchApproveProfiles(string[] profileIds, address[] wallets) external',

@@ -7,7 +7,7 @@ import crypto from 'crypto'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
-const VOTING_ADDRESS  = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'
+const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const MAIN_CHANNEL_ID   = process.env.MAIN_CHANNEL_ID   || '-1002207667493'
 const COMMUNITY_CHAT_ID = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
 
@@ -555,7 +555,7 @@ export default async function handler(req, res) {
         const endTime = parseInt(chunks[1], 16)
         const settled = chunks[4] !== '0'.padStart(64, '0')
         if (!settled && Math.floor(Date.now() / 1000) > endTime) {
-          const settleLink = `https://basescan.org/address/0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48#writeContract`
+          const settleLink = `https://basescan.org/address/0x363ce4960e3b459f5892587a37ae1ff2ed04442c#writeContract`
           await sendTelegram(adminChatId,
             `🚨 ROUND ${roundId} OVERDUE — ended ${new Date(endTime * 1000).toLocaleString()} but not settled!\n\nManual settle: ${settleLink}`,
             adminToken)

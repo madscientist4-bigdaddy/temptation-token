@@ -27,5 +27,14 @@ dist-ssr
 # Foundry build artifacts
 out/
 cache/
-.env*.local
+
+# Secrets / env files — cover every variant (.env, .env.local, .env.save, .env.*)
 .env
+.env.*
+.env*.local
+.env.save
+
+# OS / editor junk + Finder duplicate files (e.g. "wallet 2.js")
+.DS_Store
+**/.DS_Store
+*\ 2.*

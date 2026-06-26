@@ -1,9 +1,8 @@
 
 // ── CONTRACT ADDRESSES (Base Mainnet) ────────────────────────────────────────
 const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
-const VOTING_ADDRESS  = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'
+const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
-const AIRDROP_ADDRESS = '0x214f482ae7DC1C48A4761759Dc70B6545ff36f0f'
 const NFT_ADDRESS     = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2'
 const BASE_CHAIN_ID   = 8453
 
@@ -21,12 +20,6 @@ const VOTING_ABI = [
   'function getRound(uint256 roundId) view returns (uint256 startTime, uint256 endTime, uint256 totalTickets, uint256 totalRawVotes, bool settled, bool vrfPending, uint256 profileCount)',
   'function currentRoundId() view returns (uint256)',
 ]
-const AIRDROP_ABI = [
-  'function claim() returns ()',
-  'function claimWithReferral(address referrer) returns ()',
-  'function hasClaimed(address) view returns (bool)',
-]
-
 const _baseClient = createPublicClient({
   chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
   transport: http('https://mainnet.base.org')
@@ -61,14 +54,13 @@ async function waitForReceipt(hash) {
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import TTSChatbot from './TTSChatbot.jsx'
+import { describeTxError } from './lib/txError.js'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
 import { createPublicClient, http, parseAbi } from 'viem'
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 
-const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 
 // Hardcoded fallback — renders at frame 1 before Supabase loads, swapped immediately on fetch
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='534'%3E%3Crect width='400' height='534' fill='%231a1a2e'/%3E%3Ctext x='200' y='290' font-family='sans-serif' font-size='48' fill='%23d4af3740' text-anchor='middle'%3E%E2%8F%B3%3C/text%3E%3C/svg%3E"
@@ -398,6 +390,7 @@ const S = `
   .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
   .toast.s { border-color:rgba(212,175,55,.5); }
   .toast.e { border-color:rgba(232,64,90,.5); }
+  .toast.i { border-color:rgba(120,140,170,.55); }
 
   /* NFT EMPTY */
   .nft-empty { text-align:center; padding:50px 20px; color:var(--muted); font-size:.7rem; letter-spacing:.08em; line-height:1.9; margin:0 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
@@ -739,7 +732,8 @@ function TransferModal({ dir, onClose, showToast, address, walletClient, chainId
       showToast(`Sent ${amt} $TTS to ${toAddr.slice(0,8)}…`, 's')
       onClose()
     } catch(e) {
-      showToast('Transfer failed: ' + (e.shortMessage || e.message || '').slice(0,50), 'e')
+      const { cancelled, message } = describeTxError(e, 'Transfer failed')
+      showToast(cancelled ? 'Transaction cancelled' : message, cancelled ? 'i' : 'e')
     }
     setSending(false)
   }
@@ -802,25 +796,21 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         }).catch(() => {})
       }
 
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/submissions?status=eq.approved&round_id=eq.${currentRound}&select=*`,
-        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } }
-      )
-      const data = await res.json()
+      const res = await fetch(`/api/public-profiles?round=${currentRound}`)
+      const json = await res.json().catch(() => ({}))
+      const data = Array.isArray(json.profiles) ? json.profiles : []
 
-      if (!data || data.length < 1) { setPhotosLoading(false); return }
+      if (data.length < 1) { setPhotosLoading(false); return }
 
       const mapped = data.map((r, i) => ({
         id: i + 1,
         username: r.display_name || 'Anonymous',
-        profileId: r.id,
+        profileId: r.profileId,
         link: r.link_title || 'Profile',
         link_url: r.link_url || '',
         votes: 0,
         myVotes: 0,
         img: r.image_url || 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80',
-        wallet: r.wallet_address,
-        payout_wallet: r.payout_wallet
       }))
       const sorted = mapped.sort((a, b) => String(a.profileId).localeCompare(String(b.profileId)))
       photoCache = sorted
@@ -912,15 +902,15 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       const voteTx = await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
       await waitForReceipt(voteTx)
 
-      // Write vote to Supabase (non-blocking — enables dashboard metrics)
-      fetch(`${SUPABASE_URL}/rest/v1/votes`, {
+      // Record vote via server (service key) — non-blocking, enables dashboard metrics
+      fetch('/api/profiles?action=vote', {
         method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ round_id: Number(roundId), voter_wallet: address, tts_amount: a, tx_hash: voteTx, created_at: new Date().toISOString() })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roundId: Number(roundId), voterWallet: address, ttsAmount: a, txHash: voteTx })
       }).catch(() => {})
 
-      // First-vote match bonus (fire-and-forget — no UI impact if it fails)
-      fetch('/api/vote-match', {
+      // First-vote match bonus (non-blocking — surface genuine failures, stay quiet on benign cases)
+      fetch('/api/bonus?action=vote-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address, voteAmount: a, txHash: voteTx }),
@@ -928,8 +918,10 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         if (d.success && d.matchAmount > 0) {
           showToast(`🎁 First-vote match: +${d.matchAmount.toLocaleString()} $TTS sent!`, 's')
           setBalance(b => b + d.matchAmount)
+        } else if (d && d.success === false && !d.alreadyClaimed && d.reason && !/already/i.test(d.reason)) {
+          showToast(`First-vote match unavailable: ${d.reason}`, 'i')
         }
-      }).catch(() => {})
+      }).catch(() => { showToast('First-vote match could not be processed right now.', 'i') })
 
       // Update UI
       setBalance(b => b - a)
@@ -958,8 +950,8 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       } catch(_) {}
     } catch(e) {
       console.error('Vote error:', e)
-      const msg = e.shortMessage || e.message || 'Unknown error'
-      showToast('Vote failed: ' + msg.slice(0, 60), 'e')
+      const { cancelled, message } = describeTxError(e, 'Vote failed')
+      showToast(cancelled ? 'Transaction cancelled' : message, cancelled ? 'i' : 'e')
     } finally {
       setVoting(v => ({ ...v, [photo.id]: false }))
     }
@@ -1102,19 +1094,17 @@ function LeaderboardScreen() {
     async function load() {
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
       const currentRound = roundId != null ? Number(roundId) : 1
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/submissions?status=eq.approved&round_id=eq.${currentRound}&select=id,display_name,image_url`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }
-      )
-      const data = await res.json()
-      if (!data || data.length < 1) { setLoading(false); return }
+      const res = await fetch(`/api/public-profiles?round=${currentRound}`)
+      const json = await res.json().catch(() => ({}))
+      const data = Array.isArray(json.profiles) ? json.profiles : []
+      if (data.length < 1) { setLoading(false); return }
       const withVotes = await Promise.all(data.map(async (r, i) => {
         let votes = 0
         try {
-          const profile = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId || 1n, r.id])
+          const profile = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId || 1n, r.profileId])
           if (profile) votes = Math.floor(Number(profile[2]) / 1e18)
         } catch(_) {}
-        return { id: i+1, username: r.display_name || 'Anonymous', profileId: r.id, img: r.image_url || '', votes, myVotes: 0, link_url: '', link: '' }
+        return { id: i+1, username: r.display_name || 'Anonymous', profileId: r.profileId, img: r.image_url || '', votes, myVotes: 0, link_url: '', link: '' }
       }))
       const sorted = withVotes.sort((a,b) => b.votes - a.votes)
       setItems(sorted)
@@ -1405,10 +1395,10 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [subRemaining, setSubRemaining] = useState(null)
   useEffect(() => {
     if (!address) return
-    const ago = new Date(Date.now() - 7*24*60*60*1000).toISOString()
-    fetch(`${SUPABASE_URL}/rest/v1/submissions?wallet_address=eq.${address}&created_at=gte.${ago}&select=id`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(r => r.json()).then(d => { if (Array.isArray(d)) setSubRemaining(3 - d.length) }).catch(() => {})
+    fetch(`/api/submit-profile?wallet=${address}`)
+      .then(r => r.json())
+      .then(d => { if (typeof d.remaining === 'number') setSubRemaining(d.remaining) })
+      .catch(() => {})
   }, [address])
 
   const [nameErr, setNameErr] = useState('')
@@ -1433,6 +1423,50 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   }
 
   const [submitting, setSubmitting] = useState(false)
+  // I3: if the fee is paid on-chain but the DB insert fails, we keep the payload
+  // here so the user can retry the save WITHOUT paying the 5 TTS fee again.
+  const [pendingSubmit, setPendingSubmit] = useState(null)
+
+  // Saves the submission record. Returns true on success. On failure it shows a
+  // clear error (incl. the fee tx hash) — never a false "queued" message.
+  const saveSubmission = async (payload) => {
+    const feeRef = String(payload.feeTxHash || '').slice(0, 10)
+    try {
+      const r = await fetch('/api/submit-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (r.ok) {
+        showToast('Submission sent for review!', 's')
+        setSubRemaining(s => s !== null ? s - 1 : null)
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: payload.displayName, wallet: payload.walletAddress, link_url: payload.linkUrl }),
+        }).catch(() => {})
+        return true
+      }
+      const d = await r.json().catch(() => ({}))
+      showToast(`Fee paid (tx ${feeRef}…) but save failed: ${d.error || ('HTTP ' + r.status)}. Tap “Retry submission” — no new fee.`, 'e')
+      return false
+    } catch {
+      showToast(`Fee paid (tx ${feeRef}…) but save failed (network). Tap “Retry submission” — no new fee.`, 'e')
+      return false
+    }
+  }
+
+  // Recovery path: retry the save for an already-paid submission (no new fee).
+  const retrySubmit = async () => {
+    if (!pendingSubmit || submitting) return
+    setSubmitting(true)
+    const ok = await saveSubmission(pendingSubmit)
+    if (ok) {
+      setPendingSubmit(null)
+      setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
+    }
+    setSubmitting(false)
+  }
 
   const submit = async () => {
     if (!connected) { showToast('Connect your wallet first','e'); return }
@@ -1457,52 +1491,40 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
     if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
 
-    // Rate limiting: max 3 per wallet per week
-    const ago = new Date(Date.now() - 7*24*60*60*1000).toISOString()
-    const prevSubs = await fetch(`${SUPABASE_URL}/rest/v1/submissions?wallet_address=eq.${address}&created_at=gte.${ago}&select=id`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(r => r.json()).catch(() => [])
-    const used = Array.isArray(prevSubs) ? prevSubs.length : 0
-    if (used >= 3) { showToast('You have reached the 3 submissions per week limit','e'); return }
+    // Rate limiting: max 3 per wallet per week (authoritative check is server-side in the insert)
+    const rl = await fetch(`/api/submit-profile?wallet=${address}`).then(r => r.json()).catch(() => null)
+    if (rl && typeof rl.remaining === 'number' && rl.remaining <= 0) {
+      showToast('You have reached the 3 submissions per week limit','e'); return
+    }
 
     setSubmitting(true)
+    let feeTx
     try {
       showToast('Confirm 5 TTS submission fee in wallet…', 's')
-      const feeTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'transfer', [HOUSE_WALLET, SUBMISSION_FEE])
+      feeTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'transfer', [HOUSE_WALLET, SUBMISSION_FEE])
       showToast('Waiting for fee confirmation…', 's')
       await waitForReceipt(feeTx)
     } catch(e) {
-      const msg = e.shortMessage || e.message || 'unknown error'
-      showToast('Fee transfer failed: ' + msg.slice(0, 50), 'e')
+      // Fee not paid (rejected/failed) — nothing charged, no record. Safe to abort.
+      const { cancelled, message } = describeTxError(e, 'Fee transfer failed')
+      showToast(cancelled ? 'Transaction cancelled' : message, cancelled ? 'i' : 'e')
       setSubmitting(false)
       return
     }
 
+    // Fee is now paid on-chain. From here a failure must NOT claim success — the
+    // payload is preserved so the user can retry the save without paying again.
     setBalance(b => b - 5)
     const currentRoundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').then(r => r != null ? Number(r) : 1).catch(() => 1)
-    try {
-      const r = await fetch(SUPABASE_URL + '/rest/v1/submissions', {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ round_id: currentRoundId, wallet_address: address, payout_wallet: address, display_name: name.trim(), link_title: lt.trim(), link_url: lu.trim(), image_url: prev, status: 'pending', referral_code: clubCode.trim().toLowerCase() || null })
-      })
-      if (r.ok) {
-        showToast('Submission sent for review!', 's')
-        setSubRemaining(s => s !== null ? s - 1 : null)
-        // Notify admin via Telegram
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim(), wallet: address, link_url: lu.trim() })
-        }).catch(() => {})
-      } else showToast('Fee paid — submission queued for review.', 's')
-    } catch {
-      showToast('Fee paid — submission queued for review.', 's')
-      setSubmitting(false)
-      return
-    }
+    const payload = { walletAddress: address, payoutWallet: address, displayName: name.trim(), linkTitle: lt.trim(), linkUrl: lu.trim(), imageUrl: prev, referralCode: clubCode.trim().toLowerCase() || null, roundId: currentRoundId, feeTxHash: feeTx }
 
-    setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
+    const ok = await saveSubmission(payload)
+    if (ok) {
+      setPendingSubmit(null)
+      setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
+    } else {
+      setPendingSubmit(payload) // surfaces the retry button below
+    }
     setSubmitting(false)
   }
 
@@ -1557,7 +1579,10 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         </label>
         <div className="cost-note"><span>💳</span><span>Submission costs <strong>5 $TTS</strong> — signed on Base blockchain</span></div>
         <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
-        <button className="pbtn" onClick={submit} disabled={submitting}>{submitting ? 'Processing…' : 'Sign Contract & Submit (5 $TTS)'}</button>
+        {pendingSubmit
+          ? <button className="pbtn" onClick={retrySubmit} disabled={submitting} style={{ background:'rgba(232,64,90,.12)', borderColor:'rgba(232,64,90,.5)' }}>{submitting ? 'Retrying…' : 'Retry submission (no new fee)'}</button>
+          : <button className="pbtn" onClick={submit} disabled={submitting}>{submitting ? 'Processing…' : 'Sign Contract & Submit (5 $TTS)'}</button>}
+        {pendingSubmit && <div className="addr-warn" style={{ marginTop:8 }}>Your 5 TTS fee was paid but the submission didn’t save. Retry above — you won’t be charged again.</div>}
       </div>
       )}
     </div>
@@ -1725,7 +1750,7 @@ function HowToWinScreen() {
 
 function RulesScreen() {
   const rules = [
-    { t:'Weekly Voting Cycle', b:'Each week begins Monday 12:00 AM EDT and ends Sunday 11:59 PM EDT. Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
+    { t:'Weekly Voting Cycle', b:'Rounds run Monday 12:00 AM to Sunday 11:59 PM ET on a fixed weekly schedule (pinned to a constant UTC time, so it does not shift with daylight saving). Up to 50 approved profiles compete each week. Display order is randomized to prevent bias.' },
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
     { t:'Prize Distribution', b:'Top Voter: 35% of winning pool.\nWinning Profile: 35% of pool.\nBlockchain Entertainment LLC: 20%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
@@ -1810,8 +1835,9 @@ export default function App() {
       .then(raw => { if (raw != null) setBalance(Math.floor(Number(raw) / 1e18)) })
       .finally(() => setBalanceLoading(false))
 
-    // Signup bonus — fire once per wallet, silently fails if already claimed or not funded
-    fetch('/api/signup-bonus', {
+    // Signup bonus — fire once per wallet; quiet on benign cases (already claimed),
+    // but surface genuine failures so the user knows it didn't go through.
+    fetch('/api/bonus?action=signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ walletAddress: address }),
@@ -1819,15 +1845,16 @@ export default function App() {
       if (d.success && d.amount > 0) {
         showToast(`🎉 Welcome bonus: +${Math.floor(d.amount).toLocaleString()} $TTS sent!`, 's')
         setBalance(b => b + Math.floor(d.amount))
+      } else if (d && d.success === false && !d.alreadyClaimed && d.reason && !/already/i.test(d.reason)) {
+        showToast(`Welcome bonus pending: ${d.reason}`, 'i')
       }
-    }).catch(() => {})
+    }).catch(() => { showToast('Welcome bonus could not be processed right now.', 'i') })
 
     // 18+ acknowledgment — check once per wallet, show modal if not yet recorded
-    fetch(`${SUPABASE_URL}/rest/v1/age_acknowledgments?wallet_address=eq.${address.toLowerCase()}&select=id`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(r => r.json()).then(d => {
-      if (!Array.isArray(d) || d.length === 0) setShowAgeModal(true)
-    }).catch(() => {})
+    fetch(`/api/kyc?action=age&wallet=${address.toLowerCase()}`)
+      .then(r => r.json())
+      .then(d => { if (!d.acknowledged) setShowAgeModal(true) })
+      .catch(() => {})
   }, [isConnected, address])
 
   // Handle redirect back from Persona (?kyc_complete=1) — navigate to submit tab

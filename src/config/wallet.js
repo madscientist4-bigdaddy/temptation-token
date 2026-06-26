@@ -4,7 +4,9 @@ import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { QueryClient } from '@tanstack/react-query'
 
-export const projectId = 'fe98d44a78efa54c5bf113f649176020'
+// Public WalletConnect/Reown client id — env-driven (rotatable without a code change).
+// Falls back to the known public id so a missing env var never breaks the build.
+export const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'fe98d44a78efa54c5bf113f649176020'
 export const queryClient = new QueryClient()
 
 const metadata = {

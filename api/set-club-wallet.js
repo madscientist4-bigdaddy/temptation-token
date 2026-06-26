@@ -1,6 +1,6 @@
 // POST /api/set-club-wallet
 // Body: { clubName, clubCode, walletAddress }
-// Registers or updates a club's payout wallet on the TTSVotingV3b contract.
+// Registers or updates a club's payout wallet on the TTSVotingV3d contract.
 // Also upserts the club into the club_partners table in Supabase.
 // Pass walletAddress: "0x0000000000000000000000000000000000000000" to deregister.
 // Requires: DEPLOYER_PRIVATE_KEY in Vercel env.
@@ -9,7 +9,7 @@ import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const VOTING_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'
+const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const SUPABASE_URL   = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'

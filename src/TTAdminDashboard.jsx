@@ -1,26 +1,37 @@
 import React, { useState, useEffect } from "react";
+import { toFunctionSelector } from "viem";
+import { describeTxError } from "./lib/txError.js";
 
-// ─── SUPABASE CLIENT ──────────────────────────────────────────────────────────
-const SB_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k';
-const sb = {
-  get: (table, query='') => fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-  }).then(r => r.json()),
-  patch: (table, query, body) => fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-    method: 'PATCH',
-    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-    body: JSON.stringify(body)
-  }),
-  post: (table, body) => fetch(`${SB_URL}/rest/v1/${table}`, {
+// I1: compute function selectors from their signatures so they can never drift
+// from the deployed V3d ABI again (getProfile was previously a wrong hardcode).
+const SELECTORS = {
+  currentRoundId: toFunctionSelector("currentRoundId()"),       // 0x9cbe5efd
+  getRound:       toFunctionSelector("getRound(uint256)"),      // 0x8f1327c0
+  getProfile:     toFunctionSelector("getProfile(uint256,string)"), // 0xd6ca8383
+};
+
+// ─── SUPABASE CLIENT (via gated server proxy) ─────────────────────────────────
+// All dashboard data now flows through /api/admin-data, which verifies the admin
+// session token server-side and uses the service key. The public anon key is no
+// longer used here — RLS blocks it from the browser, and PII must not be exposed.
+const ADMIN_SESSION_KEY = 'tt_admin_session';
+function adminToken() {
+  try { return JSON.parse(sessionStorage.getItem(ADMIN_SESSION_KEY) || 'null')?.token || ''; }
+  catch { return ''; }
+}
+function adminData(op, table, query = '', payload, prefer) {
+  return fetch('/api/admin-data', {
     method: 'POST',
-    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-    body: JSON.stringify(body)
-  }),
-  delete: (table, query) => fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-    method: 'DELETE',
-    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-  }),
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` },
+    body: JSON.stringify({ op, table, query, payload, prefer }),
+  });
+}
+const sb = {
+  get: (table, query='') => adminData('get', table, query).then(r => r.json()).catch(() => []),
+  patch: (table, query, body) => adminData('patch', table, query, body),
+  post: (table, body) => adminData('post', table, '', body),
+  upsert: (table, body) => adminData('post', table, '', body, 'return=minimal,resolution=merge-duplicates'),
+  delete: (table, query) => adminData('delete', table, query),
 };
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -675,6 +686,17 @@ const injectStyles = () => {
       .stat-grid { grid-template-columns: 1fr 1fr; }
       .hamburger-btn { display: flex !important; }
       .adm-table th, .adm-table td { padding: 10px 12px; white-space: nowrap; }
+      /* Every table card scrolls horizontally instead of overflowing the viewport */
+      .table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
+    @media (max-width: 480px) {
+      .adm-page { padding: 12px; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .cmd-health-grid, .review-grid, .wallet-panel-grid { grid-template-columns: 1fr; }
+      .cmd-divider { border-left: none; padding-left: 0; }
+      .cmd-time { font-size: 2.1rem; }
+      .page-title { font-size: 1.2rem; }
+      .adm-table th, .adm-table td { padding: 8px 10px; font-size: 0.72rem; }
     }
     .hamburger-btn {
       display: none;
@@ -916,10 +938,27 @@ function LoginScreen({ onLogin }) {
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const handle = () => {
-    if (user === "admin" && pass === "TTS2026Admin!") { onLogin(); }
-    else { setErr("Invalid credentials. Contact your system administrator."); }
+  // Credentials are validated server-side (/api/admin-auth); the password is
+  // never present in client code. On success the server returns a signed,
+  // short-lived session token.
+  const handle = async () => {
+    if (busy) return;
+    setErr(""); setBusy(true);
+    try {
+      const r = await fetch('/api/admin-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pass }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.ok && d.token) { onLogin(d.token, d.exp); }
+      else if (r.status === 401) { setErr("Invalid credentials. Contact your system administrator."); }
+      else { setErr(d.error || "Authentication failed. Please try again."); }
+    } catch {
+      setErr("Network error — could not reach the auth server.");
+    } finally { setBusy(false); }
   };
 
   return (
@@ -928,8 +967,8 @@ function LoginScreen({ onLogin }) {
         <div className="login-logo">✦ Temptation Token</div>
         <div className="login-sub">Admin Portal · Blockchain Entertainment LLC</div>
         <input className="login-field" type="text" placeholder="Username" value={user} onChange={e => setUser(e.target.value)} autoComplete="off" />
-        <input className="login-field" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && handle()} />
-        <button className="login-btn" onClick={handle}>Access Dashboard</button>
+        <input className="login-field" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && !busy && handle()} />
+        <button className="login-btn" onClick={handle} disabled={busy}>{busy ? "Authenticating…" : "Access Dashboard"}</button>
         {err && <div className="login-err">{err}</div>}
         <div style={{ marginTop: 20, fontSize: "0.58rem", color: "var(--muted)", lineHeight: 1.7 }}>
           This portal is restricted to authorized personnel only.<br />
@@ -954,6 +993,7 @@ function OverviewScreen() {
   const [votes, setVotes] = useState([]);
   const [totalPool, setTotalPool] = useState(0);
   const [livePool, setLivePool] = useState(null);
+  const [votesReadError, setVotesReadError] = useState(null); // M7: surface on-chain read failures
 
   useEffect(() => {
     // Total users — count distinct voter_wallet from votes table
@@ -985,31 +1025,42 @@ function OverviewScreen() {
     // Live on-chain pool + rankings from on-chain getProfile
     getRoundInfo().then(async info => {
       if (!info || info.error) return;
-      const enc = '0x8f1327c0' + info.roundId.toString(16).padStart(64, '0');
+      const enc = SELECTORS.getRound + info.roundId.toString(16).padStart(64, '0');
       const res = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: enc }, 'latest']).catch(() => null);
       if (res && res !== '0x') {
         const rawVotes = Number(BigInt('0x' + res.slice(2 + 3 * 64, 2 + 4 * 64))) / 1e18;
         setLivePool(rawVotes);
         setStats(s => s.map((st, i) => i === 2 ? { ...st, value: Math.round(rawVotes).toLocaleString() } : st));
       }
-      // Fetch on-chain vote counts per profile
+      // Fetch on-chain vote counts per profile.
+      // M7 NOTE (future optimization): these are N separate eth_calls. They can be
+      // batched into a single Multicall3 aggregate3 call (Base Multicall3 =
+      // 0xcA11bde05977b3631167028862bE2a173976CA11) to cut RPC round-trips. Deferred
+      // for now — the per-call reads work and batching is a non-trivial encode/decode
+      // change; not worth risking the working path. Read failures are surfaced below
+      // instead of being silently treated as zero votes.
       try {
         const approved = await sb.get('submissions', `status=eq.approved&round_id=eq.${info.roundId}&select=id,display_name`);
         if (Array.isArray(approved) && approved.length > 0) {
+          let readErrors = 0;
           const profileVotes = await Promise.all(approved.map(async p => {
             const padRound = info.roundId.toString(16).padStart(64,'0');
             const padId = [...new TextEncoder().encode(p.id)].map(b=>b.toString(16).padStart(2,'0')).join('');
             const offset = '40'.padStart(64,'0');
             const len = p.id.length.toString(16).padStart(64,'0');
             const padded = padId.padEnd(64,'0');
-            const data = '0x76c2c389' + padRound + offset + len + padded;
+            const data = SELECTORS.getProfile + padRound + offset + len + padded;
             const r = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data }, 'latest']).catch(() => null);
-            let votes = 0;
-            if (r && r !== '0x' && r.length >= 2 + 5*64) {
-              votes = Number(BigInt('0x' + r.slice(2 + 2*64, 2 + 3*64))) / 1e18;
+            if (!r || r === '0x' || r.length < 2 + 5*64) {
+              readErrors++;
+              return { name: p.display_name || p.id.slice(0,8)+'…', votes: 0, error: true };
             }
-            return { name: p.display_name || p.id.slice(0,8)+'…', votes };
+            const votes = Number(BigInt('0x' + r.slice(2 + 2*64, 2 + 3*64))) / 1e18;
+            return { name: p.display_name || p.id.slice(0,8)+'…', votes, error: false };
           }));
+          // Surface read failures rather than swallowing them as silent zeros.
+          setVotesReadError(readErrors > 0 ? `${readErrors}/${approved.length} profile reads failed (showing 0)` : null);
+          if (readErrors > 0) console.warn(`KPI: ${readErrors}/${approved.length} on-chain profile reads failed`);
           const sorted = profileVotes.sort((a,b) => b.votes - a.votes);
           const total = sorted.reduce((s,p) => s+p.votes, 0);
           if (total > 0) {
@@ -1017,7 +1068,10 @@ function OverviewScreen() {
             setTotalPool(total);
           }
         }
-      } catch(_) {}
+      } catch(e) {
+        setVotesReadError('on-chain vote read failed');
+        console.warn('KPI per-profile read error:', e);
+      }
     }).catch(() => {});
   }, []);
   const pool = livePool !== null ? livePool : totalPool;
@@ -1044,6 +1098,11 @@ function OverviewScreen() {
           <span className="table-head-title">📊 Live Vote Rankings</span>
           <span className="table-count">Week of {weekLabel}</span>
         </div>
+        {votesReadError && (
+          <div style={{ padding:'8px 16px', fontSize:'.62rem', color:'var(--amber)', background:'rgba(255,193,7,.06)' }}>
+            ⚠ On-chain read issue: {votesReadError}
+          </div>
+        )}
         <table className="adm-table">
           <thead>
             <tr>
@@ -1088,9 +1147,6 @@ function OverviewScreen() {
   );
 }
 
-const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k';
-
 function ReviewScreen({ showToast }) {
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1104,10 +1160,7 @@ function ReviewScreen({ showToast }) {
     const query = status === 'all'
       ? 'status=in.(pending,approved)&select=*&order=created_at.asc'
       : `status=eq.${status}&select=*&order=created_at.asc`;
-    fetch(SUPABASE_URL + '/rest/v1/submissions?' + query, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-    })
-    .then(r => r.json())
+    sb.get('submissions', query)
     .then(data => {
       setQueue(Array.isArray(data) ? data.map(r => ({
         id: r.id,
@@ -1127,9 +1180,7 @@ function ReviewScreen({ showToast }) {
   useEffect(() => { loadQueue(); }, [filterStatus]);
 
   const generateOnchainCalldata = async () => {
-    const approved = await fetch(SUPABASE_URL + '/rest/v1/submissions?status=eq.approved&select=id,display_name,payout_wallet,wallet_address', {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-    }).then(r => r.json()).catch(() => []);
+    const approved = await sb.get('submissions', 'status=eq.approved&select=id,display_name,payout_wallet,wallet_address').catch(() => []);
     if (!Array.isArray(approved) || approved.length === 0) { showToast('No approved profiles found', 'e'); return; }
     const ids = approved.map(s => s.id || s.display_name);
     const wallets = approved.map(s => s.payout_wallet || s.wallet_address || DEPLOYER);
@@ -1148,11 +1199,10 @@ function ReviewScreen({ showToast }) {
     if (action === "approve") {
       // Block approval if submitter wallet is not KYC-verified.
       // Checks: verified_submitters (Persona KYC), wallet_verifications (legacy manual), verified_wallet_links (linked wallets).
-      const hdrs = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
       const [_vs, _wv, _wl] = await Promise.all([
-        fetch(SUPABASE_URL + '/rest/v1/verified_submitters?wallet_address=eq.' + wallet + '&status=eq.approved&select=id', { headers: hdrs }).then(r => r.json()).catch(() => []),
-        fetch(SUPABASE_URL + '/rest/v1/wallet_verifications?wallet_address=eq.' + wallet + '&is_verified=eq.true&select=id', { headers: hdrs }).then(r => r.json()).catch(() => []),
-        fetch(SUPABASE_URL + '/rest/v1/verified_wallet_links?linked_wallet=eq.' + wallet + '&select=id', { headers: hdrs }).then(r => r.json()).catch(() => []),
+        sb.get('verified_submitters', 'wallet_address=eq.' + wallet + '&status=eq.approved&select=id').catch(() => []),
+        sb.get('wallet_verifications', 'wallet_address=eq.' + wallet + '&is_verified=eq.true&select=id').catch(() => []),
+        sb.get('verified_wallet_links', 'linked_wallet=eq.' + wallet + '&select=id').catch(() => []),
       ]);
       const isKycVerified = [_vs, _wv, _wl].some(d => Array.isArray(d) && d.length > 0);
       if (!isKycVerified) {
@@ -1178,11 +1228,7 @@ function ReviewScreen({ showToast }) {
         showToast(`Error: ${e.message}`, "error");
       }
     } else {
-      await fetch(SUPABASE_URL + '/rest/v1/submissions?id=eq.' + id, {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ status: 'rejected' })
-      });
+      await sb.patch('submissions', 'id=eq.' + id, { status: 'rejected' });
       setQueue(q => q.filter(s => s.id !== id));
       showToast("✕ Profile denied", "info");
     }
@@ -1714,10 +1760,10 @@ const WALLETS_CONFIG = [
   { label: "House / Revenue", name: "Blockchain Entertainment LLC", addr: HOUSE_WALLET, role: "House cut (10%), deployer, admin" },
   { label: "Marketing / Bonus", name: "Marketing & Bonus Wallet", addr: MARKETING_WALLET, role: "Signup bonus + vote-match TTS payouts" },
   { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
-  { label: "Voting Contract", name: "TTSVotingV3b — Escrow", addr: '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6', role: "Holds votes during active round" },
+  { label: "Voting Contract", name: "TTSVotingV3d — Escrow", addr: '0x783b8cd80b586b723188c93ef94ee1beede617b4', role: "Holds votes during active round" },
   { label: "Staking Contract", name: "TTSStaking", addr: '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc', role: "Staked TTS lockup + APR distribution" },
   { label: "NFT Contract", name: "TTSRoundNFT", addr: '0x0768e862D3AB14d85213BfeF8f1D012E77721da2', role: "Round winner NFT trophies (minting Round 2+)" },
-  { label: "Keeper / Automation", name: "TTSKeeper2", addr: '0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48', role: "Chainlink automation: start, snapshot, settle, rollover" },
+  { label: "Keeper / Automation", name: "TTSKeeper3", addr: '0x363ce4960e3b459f5892587a37ae1ff2ed04442c', role: "Chainlink automation (V3d): calendar-pinned start, snapshot, settle, rollover" },
   { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
 ];
 
@@ -1813,7 +1859,7 @@ function WalletsScreen() {
   );
 }
 
-const V3_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6';
+const V3_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4';
 const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
 async function fetchSettlementTransfers(txHash, winnerWallet) {
@@ -2137,6 +2183,7 @@ function ReferralScreen({ showToast }) {
   const [clubsLoading, setClubsLoading] = React.useState(true)
   const [newClub, setNewClub] = React.useState({ clubName:'', clubCode:'', walletAddress:'' })
   const [addingClub, setAddingClub] = React.useState(false)
+  const [removingClub, setRemovingClub] = React.useState(null) // I6: in-flight guard (holds the code being removed)
 
   React.useEffect(() => {
     sb.get('referral_settings','id=eq.1&select=*').then(d => { if(Array.isArray(d)&&d.length>0) setSettings(d[0]) }).catch(()=>{})
@@ -2205,7 +2252,9 @@ function ReferralScreen({ showToast }) {
   }
 
   const removeClub = async (code) => {
+    if (removingClub) return // I6: prevent double-clicks firing multiple deregister txs
     if (!window.confirm(`Deregister club "${code}"? Their wallet will no longer receive payouts.`)) return
+    setRemovingClub(code)
     try {
       const r = await fetch('/api/set-club-wallet', {
         method:'POST',
@@ -2216,6 +2265,7 @@ function ReferralScreen({ showToast }) {
       if (d.ok) { showToast(`Club ${code} deregistered`,'success'); loadClubs() }
       else showToast(`Failed: ${d.error}`,'error')
     } catch { showToast('Request failed','error') }
+    finally { setRemovingClub(null) }
   }
 
   const save = async () => {
@@ -2297,8 +2347,8 @@ function ReferralScreen({ showToast }) {
                       </span>
                     </td>
                     <td>
-                      <button onClick={()=>removeClub(c.club_code)} style={{background:"rgba(232,64,90,.1)",border:"1px solid rgba(232,64,90,.3)",borderRadius:4,color:"var(--rose)",padding:"4px 10px",fontSize:".68rem",cursor:"pointer"}}>
-                        Remove
+                      <button onClick={()=>removeClub(c.club_code)} disabled={!!removingClub} style={{background:"rgba(232,64,90,.1)",border:"1px solid rgba(232,64,90,.3)",borderRadius:4,color:"var(--rose)",padding:"4px 10px",fontSize:".68rem",cursor: removingClub ? "not-allowed" : "pointer", opacity: removingClub ? 0.5 : 1}}>
+                        {removingClub === c.club_code ? 'Removing…' : 'Remove'}
                       </button>
                     </td>
                   </tr>
@@ -2433,16 +2483,55 @@ function ContractSettingsSection() {
     if (!connectedWallet) { alert('Connect wallet first'); return; }
     setPending(p => ({ ...p, [label]: true }));
     try {
+      // 1. Verify Base mainnet (8453 / 0x2105) at send time; attempt a switch if not.
+      let chainHex = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainHex !== '0x2105') {
+        try {
+          await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x2105' }] });
+          chainHex = await window.ethereum.request({ method: 'eth_chainId' });
+        } catch (_) { /* fall through to the guard below */ }
+      }
+      if (chainHex !== '0x2105') {
+        alert(`✕ ${label} aborted — wallet is not on Base mainnet (8453). Switch network and try again.`);
+        setPending(p => ({ ...p, [label]: false }));
+        return;
+      }
+
+      // 2. Estimate gas (+25% buffer); fall back to a safely high limit if estimate fails.
+      let gas = '0xC3500'; // 800,000 fallback
+      try {
+        const est = await window.ethereum.request({ method: 'eth_estimateGas', params: [{ from: connectedWallet, to, data }] });
+        gas = '0x' + Math.ceil(Number(BigInt(est)) * 1.25).toString(16);
+      } catch (_) { /* keep fallback */ }
+
+      // 3. Send.
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ from: connectedWallet, to, data, gas: '0x30D40' }]
+        params: [{ from: connectedWallet, to, data, gas }]
       });
-      alert(`✓ ${label} transaction sent!\n\nTx: ${txHash}\n\nWaiting for confirmation on BaseScan.`);
-      setTimeout(loadCurrentValues, 5000);
+      alert(`${label}: transaction submitted.\n\nTx: ${txHash}\n\nWaiting for on-chain confirmation…`);
+
+      // 4. Await the receipt and check for revert (status 0x0).
+      let receipt = null;
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 2500));
+        receipt = await rpcCall('eth_getTransactionReceipt', [txHash]).catch(() => null);
+        if (receipt) break;
+      }
+      if (!receipt) {
+        alert(`${label}: still pending after timeout.\n\nCheck BaseScan: https://basescan.org/tx/${txHash}`);
+      } else if (receipt.status === '0x0') {
+        alert(`✕ ${label} REVERTED on-chain — the change was NOT applied.\n\nTx: ${txHash}`);
+      } else {
+        alert(`✓ ${label} confirmed on-chain.\n\nTx: ${txHash}`);
+        loadCurrentValues();
+      }
     } catch(e) {
-      alert(`Transaction failed: ${e.message}`);
+      const { cancelled, message } = describeTxError(e, `${label} failed`);
+      alert(cancelled ? 'Transaction cancelled.' : message);
+    } finally {
+      setPending(p => ({ ...p, [label]: false }));
     }
-    setPending(p => ({ ...p, [label]: false }));
   };
 
   const settings = [
@@ -2539,15 +2628,7 @@ function BonusConfigSection({ showToast }) {
     try {
       const now = new Date().toISOString()
       const upsertRows = Object.entries(config).map(([key, value]) => ({ key, value, updated_at: now }))
-      await fetch(`${SB_URL}/rest/v1/admin_config`, {
-        method: 'POST',
-        headers: {
-          apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal,resolution=merge-duplicates',
-        },
-        body: JSON.stringify(upsertRows),
-      })
+      await sb.upsert('admin_config', upsertRows)
 
       // Audit log: one entry per changed key
       const auditRows = Object.entries(config)
@@ -2707,17 +2788,12 @@ function SettingsScreen() {
 
 
 // ─── SYSTEM HEALTH SCREEN ─────────────────────────────────────────────────────
-const VOTING_ADDRESS = '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6'; // TTSVotingV3b
+const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'; // TTSVotingV3d
 const CHAINLINK_REGISTRY = '0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743';
-// TODO(post-V3c): Cancel all 4 upkeeps below at automation.chain.link to recover ~27.4 LINK.
-// Then register ONE new Custom Logic upkeep pointing at TTSKeeper2V2, fund with 10 LINK.
-// Replace this array with: [{ name: 'TTS Game Keeper V2', known: 10, id: '<NEW_UPKEEP_ID_FROM_CHAINLINK_UI>' }]
-// Step-by-step: outputs/v3c_v2_deployment_runbook.md §7 and outputs/chainlink_automation_runbook.md
+// V3d cutover (2026-06-24): Keeper3 calendar-pinned upkeep is the single live upkeep.
+// Old V3b/V3c-era upkeeps to be cancelled at automation.chain.link to recover LINK.
 const UPKEEPS = [
-  { name: 'TTS Link Reserve Monitor', known: 7.11, id: '43621180820595228289765408559964550834819164637810952818427682374779443797241' },
-  { name: 'TTS Settle Or Rollover',   known: 6.2, id: '37237305312459454425630512539791531504862369275836338221195918127936604287744' },
-  { name: 'TTS Midpoint Snapshot',    known: 8.2, id: '25040729748274160188348520481105222267210028754192981237136808224459792109720' },
-  { name: 'TTS Start Round',          known: 5.9, id: '33942747581357005304782281231482493992400590377678296430206822813246412566551' },
+  { name: 'TTS Game Keeper V3d', known: 10, id: '113446314522587151772280129999432062856069985411437977877707978564657748455208' },
 ];
 const BASE_RPC = '/api/rpc';
 
@@ -2739,11 +2815,11 @@ async function ethCall(to, data) {
 async function getRoundInfo() {
   try {
     // currentRoundId() - selector: keccak256("currentRoundId()")[0:4]
-    const idHex = await ethCall(VOTING_ADDRESS, '0x9cbe5efd');
+    const idHex = await ethCall(VOTING_ADDRESS, SELECTORS.currentRoundId);
     if (!idHex || idHex === '0x') return { error: true };
     const roundId = parseInt(idHex.slice(2, 66), 16);
     // getRound(uint256) - selector: keccak256("getRound(uint256)")[0:4]  
-    const encoded = '0x8f1327c0' + roundId.toString(16).padStart(64, '0');
+    const encoded = SELECTORS.getRound + roundId.toString(16).padStart(64, '0');
     const result = await ethCall(VOTING_ADDRESS, encoded);
     if (!result || result === '0x') return { roundId, error: true };
     const vals = [];
@@ -2964,7 +3040,7 @@ function SystemScreen() {
         </table>
         <div style={{padding:'10px 16px',fontSize:'.62rem',color:'var(--muted)',lineHeight:1.7}}>
           ✅ <strong style={{color:'var(--green)'}}>Chainlink crons confirmed</strong> — Round starts Monday 12:00 AM EDT, settles Sunday 11:59 PM EDT automatically.
-          {' '}TTSVotingV3b does NOT auto-start the next round after settlement — the <strong>TTS Start Round</strong> keeper fires Monday 04:00 UTC (12:00 AM EDT). If it misses, use Manual Round Control below to start manually.
+          {' '}TTSVotingV3d uses calendar-pinned automation — TTSKeeper3 auto-starts the next round and settles each Monday 04:59 UTC (Sunday 11:59 PM EST) with no drift. Manual Round Control below is only a fallback if a keeper run is ever missed.
           {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify at automation.chain.link →</a>
         </div>
       </div>
@@ -2973,15 +3049,15 @@ function SystemScreen() {
       <div className="table-card" style={{ marginTop: 20 }}>
         <div className="table-head">
           <div className="table-head-title">🎮 Manual Round Control</div>
-          <span style={{ fontSize:'0.6rem', color:'var(--muted)' }}>Via TTSKeeper2 · Requires owner wallet</span>
+          <span style={{ fontSize:'0.6rem', color:'var(--muted)' }}>Via TTSKeeper3 · Requires owner wallet</span>
         </div>
         <div style={{ padding: 20 }}>
           <div style={{ fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8, marginBottom:16 }}>
-            These actions call TTSKeeper2 (<code style={{ fontFamily:'monospace', color:'var(--gold-dim)' }}>0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48</code>) using the owner wallet (deployer). Click a button to open the BaseScan write contract page pre-filled.
+            These actions call TTSKeeper3 (<code style={{ fontFamily:'monospace', color:'var(--gold-dim)' }}>0x363ce4960e3b459f5892587a37ae1ff2ed04442c</code>) using the owner wallet (Bank). Click a button to open the BaseScan write contract page pre-filled.
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[
-              { label:'▶ Start New Round', desc:'Calls manualExecute(1) — starts Round on TTSVotingV3', fn:'manualExecute', arg:'1', color:'var(--green)' },
+              { label:'▶ Start New Round', desc:'Calls manualExecute(1) — starts Round on TTSVotingV3d', fn:'manualExecute', arg:'1', color:'var(--green)' },
               { label:'⏩ Force Settle', desc:'Calls manualExecute(3) — triggers round settlement', fn:'manualExecute', arg:'3', color:'var(--amber)' },
               { label:'📋 Approve All Pending', desc:'Copy calldata for batchApproveProfiles — paste into BaseScan', fn:'batchApproveProfiles', arg:null, color:'var(--gold)' },
             ].map((a, i) => (
@@ -2993,7 +3069,7 @@ function SystemScreen() {
                 <a
                   href={a.fn === 'batchApproveProfiles'
                     ? `https://basescan.org/address/${V3_ADDRESS}#writeContract`
-                    : `https://basescan.org/address/0xB17b3842E2CFf594d8886e77277f4B6fC7C61A48#writeContract`}
+                    : `https://basescan.org/address/0x363ce4960e3b459f5892587a37ae1ff2ed04442c#writeContract`}
                   target="_blank" rel="noopener noreferrer"
                   style={{ textDecoration:'none', flexShrink:0 }}>
                   <button style={{ background:'transparent', border:`1px solid ${a.color}`, color:a.color, padding:'8px 16px', borderRadius:6, cursor:'pointer', fontSize:'0.65rem', fontWeight:700, letterSpacing:'0.08em', whiteSpace:'nowrap' }}>
@@ -3004,7 +3080,7 @@ function SystemScreen() {
             ))}
           </div>
           <div style={{ marginTop:14, fontSize:'0.6rem', color:'var(--muted)', lineHeight:1.7 }}>
-            ℹ Connect the TTSKeeper2 owner wallet in MetaMask on BaseScan. For <strong>Start New Round</strong> and <strong>Force Settle</strong>, call <code style={{ fontFamily:'monospace' }}>manualExecute(1)</code> or <code style={{ fontFamily:'monospace' }}>manualExecute(3)</code>. For <strong>Approve All Pending</strong>, open TTSVotingV3 write contract and call <code style={{ fontFamily:'monospace' }}>batchApproveProfiles</code> with the profile IDs and wallet addresses from the Review tab.
+            ℹ Connect the TTSKeeper3 owner wallet (Bank) in MetaMask on BaseScan. For <strong>Start New Round</strong> and <strong>Force Settle</strong>, call <code style={{ fontFamily:'monospace' }}>manualExecute(1)</code> or <code style={{ fontFamily:'monospace' }}>manualExecute(3)</code>. For <strong>Approve All Pending</strong>, open TTSVotingV3d write contract and call <code style={{ fontFamily:'monospace' }}>batchApproveProfiles</code> with the profile IDs and wallet addresses from the Review tab.
           </div>
         </div>
       </div>
@@ -3830,7 +3906,7 @@ function CommandScreen({ setActive }) {
       const roundInfo = await getRoundInfo();
       setRound(roundInfo);
       if (roundInfo && !roundInfo.error) {
-        const encoded = '0x8f1327c0' + roundInfo.roundId.toString(16).padStart(64, '0');
+        const encoded = SELECTORS.getRound + roundInfo.roundId.toString(16).padStart(64, '0');
         const result = await ethCall(VOTING_ADDRESS, encoded);
         if (result && result !== '0x') {
           const raw = result.slice(2);
@@ -4587,44 +4663,33 @@ export default function AdminApp() {
   useEffect(() => { injectStyles(); }, []);
 
   const SESSION_KEY = 'tt_admin_session'
-  const SESSION_TTL = 86400000 // 24 hours
 
-  const [loggedIn, setLoggedIn] = useState(() => {
+  // Session = the server-issued signed token + its server-set expiry. The token
+  // is HMAC-signed by /api/admin-auth, so its lifetime cannot be forged or
+  // extended client-side.
+  const readSession = () => {
     try {
       const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')
-      return !!(s && s.at && Date.now() - s.at < SESSION_TTL)
-    } catch { return false }
-  })
+      return (s && s.token && typeof s.exp === 'number' && Date.now() < s.exp) ? s : null
+    } catch { return null }
+  }
 
-  // Persist session to sessionStorage
+  const [loggedIn, setLoggedIn] = useState(() => !!readSession())
+
+  const handleLogin = (token, exp) => {
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, exp })) } catch {}
+    setLoggedIn(true)
+  }
+
+  // Clear stored token on logout.
   useEffect(() => {
-    if (loggedIn) {
-      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now() })) } catch {}
-    } else {
-      try { sessionStorage.removeItem(SESSION_KEY) } catch {}
-    }
+    if (!loggedIn) { try { sessionStorage.removeItem(SESSION_KEY) } catch {} }
   }, [loggedIn])
 
-  // Refresh session TTL on any user activity
+  // Expire the local session once the token's exp passes.
   useEffect(() => {
     if (!loggedIn) return
-    const refresh = () => {
-      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now() })) } catch {}
-    }
-    window.addEventListener('click', refresh, { passive: true })
-    window.addEventListener('keydown', refresh, { passive: true })
-    return () => { window.removeEventListener('click', refresh); window.removeEventListener('keydown', refresh) }
-  }, [loggedIn])
-
-  // Expire session when TTL elapses without activity
-  useEffect(() => {
-    if (!loggedIn) return
-    const t = setInterval(() => {
-      try {
-        const s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')
-        if (!s || !s.at || Date.now() - s.at >= SESSION_TTL) setLoggedIn(false)
-      } catch {}
-    }, 60000)
+    const t = setInterval(() => { if (!readSession()) setLoggedIn(false) }, 60000)
     return () => clearInterval(t)
   }, [loggedIn])
 
@@ -4634,7 +4699,7 @@ export default function AdminApp() {
   const weekLabel = useCurrentWeek();
   const [toast, showToast] = useToast();
 
-  if (!loggedIn) return <div className="adm-app"><LoginScreen onLogin={() => setLoggedIn(true)} /></div>;
+  if (!loggedIn) return <div className="adm-app"><LoginScreen onLogin={handleLogin} /></div>;
 
   const screenProps = { showToast };
   const screens = {

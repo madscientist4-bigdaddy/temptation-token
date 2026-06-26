@@ -6,6 +6,13 @@
     { "source": "/api/age-acknowledge", "destination": "/api/kyc?action=age" },
     { "source": "/api/bot-health",      "destination": "/api/community-stats?action=heartbeat" },
     { "source": "/api/notify",          "destination": "/api/social-post?action=notify" },
+    { "source": "/api/admin-auth",      "destination": "/api/admin?action=auth" },
+    { "source": "/api/admin-data",      "destination": "/api/admin?action=data" },
+    { "source": "/api/public-profiles", "destination": "/api/profiles?action=list" },
+    { "source": "/api/submit-profile",  "destination": "/api/profiles?action=submit" },
+    { "source": "/api/signup-bonus",    "destination": "/api/bonus?action=signup" },
+    { "source": "/api/vote-match",      "destination": "/api/bonus?action=vote-match" },
+    { "source": "/api/referral-credit", "destination": "/api/bonus?action=referral" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

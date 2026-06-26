@@ -414,7 +414,7 @@ function tts_fixer_audit_content() {
 <table style="width:100%;border-collapse:collapse">
 <tr style="border-bottom:1px solid #ddd"><th style="text-align:left;padding:8px">Contract</th><th style="text-align:left;padding:8px">Address</th></tr>
 <tr style="border-bottom:1px solid #eee"><td style="padding:8px">TTS Token (UUPS Proxy)</td><td style="padding:8px;font-family:monospace;font-size:.8rem">0x5570eA97d53A53170e973894A9Fa7feb5785d3b9</td></tr>
-<tr style="border-bottom:1px solid #eee"><td style="padding:8px">TTSVotingV3b (Active)</td><td style="padding:8px;font-family:monospace;font-size:.8rem">0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6</td></tr>
+<tr style="border-bottom:1px solid #eee"><td style="padding:8px">TTSVotingV3d (Active)</td><td style="padding:8px;font-family:monospace;font-size:.8rem">0x783b8cd80b586b723188c93ef94ee1beede617b4</td></tr>
 <tr><td style="padding:8px">TTSStaking (Proxy)</td><td style="padding:8px;font-family:monospace;font-size:.8rem">0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc</td></tr>
 </table>
 </div>
