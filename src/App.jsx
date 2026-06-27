@@ -1607,28 +1607,27 @@ function ReferScreen({ showToast, connected }) {
 
   const shareTwitter = () => {
     if (!connected) { showToast('Connect your wallet first','e'); return }
-    const txt = encodeURIComponent('Playing Temptation Token — vote on profiles and win $TTS every week. Join with my link and we both get bonus tokens 🔥')
+    const txt = encodeURIComponent('Playing Temptation Token — vote on profiles and win $TTS every week. Join with my link and claim your 500 $TTS sign-up bonus 🔥')
     const url = encodeURIComponent(referralLink)
     window.open(`https://twitter.com/intent/tweet?text=${txt}&url=${url}`, '_blank')
   }
 
   const shareTelegram = () => {
     if (!connected) { showToast('Connect your wallet first','e'); return }
-    const txt = encodeURIComponent('Vote on profiles and win $TTS every week. Join with my link and we both get bonus tokens 🔥')
+    const txt = encodeURIComponent('Vote on profiles and win $TTS every week. Join with my link and claim your 500 $TTS sign-up bonus 🔥')
     const url = encodeURIComponent(referralLink)
     window.open(`https://t.me/share/url?url=${url}&text=${txt}`, '_blank')
   }
 
   return (
     <div>
-      <div className="shead"><h2>Refer & Earn</h2><div className="grule"/><p>Earn $TTS for every friend you bring in. They get a bonus too.</p></div>
+      <div className="shead"><h2>Refer a Friend</h2><div className="grule"/><p>Share your link and bring friends into the game. Referral rewards are coming soon.</p></div>
       <div style={{padding:'0 16px 32px',display:'flex',flexDirection:'column',gap:20}}>
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           {[
             {icon:'🔗',title:'Share Your Link',body:'Copy your unique referral link and send it to anyone.'},
             {icon:'👤',title:'Friend Signs Up',body:'They register, connect their wallet, and claim their 500 $TTS sign-up bonus.'},
-            {icon:'💰',title:'You Both Earn',body:'You receive 10 $TTS. Your friend gets an extra 10 $TTS on top of their sign-up bonus.'},
-            {icon:'♾️',title:'No Limit',body:'Refer as many people as you want. Every successful referral pays.'},
+            {icon:'⏳',title:'Referral Rewards — Coming Soon',body:'Referral payouts are not active yet. Share your link now to grow the community; reward tracking launches in a future update.'},
           ].map((s,i) => (
             <div key={i} style={{display:'flex',gap:14,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:16,alignItems:'flex-start'}}>
               <div style={{fontSize:'1.5rem',flexShrink:0,width:32,textAlign:'center'}}>{s.icon}</div>
@@ -1643,10 +1642,8 @@ function ReferScreen({ showToast, connected }) {
         <div style={{background:'linear-gradient(135deg,rgba(212,175,55,.08),rgba(192,37,58,.06))',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
           <div style={{fontSize:'.72rem',letterSpacing:'.14em',textTransform:'uppercase',color:'var(--gold)',fontWeight:700,marginBottom:14}}>Bonus Breakdown</div>
           {[
-            ['You (referrer)','+10 $TTS per referral','var(--gold-light)'],
-            ['Your friend (new user)','+10 $TTS on top of sign-up bonus','var(--gold-light)'],
-            ["Friend's sign-up bonus",'500 $TTS (all new users)','var(--muted)'],
-            ['Total your friend receives','110 $TTS on day one','var(--green)'],
+            ["Friend's sign-up bonus",'500 $TTS (all new users)','var(--green)'],
+            ['Referrer reward','Coming soon','var(--muted)'],
           ].map(([l,v,col]) => (
             <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'10px 0',borderBottom:'1px solid var(--border2)',gap:12}}>
               <span style={{fontSize:'.8rem',color:'var(--muted)',flexShrink:0}}>{l}</span>

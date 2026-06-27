@@ -23,7 +23,7 @@ CONTRACT ADDRESSES (Base Mainnet):
 - NFT: 0x0768e862D3AB14d85213BfeF8f1D012E77721da2
 
 STAKING TIERS: Bronze $50+ (8% APR, 1.1x vote boost) | Silver $100+ (12% APR, 1.25x) | Gold $250+ (18% APR, 1.5x) | Diamond $1,000+ (32% APR, 2x) | VIP $5,000+ (45% APR, 3x). Live TTS equivalent shown in app based on current price.
-REFERRALS: Referrer earns a bonus (admin-configurable amount) when they bring a new user who connects a wallet.
+REFERRALS: Users can share a referral link to invite friends. Referral rewards/payouts are NOT active yet — they are coming soon. New users still get the 500 $TTS sign-up bonus when they connect a wallet. Do not promise any referral payout to the referrer.
 BUY TTS: Uniswap on Base — app.uniswap.org — contract 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
 
 You have access to a web search tool. Use it to:
