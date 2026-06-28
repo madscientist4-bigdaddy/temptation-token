@@ -95,6 +95,10 @@ def set_age_verified(uid):
         con.execute("UPDATE users SET age_verified=1 WHERE uid=?", (uid,)); con.commit()
 
 def record_referral(referrer_code, new_uid):
+    # Captures the Telegram referral link locally (SQLite). NOTE: payouts are
+    # wallet-based; the bot has no Telegram-uid -> wallet mapping, so a bot
+    # referral does not auto-pay. Cross-system linkage is a go-live dependency.
+    # Bot referral UI stays "coming soon" until that bridge + funded wallet exist.
     with db() as con:
         if not con.execute("SELECT id FROM referrals WHERE new_uid=?", (new_uid,)).fetchone():
             con.execute("INSERT INTO referrals (referrer_code,new_uid,created_at) VALUES (?,?,?)",

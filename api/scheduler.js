@@ -4,10 +4,91 @@
 //   2. AT 10AM UTC daily: post round status update to Telegram
 
 import crypto from 'crypto'
+import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
+import { base } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts'
+import { evaluateAutoFund } from './_lib/autofund.js'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
+
+// ── Referral-wallet auto-funder (Marketing → referral wallet; NEVER Bank) ──────
+const TTS_ADDRESS        = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
+const REFERRAL_WALLET    = '0x216a4555E11dcA788a78Cfe6F47277ADf396FF40'
+const MARKETING_WALLET   = '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB'
+const TTS_TRANSFER_ABI   = parseAbi([
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function balanceOf(address) view returns (uint256)',
+])
+const numv = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d }
+// Service-key Supabase (cron context) — falls back to anon if unset.
+function sbService(path, opts = {}) {
+  const key = process.env.SUPABASE_SERVICE_KEY || SUPABASE_KEY
+  return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    ...opts,
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  })
+}
+
+// Runs daily. Disabled by default (auto_fund_enabled=false) and REFUSES without
+// MARKETING_WALLET_PRIVATE_KEY. All clamps/solvency live in evaluateAutoFund().
+async function runAutoFunder() {
+  let s = {}
+  try { const d = await (await sbService('/referral_settings?id=eq.1&select=*&limit=1')).json(); if (Array.isArray(d) && d[0]) s = d[0] } catch {}
+  if (s.auto_fund_enabled !== true) return { skipped: 'auto-funder disabled' } // kill switch — no on-chain reads
+
+  const hasMarketingKey = !!process.env.MARKETING_WALLET_PRIVATE_KEY
+
+  // trailing-7-day average referral payout (burn rate)
+  let dailyAvgPayout = 0
+  try {
+    const ago = new Date(Date.now() - 7 * 864e5).toISOString()
+    const credits = await (await sbService(`/referral_credits?created_at=gte.${ago}&select=amount_tts`)).json()
+    const sum = Array.isArray(credits) ? credits.reduce((a, c) => a + (Number(c.amount_tts) || 0), 0) : 0
+    dailyAvgPayout = sum / 7
+  } catch {}
+
+  // on-chain balances
+  const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  let refWalletBalance = 0, marketingBalance = 0
+  try { refWalletBalance = Number(await pub.readContract({ address: TTS_ADDRESS, abi: TTS_TRANSFER_ABI, functionName: 'balanceOf', args: [REFERRAL_WALLET] })) / 1e18 } catch {}
+  try { marketingBalance = Number(await pub.readContract({ address: TTS_ADDRESS, abi: TTS_TRANSFER_ABI, functionName: 'balanceOf', args: [MARKETING_WALLET] })) / 1e18 } catch {}
+
+  const decision = evaluateAutoFund({
+    enabled: true, hasMarketingKey,
+    refWalletBalance, dailyAvgPayout,
+    dailyCapTts: numv(s.program_daily_cap_tts, 10000),
+    maxDailyTopupTts: numv(s.max_daily_topup_tts, 25000),
+    maxWalletBalanceTts: numv(s.max_wallet_balance_tts, 50000),
+    marketingBalance,
+    marketingReserveFloorTts: numv(s.marketing_reserve_floor_tts, 100000),
+  })
+  if (!decision.topUp) return { skipped: decision.reason, refWalletBalance, marketingBalance }
+
+  // SEND from MARKETING only — never the Bank/DEPLOYER key.
+  const pk = process.env.MARKETING_WALLET_PRIVATE_KEY
+  const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
+  const account = privateKeyToAccount(pkHex)
+  const wallet = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
+  const amountWei = BigInt(Math.floor(decision.amount * 1e18))
+  const txHash = await wallet.writeContract({ address: TTS_ADDRESS, abi: TTS_TRANSFER_ABI, functionName: 'transfer', args: [REFERRAL_WALLET, amountWei] })
+  await pub.waitForTransactionReceipt({ hash: txHash })
+  const newBalance = refWalletBalance + decision.amount
+
+  // audit log (amount, source, trigger, new balance)
+  await sbService('/admin_audit_log', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      action: 'referral_auto_fund',
+      source: 'marketing_wallet',
+      detail: JSON.stringify({ amount: decision.amount, target: decision.target, trigger: 'below_half_target', new_balance: newBalance, tx_hash: txHash }),
+      created_at: new Date().toISOString(),
+    }),
+  }).catch(() => {})
+
+  return { topUp: true, amount: decision.amount, target: decision.target, txHash, newBalance }
+}
 const MAIN_CHANNEL_ID   = process.env.MAIN_CHANNEL_ID   || '-1002207667493'
 const COMMUNITY_CHAT_ID = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
 
@@ -415,6 +496,13 @@ export default async function handler(req, res) {
   const nowISO   = new Date().toISOString()
   const nowHour  = new Date().getUTCHours()
   const results  = { fired: [], roundStatus: null }
+
+  // ── JOB: referral-wallet auto-funder (daily, 12:00 UTC) ──────────────────
+  // Inert by default: short-circuits on auto_fund_enabled=false and refuses
+  // without MARKETING_WALLET_PRIVATE_KEY. Funds ONLY from Marketing, never Bank.
+  if (nowHour === 12) {
+    try { results.autoFund = await runAutoFunder() } catch (e) { results.autoFund = { error: e.message } }
+  }
 
   // ── JOB 1: Fire approved posts that are due ──────────────────────────────
   // Instagram posts stay status='approved' after handoff (posted_at set as notification marker).

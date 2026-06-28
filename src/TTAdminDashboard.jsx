@@ -2175,7 +2175,8 @@ function StakingScreen() {
 }
 
 function ReferralScreen({ showToast }) {
-  const [settings, setSettings] = React.useState({ signup_bonus:100, referrer_bonus:10, new_user_bonus:10, referral_enabled:true })
+  const [settings, setSettings] = React.useState({ referral_enabled:false, referrer_bonus_tts:100, min_qualifying_vote_tts:500, per_referrer_daily_cap:10, program_daily_cap_tts:10000, reserve_floor_tts:0 })
+  const [refCounts, setRefCounts] = React.useState({ captured:0, paid:0, paidTts:0 })
   const [saving, setSaving] = React.useState(false)
   const [referrers, setReferrers] = React.useState([])
   const [loading, setLoading] = React.useState(true)
@@ -2186,7 +2187,18 @@ function ReferralScreen({ showToast }) {
   const [removingClub, setRemovingClub] = React.useState(null) // I6: in-flight guard (holds the code being removed)
 
   React.useEffect(() => {
-    sb.get('referral_settings','id=eq.1&select=*').then(d => { if(Array.isArray(d)&&d.length>0) setSettings(d[0]) }).catch(()=>{})
+    sb.get('referral_settings','id=eq.1&select=*').then(d => { if(Array.isArray(d)&&d.length>0) setSettings(s => ({ ...s, ...d[0] })) }).catch(()=>{})
+
+    // Referral program counts (wallet-based tables): captured links + paid credits.
+    Promise.all([
+      sb.get('referrals','select=referee_wallet').catch(()=>[]),
+      sb.get('referral_credits','select=referee_wallet,amount_tts').catch(()=>[]),
+    ]).then(([refs, creds]) => {
+      const captured = Array.isArray(refs) ? refs.length : 0
+      const paid = Array.isArray(creds) ? creds.length : 0
+      const paidTts = Array.isArray(creds) ? creds.reduce((a,c)=>a+(Number(c.amount_tts)||0),0) : 0
+      setRefCounts({ captured, paid, paidTts })
+    }).catch(()=>{})
 
     // Load referrer counts from users table AND actual paid amounts from referral_credits
     Promise.all([
@@ -2283,6 +2295,81 @@ function ReferralScreen({ showToast }) {
         <div className="page-title">Referral Program</div>
         <div className="gold-rule"/>
         <div className="page-sub">Adjust bonuses, manage club partners, and view top referrers.</div>
+      </div>
+
+      {/* ── REFERRAL PAYOUT PROGRAM (user-referral credits) ── */}
+      <div className="stat-card" style={{marginBottom:32}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:8}}>
+          <div style={{fontSize:'.82rem',fontWeight:700,color:'var(--text)',textTransform:'uppercase',letterSpacing:'.08em'}}>Referral Payout Program</div>
+          <span style={{fontSize:'.62rem',fontWeight:700,padding:'3px 10px',borderRadius:20,
+            background: settings.referral_enabled ? 'rgba(46,204,113,.12)' : 'rgba(255,193,7,.12)',
+            color: settings.referral_enabled ? 'var(--green)' : 'var(--amber)'}}>
+            {settings.referral_enabled ? '● LIVE' : '○ DISABLED — coming soon'}
+          </span>
+        </div>
+        {!settings.referral_enabled && (
+          <div style={{fontSize:'.66rem',color:'var(--muted)',lineHeight:1.7,marginBottom:14,background:'rgba(255,193,7,.05)',border:'1px solid rgba(255,193,7,.2)',borderRadius:8,padding:'10px 12px'}}>
+            ⚠ Program is OFF (kill switch). Before enabling: (1) run <code>outputs/referral_setup.sql</code>, (2) fund a dedicated referral wallet, (3) set <code>REFERRAL_WALLET_PRIVATE_KEY</code> in Vercel (NOT the Bank key — the endpoint refuses without it), (4) flip the toggle. Capture is already recording links.
+          </div>
+        )}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+          <div><div style={{fontSize:'.58rem',color:'var(--muted)',textTransform:'uppercase'}}>Links captured</div><div style={{fontSize:'1.3rem',fontWeight:700}}>{refCounts.captured}</div></div>
+          <div><div style={{fontSize:'.58rem',color:'var(--muted)',textTransform:'uppercase'}}>Payouts made</div><div style={{fontSize:'1.3rem',fontWeight:700}}>{refCounts.paid}</div></div>
+          <div><div style={{fontSize:'.58rem',color:'var(--muted)',textTransform:'uppercase'}}>TTS disbursed</div><div style={{fontSize:'1.3rem',fontWeight:700}}>{Math.round(refCounts.paidTts).toLocaleString()}</div></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+          {[
+            ['referrer_bonus_tts','Referrer bonus (TTS)'],
+            ['min_qualifying_vote_tts','Min qualifying vote (TTS)'],
+            ['per_referrer_daily_cap','Per-referrer daily cap'],
+            ['program_daily_cap_tts','Program daily cap (TTS)'],
+            ['reserve_floor_tts','Reserve floor (TTS)'],
+          ].map(([key,label]) => (
+            <div key={key}>
+              <div style={{fontSize:'.62rem',color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'.08em'}}>{label}</div>
+              <input type="number" value={settings[key] ?? ''} onChange={e=>setSettings(s=>({...s,[key]:e.target.value===''?'':Number(e.target.value)}))}
+                style={{width:'100%',background:'rgba(255,255,255,.05)',border:'1px solid var(--border-gold)',borderRadius:6,color:'var(--text)',padding:'9px 12px',fontSize:'.82rem'}}/>
+            </div>
+          ))}
+          <label style={{display:'flex',alignItems:'center',gap:8,alignSelf:'end',fontSize:'.78rem',color:'var(--text)',cursor:'pointer'}}>
+            <input type="checkbox" checked={!!settings.referral_enabled} onChange={e=>setSettings(s=>({...s,referral_enabled:e.target.checked}))}/>
+            Program enabled (kill switch)
+          </label>
+        </div>
+
+        {/* Auto-funder (Marketing → referral wallet, never Bank) */}
+        <div style={{borderTop:'1px solid var(--border)',paddingTop:14,marginBottom:14}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
+            <div style={{fontSize:'.72rem',fontWeight:700,color:'var(--gold)',textTransform:'uppercase',letterSpacing:'.08em'}}>Auto-Funder (Marketing → referral wallet)</div>
+            <span style={{fontSize:'.6rem',fontWeight:700,padding:'3px 10px',borderRadius:20,
+              background: settings.auto_fund_enabled ? 'rgba(46,204,113,.12)' : 'rgba(255,193,7,.12)',
+              color: settings.auto_fund_enabled ? 'var(--green)' : 'var(--amber)'}}>
+              {settings.auto_fund_enabled ? '● ON' : '○ OFF'}
+            </span>
+          </div>
+          <div style={{fontSize:'.62rem',color:'var(--muted)',lineHeight:1.6,marginBottom:12}}>
+            Wallet <code style={{color:'var(--gold-dim)'}}>0x216a4555…FF40</code> · source: Marketing (never Bank). Daily top-up to target = max(daily cap, 7×avg payout) when below half-target. Refuses without <code>MARKETING_WALLET_PRIVATE_KEY</code>.
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+            {[
+              ['max_daily_topup_tts','Max single top-up (TTS)'],
+              ['max_wallet_balance_tts','Max wallet balance (TTS)'],
+              ['marketing_reserve_floor_tts','Marketing reserve floor (TTS)'],
+            ].map(([key,label]) => (
+              <div key={key}>
+                <div style={{fontSize:'.62rem',color:'var(--muted)',marginBottom:5,textTransform:'uppercase',letterSpacing:'.08em'}}>{label}</div>
+                <input type="number" value={settings[key] ?? ''} onChange={e=>setSettings(s=>({...s,[key]:e.target.value===''?'':Number(e.target.value)}))}
+                  style={{width:'100%',background:'rgba(255,255,255,.05)',border:'1px solid var(--border-gold)',borderRadius:6,color:'var(--text)',padding:'9px 12px',fontSize:'.82rem'}}/>
+              </div>
+            ))}
+            <label style={{display:'flex',alignItems:'center',gap:8,alignSelf:'end',fontSize:'.78rem',color:'var(--text)',cursor:'pointer'}}>
+              <input type="checkbox" checked={!!settings.auto_fund_enabled} onChange={e=>setSettings(s=>({...s,auto_fund_enabled:e.target.checked}))}/>
+              Auto-funder enabled
+            </label>
+          </div>
+        </div>
+
+        <button className="login-btn" onClick={save} disabled={saving} style={{minWidth:140,padding:'10px 16px',fontSize:'.78rem'}}>{saving?'Saving…':'Save Program Settings'}</button>
       </div>
 
       {/* ── CLUB PARTNERS ── */}

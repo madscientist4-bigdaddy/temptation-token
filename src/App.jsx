@@ -923,6 +923,18 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         }
       }).catch(() => { showToast('First-vote match could not be processed right now.', 'i') })
 
+      // Referral qualify trigger — INERT until the program is enabled + funded:
+      // the endpoint short-circuits on referral_enabled=false, so this is a no-op
+      // today. No UI message here (program is "coming soon"). Fires only for a
+      // qualifying ≥500 TTS vote.
+      if (a >= 500) {
+        fetch('/api/bonus?action=referral', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refereeWallet: address, qualifyingAmount: a, qualifyingTx: voteTx }),
+        }).catch(() => {})
+      }
+
       // Update UI
       setBalance(b => b - a)
       setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, votes: p.votes + a, myVotes: p.myVotes + a } : p))
@@ -1847,12 +1859,33 @@ export default function App() {
       }
     }).catch(() => { showToast('Welcome bonus could not be processed right now.', 'i') })
 
+    // Referral capture — if this wallet arrived via ?ref=<referrer>, record the
+    // link (no funds move; just builds the graph). The program stays "coming soon"
+    // until an admin enables it AND the dedicated referral wallet is funded.
+    try {
+      const ref = localStorage.getItem('tts_ref')
+      if (ref && /^0x[0-9a-fA-F]{40}$/.test(ref) && ref.toLowerCase() !== address.toLowerCase()) {
+        fetch('/api/bonus?action=refer-capture', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referrerWallet: ref, refereeWallet: address, source: 'web' }),
+        }).catch(() => {})
+      }
+    } catch {}
+
     // 18+ acknowledgment — check once per wallet, show modal if not yet recorded
     fetch(`/api/kyc?action=age&wallet=${address.toLowerCase()}`)
       .then(r => r.json())
       .then(d => { if (!d.acknowledged) setShowAgeModal(true) })
       .catch(() => {})
   }, [isConnected, address])
+
+  // Persist an inbound referral code (?ref=<wallet>) for capture on wallet connect.
+  useEffect(() => {
+    try {
+      const ref = new URLSearchParams(window.location.search).get('ref')
+      if (ref && /^0x[0-9a-fA-F]{40}$/.test(ref)) localStorage.setItem('tts_ref', ref)
+    } catch {}
+  }, [])
 
   // Handle redirect back from Persona (?kyc_complete=1) — navigate to submit tab
   useEffect(() => {

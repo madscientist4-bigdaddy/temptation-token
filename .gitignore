@@ -41,3 +41,7 @@ lib/openzeppelin-contracts-upgradeable/
 .DS_Store
 **/.DS_Store
 *\ 2.*
+
+# Python bytecode
+__pycache__/
+*.pyc

@@ -1,7 +1,8 @@
 // /api/bonus  — consolidated incentive-payout endpoint (routes via ?action=)
 //   ?action=signup      POST { walletAddress }                    -> { success, amount, txHash }
 //   ?action=vote-match  POST { walletAddress, voteAmount, txHash } -> { success, matchAmount, txHash }
-//   ?action=referral    POST { newUserWallet }                     -> { ok, ... }
+//   ?action=referral      POST { refereeWallet, qualifyingAmount, qualifyingTx } -> { ok, ... }
+//   ?action=refer-capture POST { referrerWallet, refereeWallet, source }         -> { ok }
 //
 // vercel.json rewrites preserve the original URLs:
 //   /api/signup-bonus    -> /api/bonus?action=signup
@@ -9,13 +10,19 @@
 //   /api/referral-credit -> /api/bonus?action=referral
 //
 // signup + vote-match pay from the Marketing wallet (MARKETING_WALLET_PRIVATE_KEY).
-// referral pays from the house/Deployer wallet (DEPLOYER_PRIVATE_KEY).
+// REFERRAL pays ONLY from REFERRAL_WALLET_PRIVATE_KEY — never the Bank/DEPLOYER key.
+// Abuse-defense decision logic lives in ./_lib/referral.js (pure + unit-tested).
 
 import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+import { evaluateReferralPayout, REFERRAL_DEFAULTS } from './_lib/referral.js'
 
 const TTS_ADDRESS  = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
+// Program/treasury wallets — qualifying TTS must NOT originate here (anti-sybil).
+const MARKETING_WALLET = '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB'
+const BANK_WALLET      = '0xb1e991bf617459b58964eef7756b350e675c53b5'
+const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(a || '')
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
@@ -191,63 +198,159 @@ async function handleVoteMatch(req, res, body) {
 }
 
 // ── action=referral ────────────────────────────────────────────────────────
-async function handleReferral(req, res, body) {
-  const { newUserWallet } = body
-  if (!newUserWallet || !/^0x[0-9a-fA-F]{40}$/.test(newUserWallet)) {
-    return res.status(400).json({ error: 'Invalid wallet' })
+// ── action=refer-capture ───────────────────────────────────────────────────
+// Records a referrer→referee link. No funds move here. Safe to run while the
+// program is disabled (just builds the graph). Referee is unique in the table.
+async function handleReferCapture(req, res, body) {
+  const referrer = (body.referrerWallet || '').trim()
+  const referee  = (body.refereeWallet || '').trim()
+  const source   = body.source === 'bot' ? 'bot' : 'web'
+  if (!isAddr(referrer) || !isAddr(referee)) return res.status(400).json({ ok: false, error: 'invalid wallet(s)' })
+  if (referrer.toLowerCase() === referee.toLowerCase()) return res.status(200).json({ ok: false, skipped: 'self-referral' })
+  try {
+    // Insert only if this referee has never been captured (unique index).
+    const r = await sb('/referrals', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' },
+      body: JSON.stringify({ referrer_wallet: referrer, referee_wallet: referee, source, status: 'pending', created_at: new Date().toISOString() }),
+    })
+    return res.status(200).json({ ok: r.ok })
+  } catch {
+    return res.status(502).json({ ok: false, error: 'capture failed' })
   }
+}
 
-  // Live referral settings
-  let creditAmount = 100n * 10n ** 18n
-  let enabled = true
+// ── action=referral ────────────────────────────────────────────────────────
+// Qualify + pay a referral. Pays ONLY from REFERRAL_WALLET_PRIVATE_KEY. Every
+// abuse defense is evaluated by evaluateReferralPayout() before any send.
+async function handleReferral(req, res, body) {
+  const referee = (body.refereeWallet || body.newUserWallet || '').trim()
+  const qualifyingAmount = Number(body.qualifyingAmount || 0)
+  const qualifyingTx = body.qualifyingTx || null
+  if (!isAddr(referee)) return res.status(400).json({ ok: false, error: 'invalid referee wallet' })
+
+  // Settings (defaults are safe-OFF; see referral_setup.sql)
+  let s = {}
   try {
     const r = await sb('/referral_settings?id=eq.1&select=*&limit=1')
     const d = await r.json()
-    if (Array.isArray(d) && d.length > 0) {
-      enabled = d[0].referral_enabled !== false
-      creditAmount = BigInt(Math.floor((d[0].referrer_bonus || 100) * 1e18))
-    }
+    if (Array.isArray(d) && d.length > 0) s = d[0]
   } catch {}
-  if (!enabled) return res.status(200).json({ ok: true, skipped: 'referral program disabled' })
+  const enabled       = s.referral_enabled === true
+  const bonusAmount   = num(s.referrer_bonus_tts, REFERRAL_DEFAULTS.referrerBonusTts)
+  const minQualifying = num(s.min_qualifying_vote_tts, REFERRAL_DEFAULTS.minQualifyingVoteTts)
+  const perCap        = num(s.per_referrer_daily_cap, REFERRAL_DEFAULTS.perReferrerDailyCap)
+  const progCap       = num(s.program_daily_cap_tts, REFERRAL_DEFAULTS.programDailyCapTts)
+  const reserveFloor  = num(s.reserve_floor_tts, REFERRAL_DEFAULTS.reserveFloorTts)
 
-  const pk = process.env.DEPLOYER_PRIVATE_KEY
-  if (!pk) return res.status(500).json({ error: 'DEPLOYER_PRIVATE_KEY not set' })
+  // CRITICAL: dedicated wallet only — NEVER the Bank/DEPLOYER key.
+  const pk = process.env.REFERRAL_WALLET_PRIVATE_KEY
+  const hasReferralKey = !!pk
 
-  const subRes = await sb(`/submissions?wallet_address=eq.${newUserWallet}&select=referral_code&limit=1`)
-  const subs = await subRes.json()
-  const referralCode = subs?.[0]?.referral_code
-  if (!referralCode) return res.status(200).json({ ok: true, skipped: 'no referral code' })
-
-  const refRes = await sb(`/referrals?code=eq.${encodeURIComponent(referralCode)}&select=wallet_address&limit=1`)
-  const refs = await refRes.json()
-  const referrerWallet = refs?.[0]?.wallet_address
-  if (!referrerWallet) return res.status(200).json({ ok: true, skipped: 'referral code not found' })
-
-  const creditCheck = await sb(`/referral_credits?new_user_wallet=eq.${newUserWallet}&select=id&limit=1`)
-  const existing = await creditCheck.json()
-  if (existing?.length > 0) return res.status(200).json({ ok: true, skipped: 'already credited' })
-
-  let txHash
+  // Find the referrer for this referee.
+  let referrer = null
   try {
-    txHash = await sendTTS(pk, referrerWallet, creditAmount, 'referral-credit')
-  } catch (e) {
-    return res.status(500).json({ error: e.message })
+    const r = await sb(`/referrals?referee_wallet=eq.${referee}&select=referrer_wallet&limit=1`)
+    const d = await r.json()
+    referrer = d?.[0]?.referrer_wallet || null
+  } catch {}
+
+  // Gather decision inputs (only meaningful once enabled + key + referrer exist;
+  // evaluate() still short-circuits correctly on disabled/no-key first).
+  let alreadyPaid = false, referrerPaidToday = 0, programPaidTodayTts = 0
+  let walletBalanceTts = 0
+  let funding = { fromReferrer: false, fromProgram: false, fromSignupBonus: false }
+  let fundingUnverified = false
+
+  if (enabled && hasReferralKey && referrer) {
+    const today = new Date().toISOString().split('T')[0]
+    try {
+      const [paidRes, refTodayRes, progTodayRes, bonusRes] = await Promise.all([
+        sb(`/referral_credits?referee_wallet=eq.${referee}&select=id&limit=1`),
+        sb(`/referral_credits?referrer_wallet=eq.${referrer}&created_at=gte.${today}T00:00:00Z&select=id`),
+        sb(`/referral_credits?created_at=gte.${today}T00:00:00Z&select=amount_tts`),
+        sb(`/bonus_claims?wallet_address=eq.${referee}&select=id&limit=1`),
+      ])
+      alreadyPaid = (await paidRes.json())?.length > 0
+      referrerPaidToday = (await refTodayRes.json())?.length || 0
+      const prog = await progTodayRes.json()
+      programPaidTodayTts = Array.isArray(prog) ? prog.reduce((a, x) => a + (Number(x.amount_tts) || 0), 0) : 0
+      // funded by signup/vote-match bonus → program-funded → disqualify
+      funding.fromSignupBonus = (await bonusRes.json())?.length > 0
+    } catch { fundingUnverified = true }
+
+    // On-chain funding-source check: did the referee receive TTS from the
+    // referrer or a program wallet? (best-effort; fail CLOSED on error)
+    try {
+      const fromList = [referrer, MARKETING_WALLET, BANK_WALLET]
+      const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+      const logs = await pub.getLogs({
+        address: TTS_ADDRESS,
+        event: { type: 'event', name: 'Transfer', inputs: [
+          { indexed: true, name: 'from', type: 'address' },
+          { indexed: true, name: 'to', type: 'address' },
+          { indexed: false, name: 'value', type: 'uint256' } ] },
+        args: { to: referee },
+        fromBlock: 'earliest', toBlock: 'latest',
+      })
+      for (const l of logs) {
+        const from = (l.args?.from || '').toLowerCase()
+        if (from === referrer.toLowerCase()) funding.fromReferrer = true
+        if (from === MARKETING_WALLET.toLowerCase() || from === BANK_WALLET.toLowerCase()) funding.fromProgram = true
+      }
+    } catch { fundingUnverified = true }
+
+    // Referral wallet balance vs reserve floor.
+    try {
+      const acct = privateKeyToAccount(pk.startsWith('0x') ? pk : `0x${pk}`)
+      const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+      const bal = await pub.readContract({ address: TTS_ADDRESS, abi: TTS_ABI, functionName: 'balanceOf', args: [acct.address] })
+      walletBalanceTts = Number(bal) / 1e18
+    } catch { fundingUnverified = true }
   }
 
+  // Fail CLOSED if we couldn't verify funding/balance (only matters when we'd otherwise pay).
+  if (enabled && hasReferralKey && referrer && fundingUnverified) {
+    return res.status(200).json({ ok: false, skipped: 'could not verify funding source / balance — refusing' })
+  }
+  if ((enabled && hasReferralKey) && !referrer) {
+    return res.status(200).json({ ok: false, skipped: 'no referral on record for this wallet' })
+  }
+
+  const decision = evaluateReferralPayout({
+    enabled, hasReferralKey, referrer, referee,
+    qualifyingAmount, minQualifying,
+    funding, alreadyPaid,
+    referrerPaidToday, perReferrerDailyCap: perCap,
+    programPaidTodayTts, programDailyCapTts: progCap,
+    bonusAmount, walletBalanceTts, reserveFloorTts: reserveFloor,
+  })
+  if (!decision.allow) return res.status(200).json({ ok: false, skipped: decision.reason })
+
+  // PAY — from the dedicated referral wallet only.
+  let txHash
+  try {
+    txHash = await sendTTS(pk, referrer, BigInt(Math.floor(bonusAmount * 1e18)), 'referral')
+  } catch (e) {
+    if (e.badKey) return res.status(500).json({ ok: false, error: 'REFERRAL_WALLET_PRIVATE_KEY invalid — must be 64 hex chars' })
+    return res.status(500).json({ ok: false, error: e.message })
+  }
+
+  // Ledger insert (UNIQUE(referee) is the hard double-payout guarantee).
   await sb('/referral_credits', {
     method: 'POST',
-    body: JSON.stringify({
-      new_user_wallet: newUserWallet,
-      referrer_wallet: referrerWallet,
-      referral_code: referralCode,
-      amount_tts: Number(creditAmount) / 1e18,
-      tx_hash: txHash,
-      created_at: new Date().toISOString(),
-    }),
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ referee_wallet: referee, referrer_wallet: referrer, amount_tts: bonusAmount, qualifying_tx: qualifyingTx, tx_hash: txHash, created_at: new Date().toISOString() }),
+  }).catch(() => {})
+  await sb(`/referrals?referee_wallet=eq.${referee}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() }),
   }).catch(() => {})
 
-  return res.status(200).json({ ok: true, referrerWallet, txHash, amount: `${Number(creditAmount) / 1e18} TTS` })
+  return res.status(200).json({ ok: true, referrer, amount: bonusAmount, txHash })
 }
+
+function num(v, d) { const n = Number(v); return Number.isFinite(n) ? n : d }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -255,6 +358,7 @@ export default async function handler(req, res) {
   const body = parseBody(req)
   if (action === 'signup') return handleSignup(req, res, body)
   if (action === 'vote-match') return handleVoteMatch(req, res, body)
+  if (action === 'refer-capture') return handleReferCapture(req, res, body)
   if (action === 'referral') return handleReferral(req, res, body)
   return res.status(400).json({ error: 'Unknown action' })
 }

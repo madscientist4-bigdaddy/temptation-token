@@ -55,7 +55,7 @@ function safeEqual(a, b) {
 
 const ALLOWED = new Set([
   'users', 'submissions', 'votes', 'stakes', 'staking_positions',
-  'bonus_claims', 'referral_credits', 'referral_settings', 'club_partners',
+  'bonus_claims', 'referrals', 'referral_credits', 'referral_settings', 'club_partners',
   'scheduled_posts', 'admin_config', 'admin_audit_log', 'age_acknowledgments',
   'verified_submitters', 'verified_wallet_links', 'wallet_verifications',
   'project_expenses', 'project_income',
