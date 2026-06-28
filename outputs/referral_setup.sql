@@ -68,3 +68,6 @@ ALTER TABLE referral_settings ADD COLUMN IF NOT EXISTS auto_fund_enabled        
 ALTER TABLE referral_settings ADD COLUMN IF NOT EXISTS max_daily_topup_tts        NUMERIC DEFAULT 25000;  -- hard ceiling per top-up
 ALTER TABLE referral_settings ADD COLUMN IF NOT EXISTS max_wallet_balance_tts     NUMERIC DEFAULT 50000;  -- referral-wallet ceiling
 ALTER TABLE referral_settings ADD COLUMN IF NOT EXISTS marketing_reserve_floor_tts NUMERIC DEFAULT 100000;-- Marketing solvency floor
+
+-- ── KILL SWITCHES: ship with BOTH OFF regardless of any pre-existing row ──
+UPDATE referral_settings SET referral_enabled = false, auto_fund_enabled = false WHERE id = 1;
