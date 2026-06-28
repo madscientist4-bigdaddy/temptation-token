@@ -32,16 +32,22 @@ def _sb_patch(table, filter_query, body):
     except Exception as e:
         print(f"Supabase PATCH error: {e}"); return None
 
+# VIP tiers are TELEGRAM-COMMUNITY perks only (access to the VIP Vault chat + content).
+# They do NOT grant on-chain vote multipliers, token grants, or NFT drops — the bot has
+# no contract access. Descriptions must not promise any on-chain benefit.
 VIP_TIERS = {
-    "bronze":  {"stars": 350,  "label": "Bronze",  "tts": 500,   "desc": "Early previews · 1.5x votes"},
-    "silver":  {"stars": 1400, "label": "Silver",  "tts": 2000,  "desc": "Full gallery · 1.75x votes"},
-    "gold":    {"stars": 3500, "label": "Gold",    "tts": 5000,  "desc": "Creator access · 2x votes · NFT drops"},
-    "diamond": {"stars": 7000, "label": "Diamond", "tts": 10000, "desc": "Kingmaker · 3x votes · weekly AMA"},
+    "bronze":  {"stars": 350,  "label": "Bronze",  "desc": "VIP Vault chat access · early content previews"},
+    "silver":  {"stars": 1400, "label": "Silver",  "desc": "VIP Vault access · full content gallery"},
+    "gold":    {"stars": 3500, "label": "Gold",    "desc": "VIP Vault access · creator content · priority support"},
+    "diamond": {"stars": 7000, "label": "Diamond", "desc": "VIP Vault access · all content · weekly community AMA"},
 }
 
-REF_REFERRER_BONUS = 100
-REF_NEW_USER_BONUS = 10
-SIGNUP_BONUS       = 500
+# Referral rewards are NOT active — record_referral() only logs to SQLite, no payout
+# fires. These values are inert placeholders for a future (unbuilt) referral program;
+# do not advertise them as a live reward.
+REF_REFERRER_BONUS = 100  # inactive
+REF_NEW_USER_BONUS = 10   # inactive
+SIGNUP_BONUS       = 500   # active — paid by /api/signup-bonus on wallet connect
 DB_PATH = os.environ.get("DB_PATH", "/tmp/tts.db")
 
 def init_db():
@@ -152,7 +158,7 @@ def on_start(cid, uid, name, uname, args):
         "🗳 Vote $TTS on profiles\n"
         "🏆 Top voter wins 35% of weekly pot\n"
         "🔥 Losing votes burned\n"
-        "💎 Stake for up to 3x vote power\n\n"
+        "💎 Staking coming soon\n\n"
         f"*Your signup bonus:* {SIGNUP_BONUS} $TTS 🎁",
         main_kb())
     try:
@@ -176,13 +182,9 @@ def on_callback(cid, mid, cbid, data, uid, name):
         edit(cid, mid,
             "💰 *Ways to Earn $TTS*\n\n"
             "*Vote & Win:* Put the most TTS on the winning profile → earn 35% of the prize pool (top voter prize)\n\n"
-            "*Stake Your TTS:*\n"
-            "• Bronze $50+ → 8% APR · 1.1x votes\n"
-            "• Silver $100+ → 12% APR · 1.25x votes\n"
-            "• Gold $250+ → 18% APR · 1.5x votes\n"
-            "• Diamond $1,000+ → 32% APR · 2x votes\n"
-            "• VIP $5,000+ → 45% APR · 3x votes 🔥\n\n"
-            "*Refer Friends:* Earn 100 TTS per referral",
+            "*Stake Your TTS:* Coming soon — staking isn't active yet "
+            "(tiers, APR, and vote multipliers will be announced at launch)\n\n"
+            "*Refer Friends:* Coming soon — referral rewards aren't active yet",
             {"inline_keyboard":[[{"text":"🎮 Play Now","web_app":{"url":APP}}],
                                  [{"text":"⬅️ Back","callback_data":"back"}]]})
     elif data == "stats":
@@ -201,7 +203,9 @@ def on_callback(cid, mid, cbid, data, uid, name):
             f"*{v['label']}* — {v['stars']} ⭐ Stars/mo\n   → {v['desc']}"
             for k,v in VIP_TIERS.items()])
         edit(cid, mid,
-            f"⭐ *TTS VIP Vault*\n\nExclusive access for serious players.\n\n{tiers_text}\n\n"
+            f"⭐ *TTS VIP Vault*\n\nExclusive Telegram community access.\n\n{tiers_text}\n\n"
+            "_VIP is a Telegram community membership only. It does NOT include on-chain "
+            "vote multipliers, $TTS, or NFT drops._\n\n"
             "Pay with Telegram Stars — no crypto wallet needed.\nInstant access, no chargebacks.",
             {"inline_keyboard":[
                 [{"text":"🥉 Bronze — 350 Stars","callback_data":"buy_vip_bronze"}],
@@ -227,13 +231,13 @@ def on_callback(cid, mid, cbid, data, uid, name):
         ref_code = hashlib.md5(str(uid).encode()).hexdigest()[:8]
         link = f"https://t.me/TTSGameBot?start=ref_{ref_code}"
         encoded = urllib.parse.quote(link)
-        share_text = urllib.parse.quote("Join Temptation Token — vote on profiles, win $TTS every week! Use my link for a bonus 🔥")
+        share_text = urllib.parse.quote("Join Temptation Token — vote on profiles, win $TTS every week! Claim your 500 $TTS sign-up bonus 🔥")
         edit(cid, mid,
             f"🔗 *Your Referral Link*\n\n"
-            f"Share and earn *100 $TTS* for every friend who joins!\n\n"
+            f"Share your link to invite friends.\n"
+            f"_Referral rewards are coming soon — not active yet._\n\n"
             f"`{link}`\n\n"
-            "Your friend also gets a bonus on signup.\n"
-            "High-profile influencer? Email support@temptationtoken.io for custom rates.",
+            f"Your friend still gets their *{SIGNUP_BONUS} $TTS* sign-up bonus when they connect a wallet.",
             {"inline_keyboard":[
                 [{"text":"📤 Share Link","url":f"https://t.me/share/url?url={encoded}&text={share_text}"}],
                 [{"text":"⬅️ Back","callback_data":"back"}]]})
@@ -257,10 +261,10 @@ def on_payment(cid, uid, payload):
 
 DAILY_POSTS = [
     "🏆 *Weekly voting is LIVE!* Top voter wins 35% of the prize pool.\n\nVote now 👉 t.me/TTSGameBot",
-    "💰 Staking $TTS gives you up to 3x vote power AND 45% APR.\n\nStart staking 👉 t.me/TTSGameBot",
-    "🔗 Refer a friend — earn *100 $TTS* per referral!\n\nGet your link 👉 t.me/TTSGameBot",
+    "💰 $TTS staking is coming soon — tiers & rewards announced at launch.\n\nStay tuned 👉 t.me/TTSGameBot",
+    "🔗 Refer a friend and grow the game — referral rewards coming soon.\n\nGet your link 👉 t.me/TTSGameBot",
     "🔥 $TTS is deflationary — every losing vote gets BURNED forever.\n\nBuy $TTS 👉 t.me/TTSGameBot",
-    "⭐ VIP Vault is open — early previews, vote multipliers, NFT drops.\n\nJoin 👉 t.me/TTSGameBot",
+    "⭐ VIP Vault is open — exclusive Telegram community access & early content previews.\n\nJoin 👉 t.me/TTSGameBot",
     "🤝 10% of every weekly prize pool goes to the Polaris Project — fighting human trafficking.\n\nLearn more 👉 polarisproject.org",
     "📊 Check the live leaderboard — who\'s winning this week\'s vote?\n\nView 👉 t.me/TTSGameBot",
 ]
