@@ -214,9 +214,13 @@ async function handleReferCapture(req, res, body) {
       headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' },
       body: JSON.stringify({ referrer_wallet: referrer, referee_wallet: referee, source, status: 'pending', created_at: new Date().toISOString() }),
     })
-    return res.status(200).json({ ok: r.ok })
-  } catch {
-    return res.status(502).json({ ok: false, error: 'capture failed' })
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '')
+      return res.status(200).json({ ok: false, error: 'insert failed', status: r.status, detail: detail.slice(0, 300) })
+    }
+    return res.status(200).json({ ok: true })
+  } catch (e) {
+    return res.status(502).json({ ok: false, error: 'capture failed', detail: String(e.message || e).slice(0, 200) })
   }
 }
 
