@@ -23,6 +23,10 @@ const TTS_ADDRESS  = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 const MARKETING_WALLET = '0x7a9ff2f584248744cBbA32c737D660ED6f077fCB'
 const BANK_WALLET      = '0xb1e991bf617459b58964eef7756b350e675c53b5'
 const isAddr = (a) => /^0x[0-9a-fA-F]{40}$/.test(a || '')
+// Funding checks use the Alchemy endpoint (public RPC can't serve wide log/transfer
+// queries). BASE_RPC_URL must be the Alchemy URL in prod; falls back to public.
+const RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org'
+const TTS_DEPLOY_BLOCK = 43851235n // first block with TTS code — bounds funding-history scans (no history exists before it)
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
@@ -265,9 +269,14 @@ async function handleReferral(req, res, body) {
   let walletBalanceTts = 0
   let funding = { fromReferrer: false, fromProgram: false, fromSignupBonus: false }
   let fundingUnverified = false
+  const fundingDiag = {}
 
   if (enabled && hasReferralKey && referrer) {
     const today = new Date().toISOString().split('T')[0]
+
+    // 1) Ledger + bonus checks. Fail CLOSED on a non-2xx (e.g. referral_credits
+    //    schema mismatch) instead of silently passing — a silent pass here would
+    //    break the double-pay / daily-cap guards.
     try {
       const [paidRes, refTodayRes, progTodayRes, bonusRes] = await Promise.all([
         sb(`/referral_credits?referee_wallet=eq.${referee}&select=id&limit=1`),
@@ -275,47 +284,48 @@ async function handleReferral(req, res, body) {
         sb(`/referral_credits?created_at=gte.${today}T00:00:00Z&select=amount_tts`),
         sb(`/bonus_claims?wallet_address=eq.${referee}&select=id&limit=1`),
       ])
-      alreadyPaid = (await paidRes.json())?.length > 0
-      referrerPaidToday = (await refTodayRes.json())?.length || 0
-      const prog = await progTodayRes.json()
-      programPaidTodayTts = Array.isArray(prog) ? prog.reduce((a, x) => a + (Number(x.amount_tts) || 0), 0) : 0
-      // funded by signup/vote-match bonus → program-funded → disqualify
-      funding.fromSignupBonus = (await bonusRes.json())?.length > 0
-    } catch { fundingUnverified = true }
+      const bad = [['referral_credits', paidRes], ['referral_credits', refTodayRes], ['referral_credits', progTodayRes], ['bonus_claims', bonusRes]].find(([, r]) => !r.ok)
+      if (bad) { fundingUnverified = true; fundingDiag.ledger = `${bad[0]} HTTP ${bad[1].status}` }
+      const paidJson = await paidRes.json(); alreadyPaid = Array.isArray(paidJson) && paidJson.length > 0
+      const refJson = await refTodayRes.json(); referrerPaidToday = Array.isArray(refJson) ? refJson.length : 0
+      const prog = await progTodayRes.json(); programPaidTodayTts = Array.isArray(prog) ? prog.reduce((a, x) => a + (Number(x.amount_tts) || 0), 0) : 0
+      const bonusJson = await bonusRes.json(); funding.fromSignupBonus = Array.isArray(bonusJson) && bonusJson.length > 0
+    } catch (e) { fundingUnverified = true; fundingDiag.ledger = 'throw: ' + String(e.message || e).slice(0, 80) }
 
-    // On-chain funding-source check: did the referee receive TTS from the
-    // referrer or a program wallet? (best-effort; fail CLOSED on error)
+    // 2) On-chain funding source — full TTS transfer history to the referee via
+    //    Alchemy getAssetTransfers, bounded at the TTS deploy block (NOT 'earliest';
+    //    no TTS transfer can predate it, so nothing is missed — no anti-sybil
+    //    weakening). If ANY inbound TTS came from the referrer or a program wallet,
+    //    the referee is not self-funded → disqualified. Fail CLOSED on error.
     try {
-      const fromList = [referrer, MARKETING_WALLET, BANK_WALLET]
-      const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
-      const logs = await pub.getLogs({
-        address: TTS_ADDRESS,
-        event: { type: 'event', name: 'Transfer', inputs: [
-          { indexed: true, name: 'from', type: 'address' },
-          { indexed: true, name: 'to', type: 'address' },
-          { indexed: false, name: 'value', type: 'uint256' } ] },
-        args: { to: referee },
-        fromBlock: 'earliest', toBlock: 'latest',
-      })
-      for (const l of logs) {
-        const from = (l.args?.from || '').toLowerCase()
-        if (from === referrer.toLowerCase()) funding.fromReferrer = true
-        if (from === MARKETING_WALLET.toLowerCase() || from === BANK_WALLET.toLowerCase()) funding.fromProgram = true
-      }
-    } catch { fundingUnverified = true }
+      let pageKey, guard = 0
+      do {
+        const params = { fromBlock: '0x' + TTS_DEPLOY_BLOCK.toString(16), toBlock: 'latest', toAddress: referee, contractAddresses: [TTS_ADDRESS], category: ['erc20'], withMetadata: false, excludeZeroValue: false, maxCount: '0x3e8' }
+        if (pageKey) params.pageKey = pageKey
+        const r = await fetch(RPC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'alchemy_getAssetTransfers', params: [params] }) })
+        const j = await r.json()
+        if (j.error) throw new Error(JSON.stringify(j.error).slice(0, 80))
+        for (const t of (j.result?.transfers || [])) {
+          const from = (t.from || '').toLowerCase()
+          if (from === referrer.toLowerCase()) funding.fromReferrer = true
+          if (from === MARKETING_WALLET.toLowerCase() || from === BANK_WALLET.toLowerCase()) funding.fromProgram = true
+        }
+        pageKey = j.result?.pageKey
+      } while (pageKey && ++guard < 20)
+    } catch (e) { fundingUnverified = true; fundingDiag.assetTransfers = String(e.message || e).slice(0, 100) }
 
-    // Referral wallet balance vs reserve floor.
+    // 3) Referral wallet balance vs reserve floor.
     try {
       const acct = privateKeyToAccount(pk.startsWith('0x') ? pk : `0x${pk}`)
-      const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+      const pub = createPublicClient({ chain: base, transport: http(RPC_URL) })
       const bal = await pub.readContract({ address: TTS_ADDRESS, abi: TTS_ABI, functionName: 'balanceOf', args: [acct.address] })
       walletBalanceTts = Number(bal) / 1e18
-    } catch { fundingUnverified = true }
+    } catch (e) { fundingUnverified = true; fundingDiag.balance = String(e.message || e).slice(0, 80) }
   }
 
   // Fail CLOSED if we couldn't verify funding/balance (only matters when we'd otherwise pay).
   if (enabled && hasReferralKey && referrer && fundingUnverified) {
-    return res.status(200).json({ ok: false, skipped: 'could not verify funding source / balance — refusing' })
+    return res.status(200).json({ ok: false, skipped: 'could not verify funding source / balance — refusing', diag: fundingDiag })
   }
   if ((enabled && hasReferralKey) && !referrer) {
     return res.status(200).json({ ok: false, skipped: 'no referral on record for this wallet' })
