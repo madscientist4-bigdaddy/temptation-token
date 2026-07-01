@@ -219,12 +219,13 @@ async function handleReferCapture(req, res, body) {
       body: JSON.stringify({ referrer_wallet: referrer, referee_wallet: referee, source, status: 'pending', created_at: new Date().toISOString() }),
     })
     if (!r.ok) {
-      const detail = await r.text().catch(() => '')
-      return res.status(200).json({ ok: false, error: 'insert failed', status: r.status, detail: detail.slice(0, 300) })
+      // 409 = referee already captured (bound to its original referrer — anti-hijack). Benign.
+      if (r.status === 409) return res.status(200).json({ ok: false, skipped: 'referee already referred' })
+      return res.status(200).json({ ok: false, error: 'capture failed' })
     }
     return res.status(200).json({ ok: true })
-  } catch (e) {
-    return res.status(502).json({ ok: false, error: 'capture failed', detail: String(e.message || e).slice(0, 200) })
+  } catch {
+    return res.status(502).json({ ok: false, error: 'capture failed' })
   }
 }
 
