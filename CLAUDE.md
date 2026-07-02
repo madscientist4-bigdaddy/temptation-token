@@ -73,7 +73,7 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 
 ---
 
-## Feature State (LIVE / PARTIAL / NOT-BUILT) — verified 2026-06-28
+## Feature State (LIVE / PARTIAL / NOT-BUILT) — verified 2026-07-01
 
 | Feature | State | Notes |
 |---|---|---|
@@ -85,7 +85,7 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 | NFT auto-mint | 🟢 WIRED (unexercised) | V3d mints 3 NFTs on settlement (winner / top voter / house). Minter now = V3d (fixed 2026-06-28). `totalSupply()=0` — never minted yet (needs a round settling with ≥1 vote) |
 | Telegram bot | ✅ LIVE + honest | running on Railway; staking/referral/VIP copy says "coming soon" — no undeliverable promises |
 | **Staking** | 🔴 NOT-BUILT | No frontend stake/unstake/claim path — only a "Coming Soon" placeholder + cosmetic tier table. Deployed proxy `0xaA12B889…` is mis-initialized (`ttsToken=address(0)`); `getStakingTier()` reverts → voting falls back to **1x for everyone**. `contracts/TTSStakingV2.sol` is the compiled-but-undeployed fix |
-| **User referral payouts** | 🔴 NOT-BUILT | "Refer & Earn" share link is a UI mockup; `?ref=` never read; `referrals`/`users.referred_by` never written; `/api/bonus?action=referral` has no caller. (Distinct from club codes above.) |
+| **User referral payouts** | ✅ LIVE (E2E-verified in prod 2026-07-01) | Web `?ref=` capture → `/api/bonus?action=refer-capture` (unique referee). Qualifying-vote payout via `?action=referral`, paid ONLY from `REFERRAL_WALLET_PRIVATE_KEY` (never Bank). `referral_enabled=true`. Anti-sybil all verified rejecting in prod: self-referral, double-capture, referrer-hijack, kill-switch, funding-source (Alchemy `getAssetTransfers`, bounded at TTS deploy block), fail-closed; ≥500 TTS threshold gates payout. Auto-funder (Marketing→referral wallet, never Bank) armed & correctly idle. Bot referral still coming-soon (no telegram→wallet bridge). |
 
 ---
 
@@ -206,7 +206,7 @@ Consolidated; `vercel.json` rewrites preserve old URLs. Each `api/*.js` = 1 func
 |---|---|
 | `admin.js` | `?action=auth` (server-side login → HMAC token) · `?action=data` (token-gated Supabase proxy, service key, table allowlist). Rewrites: `/api/admin-auth`, `/api/admin-data` |
 | `profiles.js` | `?action=list` (public approved profiles, safe fields only) · `?action=submit` (GET rate-limit / POST insert) · `?action=vote` (record vote). Rewrites: `/api/public-profiles`, `/api/submit-profile` |
-| `bonus.js` | `?action=signup` · `?action=vote-match` · `?action=referral` (referral has no caller — inactive). Rewrites: `/api/signup-bonus`, `/api/vote-match`, `/api/referral-credit` |
+| `bonus.js` | `?action=signup` · `?action=vote-match` · `?action=refer-capture` (record referral link) · `?action=referral` (qualify + pay from dedicated referral wallet, kill-switch + anti-sybil gated). Rewrites: `/api/signup-bonus`, `/api/vote-match`, `/api/referral-credit`. Auto-funder lives in `scheduler.js` |
 | `kyc.js` | `?action=session\|webhook\|status\|age` (Persona KYC + 18+ ack). Rewrites: `/api/kyc-*`, `/api/age-acknowledge` |
 | `approve-profile.js` | admin approve → `batchApproveProfiles` + `setProfileClub` on V3d (service key) |
 | `set-club-wallet.js` | register/deregister club → `setClubWallet` on V3d |
@@ -284,8 +284,6 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
 - **Staking**: build frontend stake path + deploy `TTSStakingV2` (`upgradeToAndCall`
   initializeV2 from Bank) — see `outputs/staking_v2_diff.md`. Until then, voting tier
   boost is 1x for all.
-- **User referral payouts**: wire `?ref=` capture → `referrals`/`referred_by` writes →
-  call `/api/bonus?action=referral`. Currently a UI mockup.
 - **NFT**: minter now V3d; will mint once a round settles with ≥1 vote (`totalSupply`
   still 0).
 - **Trust/scanners**: SolidProof portal access + KYC ($600); GoPlus appeal
