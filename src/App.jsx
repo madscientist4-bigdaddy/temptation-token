@@ -505,9 +505,8 @@ function AgeAcknowledgmentModal({ onAccept }) {
 // ── KYC GATE (inside SubmitScreen when not yet verified) ─────────────────────
 function KYCGate({ address, showToast, onVerified }) {
   const [status, setStatus] = useState('loading')
-  const [personaUrl, setPersonaUrl] = useState(null)
   const [checking, setChecking] = useState(false)
-  const [starting, setStarting] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const checkStatus = async (quiet = false) => {
     if (!address) return
@@ -523,34 +522,27 @@ function KYCGate({ address, showToast, onVerified }) {
 
   useEffect(() => { checkStatus(true) }, [address])
 
-  // Handle redirect-back from Persona (?kyc_complete=1)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('kyc_complete') === '1') {
-      window.history.replaceState({}, '', window.location.pathname)
-      checkStatus(false)
-    }
-  }, [])
-
-  const startKYC = async () => {
+  // Submit this wallet for manual review. Persona production was not purchased, so a
+  // human admin approves submitters (Verifications tab) rather than an automated ID/
+  // liveness flow. We never show users a sandbox Persona window presented as "real."
+  const submitForReview = async () => {
     if (!address) { showToast('Connect your wallet first', 'e'); return }
-    setStarting(true)
+    setSubmitting(true)
     try {
-      const r = await fetch('/api/kyc-session', {
+      const r = await fetch('/api/kyc?action=request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
       })
       const d = await r.json()
-      if (d.alreadyVerified) { onVerified(); return }
-      if (d.error) { showToast('KYC error: ' + d.error, 'e'); return }
-      setPersonaUrl(d.personaUrl)
+      if (d.alreadyVerified || d.status === 'approved') { onVerified(); return }
+      if (d.error) { showToast('Could not submit: ' + d.error, 'e'); return }
       setStatus('pending')
-      window.open(d.personaUrl, '_blank', 'noopener,noreferrer')
+      showToast('✓ Submitted for verification — an admin will review your wallet shortly', 's')
     } catch (e) {
-      showToast('Could not start verification — try again', 'e')
+      showToast('Could not submit for verification — try again', 'e')
     }
-    setStarting(false)
+    setSubmitting(false)
   }
 
   if (status === 'loading') {
@@ -562,45 +554,41 @@ function KYCGate({ address, showToast, onVerified }) {
     return null
   }
 
+  const underReview = status === 'pending' || status === 'needs_review'
+
   return (
     <div style={{ padding:'0 4px' }}>
       <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:14, padding:'24px 20px', marginBottom:16, textAlign:'center' }}>
         <div style={{ fontSize:'2rem', marginBottom:12 }}>🪪</div>
-        <div style={{ fontFamily:'var(--font-d)', fontSize:'1.4rem', fontWeight:300, fontStyle:'italic', color:'var(--text)', marginBottom:8 }}>Identity Verification Required</div>
+        <div style={{ fontFamily:'var(--font-d)', fontSize:'1.4rem', fontWeight:300, fontStyle:'italic', color:'var(--text)', marginBottom:8 }}>Verification Required</div>
         <div style={{ fontSize:'.78rem', color:'var(--muted)', lineHeight:1.7, marginBottom:20 }}>
-          Profile submitters must complete a one-time government ID + liveness check. This is required by our content policy and age verification obligations. Your ID images are stored securely by Persona — never on our servers.
+          To keep the game safe and compliant, profile submitters are verified before their
+          photo goes live. Submit your connected wallet below and our team will review it —
+          you only need to do this once.
         </div>
         {status === 'pending' && (
           <div style={{ background:'rgba(212,175,55,0.08)', border:'1px solid rgba(212,175,55,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--gold)', lineHeight:1.6 }}>
-            Verification in progress. If you already completed verification in another tab, click <strong>Check Status</strong> below. It may take a few minutes for the result to process.
-          </div>
-        )}
-        {status === 'declined' && (
-          <div style={{ background:'rgba(232,64,90,0.08)', border:'1px solid rgba(232,64,90,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--rose)', lineHeight:1.6 }}>
-            Your previous verification was declined. You may retry below. If you believe this is an error, contact support at <strong>support@temptationtoken.io</strong>.
+            ⏳ Your wallet is <strong>pending manual review</strong>. This is usually approved within 24 hours. Tap <strong>Check Status</strong> once approved to continue.
           </div>
         )}
         {status === 'needs_review' && (
           <div style={{ background:'rgba(212,175,55,0.08)', border:'1px solid rgba(212,175,55,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--gold)', lineHeight:1.6 }}>
-            Your verification is under manual review. This typically resolves within 24 hours. You will be able to submit a profile once approved.
+            Your wallet is under manual review. This typically resolves within 24 hours. You'll be able to submit a profile once approved.
+          </div>
+        )}
+        {status === 'declined' && (
+          <div style={{ background:'rgba(232,64,90,0.08)', border:'1px solid rgba(232,64,90,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--rose)', lineHeight:1.6 }}>
+            Your previous request was declined. You may re-submit below. If you believe this is an error, contact support at <strong>support@temptationtoken.io</strong>.
           </div>
         )}
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {status !== 'needs_review' && (
+          {!underReview && (
             <button
-              onClick={startKYC}
-              disabled={starting}
-              style={{ background:'linear-gradient(135deg,var(--crimson),#a0203a)', color:'var(--text)', border:'none', borderRadius:10, padding:'16px', fontFamily:'var(--font-b)', fontSize:'.82rem', letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, cursor:'pointer' }}
+              onClick={submitForReview}
+              disabled={submitting}
+              style={{ background:'linear-gradient(135deg,var(--crimson),#a0203a)', color:'var(--text)', border:'none', borderRadius:10, padding:'16px', fontFamily:'var(--font-b)', fontSize:'.82rem', letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, cursor:'pointer', opacity: submitting ? .6 : 1 }}
             >
-              {starting ? 'Starting…' : status === 'declined' ? 'Retry Verification' : 'Start Verification →'}
-            </button>
-          )}
-          {personaUrl && status === 'pending' && (
-            <button
-              onClick={() => window.open(personaUrl, '_blank', 'noopener,noreferrer')}
-              style={{ background:'var(--surface2)', color:'var(--gold)', border:'1px solid var(--border)', borderRadius:10, padding:'12px', fontFamily:'var(--font-b)', fontSize:'.76rem', letterSpacing:'.06em', textTransform:'uppercase', fontWeight:600, cursor:'pointer' }}
-            >
-              Reopen Verification Window
+              {submitting ? 'Submitting…' : status === 'declined' ? 'Re-submit for Review' : 'Submit for Verification →'}
             </button>
           )}
           <button
@@ -613,7 +601,7 @@ function KYCGate({ address, showToast, onVerified }) {
         </div>
       </div>
       <div style={{ fontSize:'.68rem', color:'var(--muted)', textAlign:'center', lineHeight:1.6 }}>
-        Powered by <strong>Persona</strong> · Your ID documents are never stored on Temptation Token servers.
+        Reviewed by the Temptation Token team · We never store government ID documents.
       </div>
     </div>
   )
@@ -785,9 +773,13 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       }
     }
 
+    // Carry approved profiles onto the current on-chain round so they are votable
+    // after the weekly rollover (idempotent + self-healing; server sends at most
+    // one tx per round). Fire-and-forget — photos render regardless.
+    fetch('/api/profiles?action=sync', { method: 'POST' }).catch(() => {})
+
     async function loadPhotos() {
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
-      const currentRound = roundId != null ? Number(roundId) : 1
 
       // Fetch on-chain round end time for accurate countdown
       if (roundId != null) {
@@ -796,7 +788,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         }).catch(() => {})
       }
 
-      const res = await fetch(`/api/public-profiles?round=${currentRound}`)
+      const res = await fetch('/api/public-profiles')
       const json = await res.json().catch(() => ({}))
       const data = Array.isArray(json.profiles) ? json.profiles : []
 
@@ -1105,8 +1097,7 @@ function LeaderboardScreen() {
   useEffect(() => {
     async function load() {
       const roundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').catch(() => null)
-      const currentRound = roundId != null ? Number(roundId) : 1
-      const res = await fetch(`/api/public-profiles?round=${currentRound}`)
+      const res = await fetch('/api/public-profiles')
       const json = await res.json().catch(() => ({}))
       const data = Array.isArray(json.profiles) ? json.profiles : []
       if (data.length < 1) { setLoading(false); return }
@@ -1819,8 +1810,11 @@ export default function App() {
   const { address, isConnected, chainId } = useAccount()
   const { disconnect } = useDisconnect()
   const [tab, setTab] = useState('play')
-  const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem('tt_seen'))
-  const dismissWelcome = () => { sessionStorage.setItem('tt_seen','1'); setShowWelcome(false) }
+  // sessionStorage access is wrapped: Safari Private Mode throws on setItem (quota 0).
+  // If dismissWelcome threw before setShowWelcome, the user was trapped on the welcome
+  // screen ("can't get past Play Game" on iOS). setState must always run.
+  const [showWelcome, setShowWelcome] = useState(() => { try { return !sessionStorage.getItem('tt_seen') } catch { return true } })
+  const dismissWelcome = () => { try { sessionStorage.setItem('tt_seen','1') } catch {} ; setShowWelcome(false) }
   const [balance, setBalance] = useState(0)
   const [balanceLoading, setBalanceLoading] = useState(false)
   const { data: walletClient } = useWalletClient()
@@ -1851,11 +1845,17 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ walletAddress: address }),
     }).then(r => r.json()).then(d => {
+      // Surface EVERY outcome — never leave the user guessing whether the 500 TTS
+      // bonus is coming (the old code was silent on already-claimed / benign cases).
       if (d.success && d.amount > 0) {
         showToast(`🎉 Welcome bonus: +${Math.floor(d.amount).toLocaleString()} $TTS sent!`, 's')
         setBalance(b => b + Math.floor(d.amount))
-      } else if (d && d.success === false && !d.alreadyClaimed && d.reason && !/already/i.test(d.reason)) {
-        showToast(`Welcome bonus pending: ${d.reason}`, 'i')
+      } else if (d.alreadyClaimed) {
+        showToast(`✓ Welcome bonus${d.amount ? ` (+${Math.floor(d.amount).toLocaleString()} $TTS)` : ''} already credited to this wallet`, 'i')
+      } else if (d && d.success === false && d.reason) {
+        showToast(`Welcome bonus not sent: ${d.reason}`, 'i')
+      } else {
+        showToast('Welcome bonus could not be confirmed — contact support if it does not arrive.', 'i')
       }
     }).catch(() => { showToast('Welcome bonus could not be processed right now.', 'i') })
 
@@ -1967,7 +1967,8 @@ export default function App() {
       <div className={`toast ${toast.type}${toast.show?' show':''}`}>{toast.msg}</div>
 
       {showWelcome && (
-        <div style={{position:'fixed',inset:0,background:'var(--void)',zIndex:800,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'32px 24px'}}>
+        <div style={{position:'fixed',inset:0,background:'var(--void)',zIndex:800,overflowY:'auto',WebkitOverflowScrolling:'touch'}}>
+         <div style={{minHeight:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxSizing:'border-box',padding:'max(32px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom))'}}>
           <img src="/tts_logo.webp" alt="TTS" style={{width:88,height:88,objectFit:'contain',marginBottom:20}} draggable="false"/>
           <div style={{fontFamily:'var(--font-b)',fontSize:'1.7rem',fontWeight:800,color:'var(--text)',marginBottom:8,textAlign:'center'}}>Temptation Token</div>
           <div style={{fontSize:'.82rem',color:'var(--muted)',textAlign:'center',lineHeight:1.7,marginBottom:28,maxWidth:320}}>Vote on profiles. Pick the winner. Earn $TTS every week.</div>
@@ -1983,6 +1984,7 @@ export default function App() {
             Let's Go — Start Playing
           </button>
           <div onClick={dismissWelcome} style={{fontSize:'.68rem',color:'var(--muted)',marginTop:14,cursor:'pointer',textDecoration:'underline'}}>Skip intro</div>
+         </div>
         </div>
       )}
     </div>

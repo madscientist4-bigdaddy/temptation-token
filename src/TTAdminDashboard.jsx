@@ -1199,10 +1199,16 @@ function ReviewScreen({ showToast }) {
     if (action === "approve") {
       // Block approval if submitter wallet is not KYC-verified.
       // Checks: verified_submitters (Persona KYC), wallet_verifications (legacy manual), verified_wallet_links (linked wallets).
+      // IMPORTANT: verified_submitters / verified_wallet_links store wallets LOWERCASE
+      // (KYC session + webhook + manual-verify all lowercase). The submission wallet is
+      // checksummed (mixed-case), and PostgREST `eq` is case-sensitive — so we MUST
+      // lowercase here or a genuinely-verified wallet never matches and approval is
+      // wrongly blocked. (This was the "completed KYC but still shows not verified" bug.)
+      const w = (wallet || '').toLowerCase();
       const [_vs, _wv, _wl] = await Promise.all([
-        sb.get('verified_submitters', 'wallet_address=eq.' + wallet + '&status=eq.approved&select=id').catch(() => []),
-        sb.get('wallet_verifications', 'wallet_address=eq.' + wallet + '&is_verified=eq.true&select=id').catch(() => []),
-        sb.get('verified_wallet_links', 'linked_wallet=eq.' + wallet + '&select=id').catch(() => []),
+        sb.get('verified_submitters', 'wallet_address=eq.' + w + '&status=eq.approved&select=id').catch(() => []),
+        sb.get('wallet_verifications', 'wallet_address=eq.' + w + '&is_verified=eq.true&select=id').catch(() => []),
+        sb.get('verified_wallet_links', 'linked_wallet=eq.' + w + '&select=id').catch(() => []),
       ]);
       const isKycVerified = [_vs, _wv, _wl].some(d => Array.isArray(d) && d.length > 0);
       if (!isKycVerified) {
@@ -1385,6 +1391,32 @@ function VerificationsScreen({ showToast }) {
     loadAll();
   };
 
+  // Manually verify ANY wallet — even one that never started Persona (no existing
+  // row). Upserts a verified_submitters row at status=approved so the profile-approve
+  // gate unblocks immediately. Wallet is stored LOWERCASE to match how the gate + KYC
+  // webhook key rows (case-sensitive eq). Used to self-verify a test wallet while
+  // Persona production is pending.
+  const [manualWallet, setManualWallet] = useState('');
+  const [manualBusy, setManualBusy] = useState(false);
+  const manualVerify = async () => {
+    const w = manualWallet.trim().toLowerCase();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(w)) { showToast('Enter a valid 0x wallet address', 'error'); return; }
+    setManualBusy(true);
+    try {
+      const existing = await sb.get('verified_submitters', `wallet_address=eq.${w}&select=id`);
+      const payload = { status: 'approved', provider: 'admin', verified_at: new Date().toISOString(), rejection_reason: null };
+      if (Array.isArray(existing) && existing.length > 0) {
+        await sb.patch('verified_submitters', `wallet_address=eq.${w}`, payload);
+      } else {
+        await sb.post('verified_submitters', { wallet_address: w, created_at: new Date().toISOString(), reference_id: null, ...payload });
+      }
+      showToast(`✓ Manually verified ${w.slice(0,10)}… — profile approval now unblocked`, 'success');
+      setManualWallet('');
+      loadAll();
+    } catch { showToast('Manual verify failed', 'error'); }
+    setManualBusy(false);
+  };
+
   const overrideDecline = async row => {
     await sb.patch('verified_submitters', `id=eq.${row.id}`, {
       status: 'declined', rejection_reason: 'Admin override'
@@ -1532,6 +1564,23 @@ function VerificationsScreen({ showToast }) {
 
         activeTab === 'kyc' ? (
           <>
+            {/* Manual verify — approve ANY wallet (even one that never started Persona).
+                Lets the owner self-verify a test wallet while Persona production is pending. */}
+            <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px', marginBottom:14 }}>
+              <div style={{ fontSize:'.65rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>MANUALLY VERIFY A WALLET</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <input
+                  value={manualWallet}
+                  onChange={e => setManualWallet(e.target.value)}
+                  placeholder="0x… wallet to mark KYC-approved"
+                  style={{ flex:1, minWidth:240, background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:8, padding:'10px 12px', color:'var(--text)', fontSize:'.72rem', fontFamily:'monospace' }}
+                />
+                <button onClick={manualVerify} disabled={manualBusy} style={{ background:'var(--green-dim, rgba(46,204,113,.15))', border:'1px solid rgba(46,204,113,.4)', color:'var(--green)', padding:'10px 18px', borderRadius:8, cursor:manualBusy?'default':'pointer', fontSize:'.68rem', fontWeight:700, opacity:manualBusy?.6:1 }}>
+                  {manualBusy ? 'Verifying…' : '✓ Verify Wallet'}
+                </button>
+              </div>
+              <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:8 }}>Creates/updates a verified_submitters row at status <strong>approved</strong> — unblocks profile approval for this wallet immediately.</div>
+            </div>
             <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
               {['all','approved','pending','needs_review','declined'].map(s => (
                 <button key={s} onClick={() => setKycFilter(s)} style={{ background: kycFilter===s ? 'rgba(212,175,55,.15)' : 'transparent', color: kycFilter===s ? 'var(--gold)' : 'var(--muted)', border:'1px solid var(--border)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:600 }}>
@@ -1551,7 +1600,7 @@ function VerificationsScreen({ showToast }) {
                         <div style={{ fontSize:'.68rem', color:'var(--muted)', fontFamily:'monospace', marginBottom:4 }}>{row.wallet_address}</div>
                         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:6 }}>
                           {statusBadge(row.status)}
-                          <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>Persona</span>
+                          <span style={{ fontSize:'.6rem', color:'var(--muted)' }}>{row.provider === 'manual' ? 'Manual review' : row.provider === 'admin' ? 'Admin' : 'Persona'}</span>
                           {row.reference_id && <span style={{ fontSize:'.6rem', color:'var(--muted)', fontFamily:'monospace' }}>{row.reference_id.slice(0,16)}…</span>}
                         </div>
                         <div style={{ fontSize:'.63rem', color:'var(--muted)' }}>

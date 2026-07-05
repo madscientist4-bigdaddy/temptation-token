@@ -404,5 +404,42 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── /api/kyc?action=request — user submits for MANUAL review ───────────────
+  // Persona production was not purchased (business decision), so manual admin approval
+  // is the launch KYC mechanism. This records the wallet as `pending` so it surfaces in
+  // the admin Verifications queue (where "Override Approve" / the manual-verify box mark
+  // it approved). No Persona session, no ID upload, no sandbox flow shown to the user.
+  if (action === 'request') {
+    if (req.method !== 'POST') return res.status(405).end()
+    const { walletAddress } = body
+    if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/i.test(walletAddress)) {
+      return res.status(400).json({ error: 'Invalid wallet address' })
+    }
+    const wallet = walletAddress.toLowerCase()
+    try {
+      const r = await sbFetch(`/verified_submitters?wallet_address=eq.${wallet}&select=status`)
+      const rows = await r.json()
+      const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+      if (existing?.status === 'approved') {
+        return res.status(200).json({ ok: true, status: 'approved', alreadyVerified: true })
+      }
+      const payload = { provider: 'manual', status: 'pending', rejection_reason: null, verified_at: null }
+      if (existing) {
+        await sbFetch(`/verified_submitters?wallet_address=eq.${wallet}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload),
+        })
+      } else {
+        await sbFetch('/verified_submitters', {
+          method: 'POST', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ ...payload, wallet_address: wallet, reference_id: null, created_at: new Date().toISOString() }),
+        })
+      }
+      return res.status(200).json({ ok: true, status: 'pending' })
+    } catch (e) {
+      console.error('kyc request-manual failed:', e.message)
+      return res.status(500).json({ error: 'Could not submit verification request' })
+    }
+  }
+
   return res.status(400).json({ error: 'Missing or unknown action' })
 }

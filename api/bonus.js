@@ -119,10 +119,23 @@ async function handleSignup(req, res, body) {
   const pk = process.env.MARKETING_WALLET_PRIVATE_KEY
   if (!pk) return res.status(200).json({ success: false, reason: 'Bonus system not yet funded — contact admin' })
 
+  // Look up any prior signup claim. A row with a VALID on-chain tx_hash = genuinely
+  // paid → surface proof (never silent). A row with a missing/invalid tx_hash = a prior
+  // attempt recorded a claim but never confirmed a transfer (legacy/interrupted write).
+  // In that stuck state we self-heal: (re)send below and UPDATE the row rather than
+  // insert a duplicate — this is what makes a never-delivered bonus retroactively claimable.
+  let existingUnpaidId = null
   try {
-    const r = await sb(`/bonus_claims?wallet_address=eq.${walletAddress}&bonus_type=eq.signup&select=id&limit=1`)
+    const r = await sb(`/bonus_claims?wallet_address=eq.${walletAddress}&bonus_type=eq.signup&select=id,tts_amount,tx_hash,created_at&limit=1`)
     const d = await r.json()
-    if (Array.isArray(d) && d.length > 0) return res.status(200).json({ alreadyClaimed: true })
+    if (Array.isArray(d) && d.length > 0) {
+      const row = d[0]
+      const paid = typeof row.tx_hash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(row.tx_hash)
+      if (paid) {
+        return res.status(200).json({ alreadyClaimed: true, amount: Number(row.tts_amount) || null, txHash: row.tx_hash, claimedAt: row.created_at || null })
+      }
+      existingUnpaidId = row.id
+    }
   } catch {}
 
   if (await dailyCount('signup') >= SIGNUP_DAY_LIMIT) {
@@ -140,10 +153,18 @@ async function handleSignup(req, res, body) {
     return res.status(500).json({ success: false, reason: e.message })
   }
 
-  await sb('/bonus_claims', {
-    method: 'POST',
-    body: JSON.stringify({ wallet_address: walletAddress, bonus_type: 'signup', tts_amount: bonusTTS, tx_hash: txHash, created_at: new Date().toISOString() }),
-  }).catch(() => {})
+  if (existingUnpaidId != null) {
+    // Heal the stuck row in place with the now-confirmed transfer.
+    await sb(`/bonus_claims?id=eq.${existingUnpaidId}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ tts_amount: bonusTTS, tx_hash: txHash, created_at: new Date().toISOString() }),
+    }).catch(() => {})
+  } else {
+    await sb('/bonus_claims', {
+      method: 'POST',
+      body: JSON.stringify({ wallet_address: walletAddress, bonus_type: 'signup', tts_amount: bonusTTS, tx_hash: txHash, created_at: new Date().toISOString() }),
+    }).catch(() => {})
+  }
   await sb('/users', {
     method: 'POST',
     headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' },
