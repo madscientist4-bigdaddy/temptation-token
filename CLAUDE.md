@@ -4,7 +4,15 @@ Guidance for Claude Code working in this repo. **Canonical CURRENT-STATE only.**
 Resolved sagas, dated audits, and superseded-contract narrative live in
 [CLAUDE_HISTORY.md](./CLAUDE_HISTORY.md).
 
-**Last verified: 2026-06-28.** V3d + TTSKeeper3 are LIVE on Base mainnet, fully
+**Last verified: 2026-07-05.** User-journey fixes deployed & prod-verified: play
+screen renders all approved profiles round-agnostic + `profiles?action=sync` carries
+them onto the current on-chain round (round 2 now has 16 votable profiles); signup-bonus
+UI silence fixed (bonus was always paid — old client just showed nothing on
+already-claimed); KYC manual-review (`kyc?action=request` + admin approve) is the live
+launch path (Persona stays sandbox); iOS Safari-Private storage trap on the welcome
+screen guarded.
+
+**Prior anchor — 2026-06-28.** V3d + TTSKeeper3 are LIVE on Base mainnet, fully
 wired, Chainlink-automated, and the frontend is deployed to production
 (`app.temptationtoken.io`). Round 1 on V3d has started (calendar-pinned). NFT
 auto-mint is now authorized to V3d. Always re-verify on-chain values before acting
@@ -205,9 +213,9 @@ Consolidated; `vercel.json` rewrites preserve old URLs. Each `api/*.js` = 1 func
 | File | Routes / actions |
 |---|---|
 | `admin.js` | `?action=auth` (server-side login → HMAC token) · `?action=data` (token-gated Supabase proxy, service key, table allowlist). Rewrites: `/api/admin-auth`, `/api/admin-data` |
-| `profiles.js` | `?action=list` (public approved profiles, safe fields only) · `?action=submit` (GET rate-limit / POST insert) · `?action=vote` (record vote). Rewrites: `/api/public-profiles`, `/api/submit-profile` |
-| `bonus.js` | `?action=signup` · `?action=vote-match` · `?action=refer-capture` (record referral link) · `?action=referral` (qualify + pay from dedicated referral wallet, kill-switch + anti-sybil gated). Rewrites: `/api/signup-bonus`, `/api/vote-match`, `/api/referral-credit`. Auto-funder lives in `scheduler.js` |
-| `kyc.js` | `?action=session\|webhook\|status\|age` (Persona KYC + 18+ ack). Rewrites: `/api/kyc-*`, `/api/age-acknowledge` |
+| `profiles.js` | `?action=list` (ALL approved profiles, round-agnostic — safe fields) · `?action=submit` (GET rate-limit / POST insert) · `?action=vote` (record vote) · `?action=sync` (POST — carry approved profiles onto the current on-chain round via idempotent `batchApproveProfiles`; PlayScreen fires it on load; fixes empty play screen after weekly rollover). Rewrites: `/api/public-profiles`, `/api/submit-profile` |
+| `bonus.js` | `?action=signup` (surfaces sent / already-credited+txHash / why-not; self-heals a claim row with no valid tx_hash → retroactive re-send) · `?action=vote-match` · `?action=refer-capture` (record referral link) · `?action=referral` (qualify + pay from dedicated referral wallet, kill-switch + anti-sybil gated). Rewrites: `/api/signup-bonus`, `/api/vote-match`, `/api/referral-credit`. Auto-funder lives in `scheduler.js` |
+| `kyc.js` | `?action=session\|webhook\|status\|age\|account\|request` (Persona KYC + 18+ ack). **Persona stays sandbox (no purchase) → `?action=request` is the LAUNCH KYC path**: user submits wallet → `verified_submitters` row at `status=pending` → admin approves in Verifications tab (manual-verify box / Override Approve). User-facing flow no longer shows a sandbox Persona window. Rewrites: `/api/kyc-*`, `/api/age-acknowledge` |
 | `approve-profile.js` | admin approve → `batchApproveProfiles` + `setProfileClub` on V3d (service key) |
 | `set-club-wallet.js` | register/deregister club → `setClubWallet` on V3d |
 | `community-stats.js` | community stats + bot heartbeat (`/api/bot-health`) |
