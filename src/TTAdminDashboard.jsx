@@ -1345,6 +1345,17 @@ function VerificationsScreen({ showToast }) {
   const [loading, setLoading] = useState(true);
   const [kycFilter, setKycFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
+  // Per-row manual-review checklist (keyed by row id). All items must be ticked before
+  // the approve button arms — enforces the reviewer actually confirmed each criterion.
+  const REVIEW_CHECKS = [
+    { k: 'age',          label: 'Subject is 18 or older (DOB on ID)' },
+    { k: 'idSelfie',     label: 'Selfie face matches the ID photo' },
+    { k: 'selfieProfile',label: 'Selfie matches the submitted profile photo' },
+    { k: 'noTamper',     label: 'ID shows no signs of tampering/editing' },
+  ];
+  const [reviewChecks, setReviewChecks] = useState({}); // { [rowId]: { age, idSelfie, ... } }
+  const toggleCheck = (rowId, k) => setReviewChecks(s => ({ ...s, [rowId]: { ...(s[rowId] || {}), [k]: !(s[rowId]?.[k]) } }));
+  const allChecked = (rowId) => REVIEW_CHECKS.every(c => reviewChecks[rowId]?.[c.k]);
   const [linkWallet, setLinkWallet] = useState('');
   const [linkTarget, setLinkTarget] = useState(null);
   const [linking, setLinking] = useState(false);
@@ -1611,7 +1622,12 @@ function VerificationsScreen({ showToast }) {
                       </div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end' }}>
                         {row.status !== 'approved' && (
-                          <button onClick={() => overrideApprove(row)} style={{ background:'rgba(46,204,113,.1)', border:'1px solid rgba(46,204,113,.3)', color:'var(--green)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap' }}>✓ Override Approve</button>
+                          <button
+                            onClick={() => allChecked(row.id) && overrideApprove(row)}
+                            disabled={!allChecked(row.id)}
+                            title={allChecked(row.id) ? 'All checks complete — approve this wallet' : 'Complete all review checks below first'}
+                            style={{ background: allChecked(row.id) ? 'rgba(46,204,113,.1)' : 'var(--surface2)', border:`1px solid ${allChecked(row.id) ? 'rgba(46,204,113,.3)' : 'var(--border)'}`, color: allChecked(row.id) ? 'var(--green)' : 'var(--muted)', padding:'5px 12px', borderRadius:6, cursor: allChecked(row.id) ? 'pointer' : 'not-allowed', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap', opacity: allChecked(row.id) ? 1 : .6 }}
+                          >✓ Verify Wallet</button>
                         )}
                         {row.status === 'approved' && (
                           <>
@@ -1621,6 +1637,29 @@ function VerificationsScreen({ showToast }) {
                         )}
                       </div>
                     </div>
+                    {row.status !== 'approved' && (
+                      <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:'.6rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>
+                          MANUAL REVIEW CHECKLIST — confirm each before verifying
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+                          {REVIEW_CHECKS.map(c => (
+                            <label key={c.k} style={{ display:'flex', alignItems:'center', gap:9, cursor:'pointer', fontSize:'.7rem', color: reviewChecks[row.id]?.[c.k] ? 'var(--text)' : 'var(--muted)' }}>
+                              <input
+                                type="checkbox"
+                                checked={!!reviewChecks[row.id]?.[c.k]}
+                                onChange={() => toggleCheck(row.id, c.k)}
+                                style={{ width:15, height:15, accentColor:'var(--green)', cursor:'pointer', flexShrink:0 }}
+                              />
+                              {c.label}
+                            </label>
+                          ))}
+                        </div>
+                        <div style={{ fontSize:'.6rem', color: allChecked(row.id) ? 'var(--green)' : 'var(--muted)' }}>
+                          {allChecked(row.id) ? '✓ All checks complete — “Verify Wallet” is armed.' : `${REVIEW_CHECKS.filter(c => reviewChecks[row.id]?.[c.k]).length}/${REVIEW_CHECKS.length} checks complete — verify button locked until all are confirmed.`}
+                        </div>
+                      </div>
+                    )}
                     {expandedId === row.id && row.status === 'approved' && (
                       <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
                         <div style={{ fontSize:'.65rem', color:'var(--muted)', marginBottom:8, fontWeight:600 }}>ADD LINKED WALLET — shares this KYC approval</div>

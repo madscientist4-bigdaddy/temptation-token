@@ -507,6 +507,13 @@ function KYCGate({ address, showToast, onVerified }) {
   const [status, setStatus] = useState('loading')
   const [checking, setChecking] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const VERIFY_EMAIL = 'support@temptationtoken.io'
+  const emailSubject = `Verify ${address || ''}`
+  const copySubject = () => {
+    try { navigator.clipboard?.writeText(emailSubject); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
+  }
 
   const checkStatus = async (quiet = false) => {
     if (!address) return
@@ -563,12 +570,40 @@ function KYCGate({ address, showToast, onVerified }) {
         <div style={{ fontFamily:'var(--font-d)', fontSize:'1.4rem', fontWeight:300, fontStyle:'italic', color:'var(--text)', marginBottom:8 }}>Verification Required</div>
         <div style={{ fontSize:'.78rem', color:'var(--muted)', lineHeight:1.7, marginBottom:20 }}>
           To keep the game safe and compliant, profile submitters are verified before their
-          photo goes live. Submit your connected wallet below and our team will review it —
-          you only need to do this once.
+          photo goes live. Submit your wallet below, then email us two photos (ID + a dated
+          selfie holding it) — our team reviews it, usually within 24 hours. One-time only.
+        </div>
+
+        {/* Exact instructions: what to send + where. Shown for every not-yet-approved
+            state so users know what's needed before AND after they submit the wallet. */}
+        <div style={{ background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px', marginBottom:16, textAlign:'left' }}>
+          <div style={{ fontSize:'.64rem', fontWeight:800, letterSpacing:'.06em', color:'var(--gold)', marginBottom:10 }}>📋 HOW TO COMPLETE VERIFICATION</div>
+          <div style={{ fontSize:'.73rem', color:'var(--text)', lineHeight:1.6, marginBottom:10 }}>
+            Email the following <strong>two photos</strong> to{' '}
+            <a href={`mailto:${VERIFY_EMAIL}?subject=${encodeURIComponent(emailSubject)}`} style={{ color:'var(--gold-light)', fontWeight:700 }}>{VERIFY_EMAIL}</a>:
+          </div>
+          <div style={{ display:'flex', gap:10, marginBottom:8 }}>
+            <div style={{ color:'var(--gold)', fontWeight:800, fontSize:'.8rem' }}>1</div>
+            <div style={{ fontSize:'.72rem', color:'var(--muted)', lineHeight:1.55 }}>A clear photo of your <strong style={{ color:'var(--text)' }}>government-issued ID</strong> (passport, driver's license, or national ID).</div>
+          </div>
+          <div style={{ display:'flex', gap:10, marginBottom:12 }}>
+            <div style={{ color:'var(--gold)', fontWeight:800, fontSize:'.8rem' }}>2</div>
+            <div style={{ fontSize:'.72rem', color:'var(--muted)', lineHeight:1.55 }}>A <strong style={{ color:'var(--text)' }}>selfie of you holding that same ID</strong>, next to a paper showing <strong style={{ color:'var(--text)' }}>today's date</strong>.</div>
+          </div>
+          <div style={{ fontSize:'.68rem', color:'var(--muted)', lineHeight:1.55, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:8, padding:'8px 10px', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            <span>Use this email subject so we can match you:</span>
+            <code style={{ color:'var(--gold-light)', fontFamily:'monospace', fontSize:'.66rem', wordBreak:'break-all' }}>{emailSubject}</code>
+            {address && (
+              <button onClick={copySubject} style={{ background:'transparent', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:6, padding:'3px 8px', fontSize:'.6rem', cursor:'pointer', whiteSpace:'nowrap' }}>{copied ? '✓ Copied' : 'Copy'}</button>
+            )}
+          </div>
+          <div style={{ fontSize:'.63rem', color:'var(--muted)', lineHeight:1.5, marginTop:10 }}>
+            We check you're <strong>18+</strong> and that the ID, selfie, and your profile photo are the same person. Documents are used only for review and never stored.
+          </div>
         </div>
         {status === 'pending' && (
           <div style={{ background:'rgba(212,175,55,0.08)', border:'1px solid rgba(212,175,55,0.25)', borderRadius:10, padding:'12px 16px', marginBottom:16, fontSize:'.74rem', color:'var(--gold)', lineHeight:1.6 }}>
-            ⏳ Your wallet is <strong>pending manual review</strong>. This is usually approved within 24 hours. Tap <strong>Check Status</strong> once approved to continue.
+            ⏳ Your wallet is <strong>pending manual review</strong>. If you haven't yet, email the two photos above so we can approve you (usually within 24 hours). Tap <strong>Check Status</strong> once approved to continue.
           </div>
         )}
         {status === 'needs_review' && (
