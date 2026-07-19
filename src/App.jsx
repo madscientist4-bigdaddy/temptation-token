@@ -1416,7 +1416,32 @@ function BuySellScreen({ showToast, connected }) {
 
 // ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
 function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
-  const [kycVerified, setKycVerified] = useState(false)
+  // Identity verification status for this wallet. 'approved' → skip ID (one-time-per-
+  // wallet). 'unverified'/'declined' → require ID + selfie upload. 'pending' → awaiting
+  // admin review. Authoritative check is server-side at submit; this only drives the UI.
+  const [verifyStatus, setVerifyStatus] = useState('loading')
+  const mapStatus = (s) => s === 'approved' ? 'approved'
+    : (s === 'pending' || s === 'needs_review') ? 'pending'
+    : s === 'declined' ? 'declined' : 'unverified'
+  const recheckVerify = () => {
+    if (!address) return
+    fetch(`/api/kyc-status?wallet=${address}`).then(r => r.json())
+      .then(d => setVerifyStatus(mapStatus(d.status))).catch(() => {})
+  }
+  useEffect(() => {
+    if (!connected || !address) { setVerifyStatus('loading'); return }
+    let live = true
+    fetch(`/api/kyc-status?wallet=${address}`).then(r => r.json())
+      .then(d => { if (live) setVerifyStatus(mapStatus(d.status)) })
+      .catch(() => { if (live) setVerifyStatus('unverified') })
+    return () => { live = false }
+  }, [connected, address])
+
+  // ID + selfie (first-time / unverified wallets only). We keep the File objects to PUT
+  // directly to private storage, plus data-URI previews for display.
+  const [idFile, setIdFile] = useState(null); const [idPrev, setIdPrev] = useState(null)
+  const [selfieFile, setSelfieFile] = useState(null); const [selfiePrev, setSelfiePrev] = useState(null)
+  const idRef = useRef(); const selfieRef = useRef()
 
   const [prev, setPrev] = useState(null)
   const [name, setName] = useState('')
@@ -1458,6 +1483,32 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       r.readAsDataURL(f)
     }
     img.src = url
+  }
+
+  // ID / selfie picker (accepts JPEG/PNG/WEBP up to 15MB; keeps File + preview).
+  const handleDocFile = (setFile, setPreview) => e => {
+    const f = e.target.files[0]
+    if (!f) return
+    if (!['image/jpeg','image/jpg','image/png','image/webp'].includes(f.type)) { showToast('Only JPEG, PNG or WEBP accepted','e'); return }
+    if (f.size > 15 * 1024 * 1024) { showToast('Image must be under 15MB','e'); return }
+    setFile(f)
+    const r = new FileReader(); r.onload = ev => setPreview(ev.target.result); r.readAsDataURL(f)
+  }
+
+  // Upload ID + selfie DIRECTLY to the private bucket via server-minted signed URLs.
+  // The service key never reaches the browser and the bytes never pass through our API.
+  // Returns { idDocPath, selfiePath } (or { skip:true } if the wallet became verified).
+  const uploadIdDocs = async () => {
+    const initR = await fetch('/api/kyc?action=id-upload-init', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ walletAddress: address }) })
+    const init = await initR.json().catch(() => ({}))
+    if (init.alreadyVerified) return { skip: true }
+    if (!init.id?.url || !init.selfie?.url) throw new Error(init.error || 'upload init failed')
+    const put = async (target, file) => {
+      const r = await fetch(`${init.bucketBase}${target.url}`, { method:'PUT', headers:{ 'Content-Type': file.type, 'x-upsert':'true' }, body: file })
+      if (!r.ok) throw new Error(`upload failed (${r.status})`)
+    }
+    await Promise.all([put(init.id, idFile), put(init.selfie, selfieFile)])
+    return { idDocPath: init.id.path, selfiePath: init.selfie.path }
   }
 
   const [submitting, setSubmitting] = useState(false)
@@ -1529,6 +1580,12 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
     if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
 
+    // First-time identity check: unverified wallets must attach ID + selfie.
+    const needId = verifyStatus !== 'approved'
+    if (needId && (!idFile || !selfieFile)) {
+      showToast('Upload your government ID and a selfie holding it to continue','e'); return
+    }
+
     // Rate limiting: max 3 per wallet per week (authoritative check is server-side in the insert)
     const rl = await fetch(`/api/submit-profile?wallet=${address}`).then(r => r.json()).catch(() => null)
     if (rl && typeof rl.remaining === 'number' && rl.remaining <= 0) {
@@ -1536,6 +1593,20 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     }
 
     setSubmitting(true)
+
+    // Upload ID + selfie to private storage BEFORE charging the fee, so a failed upload
+    // never costs the user. Retry path reuses the already-uploaded paths (no re-upload).
+    let idPaths = null
+    if (needId) {
+      showToast('Uploading your ID securely…', 's')
+      try {
+        const up = await uploadIdDocs()
+        if (!up.skip) idPaths = up
+      } catch {
+        showToast('ID upload failed — please try again','e'); setSubmitting(false); return
+      }
+    }
+
     let feeTx
     try {
       showToast('Confirm 5 TTS submission fee in wallet…', 's')
@@ -1554,12 +1625,14 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     // payload is preserved so the user can retry the save without paying again.
     setBalance(b => b - 5)
     const currentRoundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').then(r => r != null ? Number(r) : 1).catch(() => 1)
-    const payload = { walletAddress: address, payoutWallet: address, displayName: name.trim(), linkTitle: lt.trim(), linkUrl: lu.trim(), imageUrl: prev, referralCode: clubCode.trim().toLowerCase() || null, roundId: currentRoundId, feeTxHash: feeTx }
+    const payload = { walletAddress: address, payoutWallet: address, displayName: name.trim(), linkTitle: lt.trim(), linkUrl: lu.trim(), imageUrl: prev, referralCode: clubCode.trim().toLowerCase() || null, roundId: currentRoundId, feeTxHash: feeTx, idDocPath: idPaths?.idDocPath, selfiePath: idPaths?.selfiePath }
 
     const ok = await saveSubmission(payload)
     if (ok) {
       setPendingSubmit(null)
       setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
+      setIdFile(null); setIdPrev(null); setSelfieFile(null); setSelfiePrev(null)
+      if (needId) setVerifyStatus('pending')
     } else {
       setPendingSubmit(payload) // surfaces the retry button below
     }
@@ -1569,12 +1642,20 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   return (
     <div>
       <div className="shead"><h2>Submit Profile</h2><div className="grule" /><p>Be voted on · Win $TTS · Promote yourself · 3 per week max</p></div>
-      {connected && address && !kycVerified && (
+      {connected && address && verifyStatus === 'loading' && (
+        <div className="sub-wrap"><div style={{ textAlign:'center', padding:'40px 20px', color:'var(--muted)', fontSize:'.8rem' }}>Checking verification status…</div></div>
+      )}
+      {connected && address && verifyStatus === 'pending' && (
         <div className="sub-wrap">
-          <KYCGate address={address} showToast={showToast} onVerified={() => setKycVerified(true)} />
+          <div style={{ background:'rgba(212,175,55,0.08)', border:'1px solid rgba(212,175,55,0.25)', borderRadius:12, padding:'22px 20px', textAlign:'center' }}>
+            <div style={{ fontSize:'1.6rem', marginBottom:8 }}>⏳</div>
+            <div style={{ fontFamily:'var(--font-d)', fontSize:'1.2rem', fontStyle:'italic', color:'var(--text)', marginBottom:8 }}>Verification pending</div>
+            <div style={{ fontSize:'.76rem', color:'var(--muted)', lineHeight:1.6, marginBottom:16 }}>Your profile and ID are with our team for review — usually within 24 hours. Once approved, your profile goes live and every future submission skips this step (no re-verification).</div>
+            <button className="pbtn" onClick={recheckVerify} style={{ maxWidth:220, margin:'0 auto' }}>Check Status</button>
+          </div>
         </div>
       )}
-      {(!connected || !address || kycVerified) && (
+      {(!connected || !address || verifyStatus === 'approved' || verifyStatus === 'unverified' || verifyStatus === 'declined') && (
       <div className="sub-wrap">
         <input ref={fRef} type="file" accept=".jpg,.jpeg,.png" style={{ display:'none' }} onChange={handleFile} />
         {prev
@@ -1587,6 +1668,44 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
               <div className="uptxt">Tap to upload<br /><strong style={{ color:'var(--gold-dim)' }}>JPEG or PNG only</strong><br />High resolution · SFW required</div>
             </div>
         }
+
+        {/* First-time identity verification — in-dashboard, no email. Hidden once the
+            wallet is approved (one-time-per-wallet). */}
+        {connected && address && (verifyStatus === 'unverified' || verifyStatus === 'declined') && (
+          <div style={{ background:'var(--surface2)', border:'1px solid rgba(212,175,55,0.3)', borderRadius:12, padding:'16px', marginBottom:16 }}>
+            <div style={{ fontSize:'.66rem', fontWeight:800, letterSpacing:'.06em', color:'var(--gold)', marginBottom:8 }}>🪪 ONE-TIME IDENTITY CHECK (FIRST SUBMISSION)</div>
+            <div style={{ fontSize:'.74rem', color:'var(--muted)', lineHeight:1.6, marginBottom:6 }}>
+              Because prizes are real, we verify each new submitter once. Upload:
+            </div>
+            <div style={{ fontSize:'.72rem', color:'var(--text)', lineHeight:1.6, marginBottom:12, paddingLeft:4 }}>
+              <div style={{ marginBottom:4 }}><strong style={{ color:'var(--gold-light)' }}>1.</strong> A clear photo of your <strong>government-issued ID</strong> (passport, driver's license, or national ID).</div>
+              <div><strong style={{ color:'var(--gold-light)' }}>2.</strong> A <strong>selfie holding that ID next to your face</strong>, close to the camera, with <strong>today's date written on a piece of paper</strong> in the shot.</div>
+            </div>
+            {verifyStatus === 'declined' && (
+              <div style={{ background:'rgba(232,64,90,0.08)', border:'1px solid rgba(232,64,90,0.25)', borderRadius:8, padding:'9px 12px', marginBottom:12, fontSize:'.7rem', color:'var(--rose)', lineHeight:1.5 }}>
+                A previous verification was declined. Re-upload clear photos below. Questions: <strong>support@temptationtoken.io</strong>.
+              </div>
+            )}
+            <input ref={idRef} type="file" accept=".jpg,.jpeg,.png,.webp" style={{ display:'none' }} onChange={handleDocFile(setIdFile, setIdPrev)} />
+            <input ref={selfieRef} type="file" accept=".jpg,.jpeg,.png,.webp" style={{ display:'none' }} onChange={handleDocFile(setSelfieFile, setSelfiePrev)} />
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:130 }}>
+                {idPrev
+                  ? <div onClick={() => idRef.current?.click()} style={{ cursor:'pointer' }}><img src={idPrev} alt="ID" style={{ width:'100%', borderRadius:8, border:'1px solid var(--border)', display:'block' }} /><div style={{ fontSize:'.6rem', color:'var(--green)', textAlign:'center', marginTop:4 }}>✓ ID selected — tap to change</div></div>
+                  : <div className="upbox" onClick={() => idRef.current?.click()} style={{ minHeight:110, margin:0 }}><span className="upicon" style={{ fontSize:'1.4rem' }}>🪪</span><div className="uptxt" style={{ fontSize:'.66rem' }}>Government ID</div></div>}
+              </div>
+              <div style={{ flex:1, minWidth:130 }}>
+                {selfiePrev
+                  ? <div onClick={() => selfieRef.current?.click()} style={{ cursor:'pointer' }}><img src={selfiePrev} alt="Selfie" style={{ width:'100%', borderRadius:8, border:'1px solid var(--border)', display:'block' }} /><div style={{ fontSize:'.6rem', color:'var(--green)', textAlign:'center', marginTop:4 }}>✓ Selfie selected — tap to change</div></div>
+                  : <div className="upbox" onClick={() => selfieRef.current?.click()} style={{ minHeight:110, margin:0 }}><span className="upicon" style={{ fontSize:'1.4rem' }}>🤳</span><div className="uptxt" style={{ fontSize:'.66rem' }}>Selfie holding ID<br/>+ today's date</div></div>}
+              </div>
+            </div>
+            <div style={{ fontSize:'.62rem', color:'var(--muted)', lineHeight:1.5, marginTop:10 }}>
+              🔒 Stored privately, shown only to our review team, and never posted publicly or shared. The date on paper protects you against stolen-photo fraud.
+            </div>
+          </div>
+        )}
+
         {subRemaining !== null && (
           <div style={{ background: subRemaining > 0 ? 'rgba(46,204,113,.08)' : 'rgba(232,64,90,.08)', border: `1px solid ${subRemaining > 0 ? 'rgba(46,204,113,.25)' : 'rgba(232,64,90,.25)'}`, borderRadius: 8, padding:'10px 14px', fontSize:'.76rem', color: subRemaining > 0 ? 'var(--green)' : 'var(--rose)', marginBottom:14 }}>
             {subRemaining > 0 ? `✓ ${subRemaining} submission${subRemaining===1?'':'s'} remaining this week` : '✗ Submission limit reached — resets next week'}

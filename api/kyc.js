@@ -24,6 +24,27 @@ const PERSONA_VERSION = '2023-01-05'
 const REDIRECT_URI    = 'https://app.temptationtoken.io?kyc_complete=1'
 const AGREEMENT_VERSION = 'v1.0'
 
+// Private bucket holding government IDs + verification selfies. NEVER public.
+// Access is service-key-only (this file) for upload-signing; admin reads go through
+// the gated /api/admin?action=storage-url signed-URL minter. See storage-security design.
+const ID_BUCKET = 'id-verifications'
+let idBucketEnsured = false
+async function ensureIdBucket() {
+  if (idBucketEnsured) return
+  try {
+    await fetch(`${SUPABASE_URL}/storage/v1/bucket`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: ID_BUCKET, name: ID_BUCKET, public: false,
+        file_size_limit: 15728640, // 15 MB
+        allowed_mime_types: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+      }),
+    }) // 200 = created, 400/409 = already exists — both fine
+    idBucketEnsured = true
+  } catch { /* leave un-ensured; next call retries */ }
+}
+
 function sbFetch(path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     ...opts,
@@ -273,7 +294,7 @@ export default async function handler(req, res) {
     }
 
     const [vsRows, wvRows, wlRows] = await Promise.all([
-      sbFetch(`/verified_submitters?wallet_address=eq.${wallet}&select=status,reference_id,verified_at`).then(r=>r.json()).catch(()=>[]),
+      sbFetch(`/verified_submitters?wallet_address=eq.${wallet}&select=status,provider,verified_at`).then(r=>r.json()).catch(()=>[]),
       sbFetch(`/wallet_verifications?wallet_address=eq.${wallet}&is_verified=eq.true&select=id`).then(r=>r.json()).catch(()=>[]),
       sbFetch(`/verified_wallet_links?linked_wallet=eq.${wallet}&select=primary_wallet`).then(r=>r.json()).catch(()=>[]),
     ])
@@ -286,7 +307,9 @@ export default async function handler(req, res) {
     }
     if (Array.isArray(vsRows) && vsRows.length > 0) {
       const row = vsRows[0]
-      return res.status(200).json({ status: row.status, reference_id: row.reference_id, verified_at: row.verified_at, source: 'persona' })
+      // NOTE: reference_id is intentionally NOT returned — for provider='id_upload'
+      // rows it holds private ID/selfie storage paths, and this is a PUBLIC endpoint.
+      return res.status(200).json({ status: row.status, verified_at: row.verified_at, source: row.provider || 'persona' })
     }
     return res.status(200).json({ status: 'not_started' })
   }
@@ -438,6 +461,54 @@ export default async function handler(req, res) {
     } catch (e) {
       console.error('kyc request-manual failed:', e.message)
       return res.status(500).json({ error: 'Could not submit verification request' })
+    }
+  }
+
+  // ── /api/kyc?action=id-upload-init — mint signed UPLOAD urls for ID + selfie ──
+  // Browser uploads government ID + selfie DIRECTLY to the private bucket via these
+  // short-lived, single-object signed URLs. The service key never reaches the client;
+  // the server chooses wallet-scoped, random paths (client cannot pick the path).
+  if (action === 'id-upload-init') {
+    if (req.method !== 'POST') return res.status(405).end()
+    const { walletAddress } = body
+    if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/i.test(walletAddress)) {
+      return res.status(400).json({ error: 'Invalid wallet address' })
+    }
+    const wallet = walletAddress.toLowerCase()
+
+    // Already verified → no ID needed (one-time-per-wallet, enforced again at submit).
+    try {
+      const r = await sbFetch(`/verified_submitters?wallet_address=eq.${wallet}&status=eq.approved&select=wallet_address&limit=1`)
+      const rows = await r.json()
+      if (Array.isArray(rows) && rows.length > 0) return res.status(200).json({ alreadyVerified: true })
+    } catch {}
+
+    await ensureIdBucket()
+    const uid = crypto.randomUUID()
+    const idPath = `${wallet}/${uid}-id.jpg`
+    const selfiePath = `${wallet}/${uid}-selfie.jpg`
+
+    async function signUpload(path) {
+      const r = await fetch(`${SUPABASE_URL}/storage/v1/object/upload/sign/${ID_BUCKET}/${path}`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}), // storage rejects an empty JSON body
+      })
+      if (!r.ok) throw new Error(`sign-upload ${r.status}: ${(await r.text()).slice(0, 140)}`)
+      const d = await r.json()
+      return d.url // "/object/upload/sign/<bucket>/<path>?token=<jwt>"
+    }
+
+    try {
+      const [idUrl, selfieUrl] = await Promise.all([signUpload(idPath), signUpload(selfiePath)])
+      return res.status(200).json({
+        bucketBase: `${SUPABASE_URL}/storage/v1`,
+        id: { path: idPath, url: idUrl },
+        selfie: { path: selfiePath, url: selfieUrl },
+      })
+    } catch (e) {
+      console.error('id-upload-init failed:', e.message)
+      return res.status(502).json({ error: 'Could not start ID upload' })
     }
   }
 

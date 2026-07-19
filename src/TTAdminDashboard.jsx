@@ -33,6 +33,14 @@ const sb = {
   upsert: (table, body) => adminData('post', table, '', body, 'return=minimal,resolution=merge-duplicates'),
   delete: (table, query) => adminData('delete', table, query),
 };
+// Token-gated call to a non-data admin action (e.g. storage-url, storage-del).
+function adminAction(action, extra = {}) {
+  return fetch(`/api/admin?action=${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` },
+    body: JSON.stringify(extra),
+  });
+}
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const RAILWAY_PLAN   = 'HOBBY'; // Upgraded April 24, 2026 — paid plan, no expiry concern
@@ -1356,6 +1364,66 @@ function VerificationsScreen({ showToast }) {
   const [reviewChecks, setReviewChecks] = useState({}); // { [rowId]: { age, idSelfie, ... } }
   const toggleCheck = (rowId, k) => setReviewChecks(s => ({ ...s, [rowId]: { ...(s[rowId] || {}), [k]: !(s[rowId]?.[k]) } }));
   const allChecked = (rowId) => REVIEW_CHECKS.every(c => reviewChecks[rowId]?.[c.k]);
+
+  // ── In-dashboard ID review (provider='id_upload') ──────────────────────────
+  // reference_id on these rows is JSON { i: idPath, s: selfiePath, sub: submissionId }.
+  const parseIdMeta = (row) => { try { const m = JSON.parse(row.reference_id || '{}'); return (m && m.i && m.s) ? m : null; } catch { return null; } };
+  const isIdUpload = (row) => row.provider === 'id_upload' || !!parseIdMeta(row);
+  const [idMedia, setIdMedia] = useState({}); // { [rowId]: { loading|error|idUrl,selfieUrl,profileImg,profileName,paths,sub } }
+
+  // Load short-lived signed URLs for the ID + selfie and the linked profile photo.
+  // Signed URLs are minted only when the reviewer opens the row (privacy: no bulk minting).
+  const loadIdMedia = async (row) => {
+    const meta = parseIdMeta(row);
+    if (!meta) { setIdMedia(m => ({ ...m, [row.id]: { error: 'No ID on file for this row' } })); return; }
+    setIdMedia(m => ({ ...m, [row.id]: { loading: true } }));
+    try {
+      const [idR, selfieR] = await Promise.all([
+        adminAction('storage-url', { path: meta.i }).then(r => r.json()).catch(() => ({})),
+        adminAction('storage-url', { path: meta.s }).then(r => r.json()).catch(() => ({})),
+      ]);
+      let profileImg = null, profileName = null;
+      if (meta.sub) {
+        const subRows = await sb.get('submissions', `id=eq.${meta.sub}&select=display_name,image_url`);
+        if (Array.isArray(subRows) && subRows[0]) { profileImg = subRows[0].image_url; profileName = subRows[0].display_name; }
+      }
+      setIdMedia(m => ({ ...m, [row.id]: { idUrl: idR.url, selfieUrl: selfieR.url, profileImg, profileName, sub: meta.sub, paths: [meta.i, meta.s] } }));
+    } catch { setIdMedia(m => ({ ...m, [row.id]: { error: 'Could not load images' } })); }
+  };
+  const toggleIdReview = (row) => {
+    const opening = expandedId !== row.id;
+    setExpandedId(opening ? row.id : null);
+    if (opening && !idMedia[row.id]) loadIdMedia(row);
+  };
+
+  // ONE approve: mark WALLET verified AND publish the linked profile on-chain, then
+  // delete the ID/selfie (retention-flag aware, enforced server-side).
+  const approveIdUpload = async (row) => {
+    if (!allChecked(row.id)) { showToast('Complete all review checks first', 'error'); return; }
+    const meta = parseIdMeta(row) || {};
+    await sb.patch('verified_submitters', `id=eq.${row.id}`, { status: 'approved', verified_at: new Date().toISOString(), rejection_reason: null });
+    let pubOk = true;
+    if (meta.sub) {
+      try {
+        const r = await fetch('/api/approve-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: meta.sub }) });
+        pubOk = r.ok;
+        if (!r.ok) { const d = await r.json().catch(() => ({})); showToast('Wallet verified, but profile publish failed: ' + (d.error || ('HTTP ' + r.status)), 'error'); }
+      } catch { pubOk = false; showToast('Wallet verified, but profile publish failed (network)', 'error'); }
+    }
+    const paths = [meta.i, meta.s].filter(Boolean);
+    if (paths.length) await adminAction('storage-del', { paths }).catch(() => {});
+    if (pubOk) showToast(`✓ Verified ${row.wallet_address.slice(0, 10)}… and published their profile`, 'success');
+    loadAll();
+  };
+
+  const declineIdUpload = async (row) => {
+    const meta = parseIdMeta(row) || {};
+    await sb.patch('verified_submitters', `id=eq.${row.id}`, { status: 'declined', rejection_reason: 'ID verification declined by admin' });
+    const paths = [meta.i, meta.s].filter(Boolean);
+    if (paths.length) await adminAction('storage-del', { paths }).catch(() => {});
+    showToast('Declined — ID and selfie deleted', 'success');
+    loadAll();
+  };
   const [linkWallet, setLinkWallet] = useState('');
   const [linkTarget, setLinkTarget] = useState(null);
   const [linking, setLinking] = useState(false);
@@ -1621,13 +1689,19 @@ function VerificationsScreen({ showToast }) {
                         </div>
                       </div>
                       <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'flex-end' }}>
+                        {row.status !== 'approved' && isIdUpload(row) && (
+                          <button onClick={() => toggleIdReview(row)} style={{ background:'rgba(212,175,55,.12)', border:'1px solid rgba(212,175,55,.35)', color:'var(--gold)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap' }}>{expandedId === row.id ? '▲ Hide ID' : '🪪 Review ID + Selfie'}</button>
+                        )}
                         {row.status !== 'approved' && (
                           <button
-                            onClick={() => allChecked(row.id) && overrideApprove(row)}
+                            onClick={() => allChecked(row.id) && (isIdUpload(row) ? approveIdUpload(row) : overrideApprove(row))}
                             disabled={!allChecked(row.id)}
-                            title={allChecked(row.id) ? 'All checks complete — approve this wallet' : 'Complete all review checks below first'}
+                            title={allChecked(row.id) ? 'All checks complete — approve' : 'Complete all review checks below first'}
                             style={{ background: allChecked(row.id) ? 'rgba(46,204,113,.1)' : 'var(--surface2)', border:`1px solid ${allChecked(row.id) ? 'rgba(46,204,113,.3)' : 'var(--border)'}`, color: allChecked(row.id) ? 'var(--green)' : 'var(--muted)', padding:'5px 12px', borderRadius:6, cursor: allChecked(row.id) ? 'pointer' : 'not-allowed', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap', opacity: allChecked(row.id) ? 1 : .6 }}
-                          >✓ Verify Wallet</button>
+                          >{isIdUpload(row) ? '✓ Verify & Publish' : '✓ Verify Wallet'}</button>
+                        )}
+                        {row.status !== 'approved' && isIdUpload(row) && (
+                          <button onClick={() => declineIdUpload(row)} style={{ background:'rgba(232,64,90,.08)', border:'1px solid rgba(232,64,90,.2)', color:'var(--rose)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap' }}>✕ Decline</button>
                         )}
                         {row.status === 'approved' && (
                           <>
@@ -1637,6 +1711,30 @@ function VerificationsScreen({ showToast }) {
                         )}
                       </div>
                     </div>
+                    {isIdUpload(row) && expandedId === row.id && (
+                      <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
+                        <div style={{ fontSize:'.6rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>REVIEW — compare all three (signed links expire in 60s; hide & reopen to refresh)</div>
+                        {(() => {
+                          const m = idMedia[row.id];
+                          if (!m || m.loading) return <div style={{ fontSize:'.7rem', color:'var(--muted)', padding:'12px 0' }}>Loading secure images…</div>;
+                          if (m.error) return <div style={{ fontSize:'.7rem', color:'var(--rose)', padding:'12px 0' }}>⚠ {m.error}</div>;
+                          const cell = (label, src) => (
+                            <div style={{ flex:1, minWidth:150 }}>
+                              <div style={{ fontSize:'.58rem', color:'var(--muted)', fontWeight:700, marginBottom:4 }}>{label}</div>
+                              {src ? <a href={src} target="_blank" rel="noopener noreferrer"><img src={src} alt={label} style={{ width:'100%', borderRadius:8, border:'1px solid var(--border)', display:'block', maxHeight:280, objectFit:'contain', background:'#000' }} /></a>
+                                   : <div style={{ fontSize:'.62rem', color:'var(--rose)' }}>missing</div>}
+                            </div>
+                          );
+                          return (
+                            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                              {cell('GOVERNMENT ID', m.idUrl)}
+                              {cell('SELFIE + ID + DATE', m.selfieUrl)}
+                              {cell(`PROFILE PHOTO${m.profileName ? ' — ' + m.profileName : ''}`, m.profileImg)}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                     {row.status !== 'approved' && (
                       <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
                         <div style={{ fontSize:'.6rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>
@@ -1656,7 +1754,7 @@ function VerificationsScreen({ showToast }) {
                           ))}
                         </div>
                         <div style={{ fontSize:'.6rem', color: allChecked(row.id) ? 'var(--green)' : 'var(--muted)' }}>
-                          {allChecked(row.id) ? '✓ All checks complete — “Verify Wallet” is armed.' : `${REVIEW_CHECKS.filter(c => reviewChecks[row.id]?.[c.k]).length}/${REVIEW_CHECKS.length} checks complete — verify button locked until all are confirmed.`}
+                          {allChecked(row.id) ? `✓ All checks complete — “${isIdUpload(row) ? 'Verify & Publish' : 'Verify Wallet'}” is armed.` : `${REVIEW_CHECKS.filter(c => reviewChecks[row.id]?.[c.k]).length}/${REVIEW_CHECKS.length} checks complete — verify button locked until all are confirmed.`}
                         </div>
                       </div>
                     )}

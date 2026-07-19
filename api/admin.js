@@ -63,6 +63,13 @@ const ALLOWED = new Set([
 const METHODS = { get: 'GET', post: 'POST', patch: 'PATCH', delete: 'DELETE' }
 const PREFER_OK = new Set(['return=minimal', 'return=representation', 'resolution=merge-duplicates', 'resolution=ignore-duplicates'])
 
+// Private ID/selfie bucket. Objects are served to admins ONLY as short-lived signed
+// URLs minted here with the service key; there is no public URL. RETAIN_IDS gates
+// deletion (default: delete government IDs on approve/decline).
+const ID_BUCKET = 'id-verifications'
+const RETAIN_IDS = process.env.RETAIN_IDS === 'true'
+const okStoragePath = (p) => typeof p === 'string' && p.length > 0 && !p.includes('..') && !p.startsWith('/')
+
 function parseBody(req) {
   let body = req.body
   if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
@@ -123,11 +130,57 @@ async function handleData(req, res, body) {
   }
 }
 
+// ── action=storage-url — mint a 60s signed DOWNLOAD url for an ID/selfie object ──
+// Admin-token-gated. This is the ONLY read path for the private bucket.
+async function handleStorageUrl(req, res, body) {
+  const auth = req.headers.authorization || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : (body.token || '')
+  if (!verifyToken(token)) { res.status(401).json({ error: 'Unauthorized' }); return }
+  if (!SERVICE_KEY) { res.status(500).json({ error: 'Server not configured: SUPABASE_SERVICE_KEY missing' }); return }
+  const path = String(body.path || '')
+  if (!okStoragePath(path)) { res.status(400).json({ error: 'Bad path' }); return }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${ID_BUCKET}/${path}`, {
+      method: 'POST',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresIn: 60 }),
+    })
+    if (!r.ok) { res.status(502).json({ error: 'Sign failed' }); return }
+    const d = await r.json()
+    const signed = d.signedURL || d.signedUrl
+    if (!signed) { res.status(502).json({ error: 'No signed URL' }); return }
+    res.setHeader('Cache-Control', 'no-store')
+    res.status(200).json({ url: `${SUPABASE_URL}/storage/v1${signed}` })
+  } catch { res.status(502).json({ error: 'Upstream error' }) }
+}
+
+// ── action=storage-del — delete ID/selfie objects (retention flag aware) ────────
+async function handleStorageDel(req, res, body) {
+  const auth = req.headers.authorization || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : (body.token || '')
+  if (!verifyToken(token)) { res.status(401).json({ error: 'Unauthorized' }); return }
+  if (!SERVICE_KEY) { res.status(500).json({ error: 'Server not configured: SUPABASE_SERVICE_KEY missing' }); return }
+  // Legal-hold switch: if RETAIN_IDS=true, keep the documents (one-flag flip).
+  if (RETAIN_IDS) { res.status(200).json({ ok: true, retained: true }); return }
+  const paths = Array.isArray(body.paths) ? body.paths.filter(okStoragePath) : []
+  if (paths.length === 0) { res.status(200).json({ ok: true, deleted: 0 }); return }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${ID_BUCKET}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: paths }),
+    })
+    res.status(200).json({ ok: r.ok, deleted: r.ok ? paths.length : 0 })
+  } catch { res.status(502).json({ error: 'Delete failed' }) }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   const action = req.query.action || ''
   const body = parseBody(req)
   if (action === 'auth') return handleAuth(req, res, body)
   if (action === 'data') return handleData(req, res, body)
+  if (action === 'storage-url') return handleStorageUrl(req, res, body)
+  if (action === 'storage-del') return handleStorageDel(req, res, body)
   res.status(400).json({ error: 'Unknown action' })
 }

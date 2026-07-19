@@ -62,6 +62,31 @@ async function countThisWeek(wallet) {
   return Array.isArray(rows) ? rows.length : 0
 }
 
+// One-time-per-wallet identity check: a wallet is verified if it has an approved
+// verified_submitters row, a legacy wallet_verifications record, or is a linked wallet.
+// Mirrors the admin approve-gate. Once true, future submissions SKIP the ID step.
+async function isWalletVerified(wallet) {
+  const w = (wallet || '').toLowerCase()
+  try {
+    const [vs, wv, wl] = await Promise.all([
+      sb(`/verified_submitters?wallet_address=eq.${w}&status=eq.approved&select=wallet_address&limit=1`).then(r => r.json()).catch(() => []),
+      sb(`/wallet_verifications?wallet_address=eq.${w}&is_verified=eq.true&select=id&limit=1`).then(r => r.json()).catch(() => []),
+      sb(`/verified_wallet_links?linked_wallet=eq.${w}&select=id&limit=1`).then(r => r.json()).catch(() => []),
+    ])
+    return [vs, wv, wl].some(d => Array.isArray(d) && d.length > 0)
+  } catch { return false }
+}
+
+// A storage path is valid only if it lives under THIS wallet's folder (prevents a
+// client from pointing the verification row at another wallet's / arbitrary object).
+function isOwnIdPath(path, wallet) {
+  const w = (wallet || '').toLowerCase()
+  return typeof path === 'string'
+    && path.startsWith(`${w}/`)
+    && !path.includes('..')
+    && /-(id|selfie)\.(jpe?g|png|webp)$/i.test(path)
+}
+
 // ── action=list ────────────────────────────────────────────────────────────
 // Returns ALL approved profiles regardless of round. Rounds roll over weekly
 // (calendar-pinned via Chainlink), but approved profiles PERSIST into the current
@@ -117,13 +142,26 @@ async function handleSubmit(req, res) {
     const round = Number.isInteger(roundId) && roundId > 0 ? roundId : 1
 
     try {
+      // One-time identity gate (server-authoritative). Verified wallets skip the ID
+      // step; unverified wallets MUST supply their uploaded ID + selfie storage paths.
+      const verified = await isWalletVerified(walletAddress)
+      const { idDocPath, selfiePath } = body
+      if (!verified) {
+        if (!isOwnIdPath(idDocPath, walletAddress) || !isOwnIdPath(selfiePath, walletAddress)) {
+          res.status(400).json({ error: 'Identity verification required: upload your government ID and selfie before submitting.', needsId: true })
+          return
+        }
+      }
+
       if (await countThisWeek(walletAddress) >= MAX_PER_WEEK) {
         res.status(429).json({ error: 'Submission limit reached (3 per week)' })
         return
       }
-      const ins = await sb('/submissions', {
+      // return=representation + ?select=id → we get the new row id WITHOUT echoing the
+      // multi-MB base64 image back.
+      const ins = await sb('/submissions?select=id', {
         method: 'POST',
-        headers: { Prefer: 'return=minimal' },
+        headers: { Prefer: 'return=representation' },
         body: JSON.stringify({
           round_id: round,
           wallet_address: walletAddress,
@@ -141,6 +179,25 @@ async function handleSubmit(req, res) {
         res.status(502).json({ error: 'Insert failed', detail: detail.slice(0, 200) })
         return
       }
+      const created = await ins.json().catch(() => [])
+      const submissionId = Array.isArray(created) && created[0] ? created[0].id : null
+
+      // First-time wallet: record a PENDING verification tied to the wallet, carrying
+      // the private ID/selfie paths + the linked submission so the admin can review all
+      // three together and approve both in one click. Paths live ONLY here (reference_id),
+      // never on the submission and never in any public response.
+      if (!verified && submissionId != null) {
+        const w = walletAddress.toLowerCase()
+        const meta = JSON.stringify({ i: idDocPath, s: selfiePath, sub: String(submissionId) })
+        const payload = { provider: 'id_upload', status: 'pending', reference_id: meta, rejection_reason: null, verified_at: null }
+        const ex = await sb(`/verified_submitters?wallet_address=eq.${w}&select=wallet_address&limit=1`).then(r => r.json()).catch(() => [])
+        if (Array.isArray(ex) && ex.length > 0) {
+          await sb(`/verified_submitters?wallet_address=eq.${w}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) }).catch(() => {})
+        } else {
+          await sb('/verified_submitters', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ...payload, wallet_address: w, created_at: new Date().toISOString() }) }).catch(() => {})
+        }
+      }
+
       res.status(200).json({ ok: true })
     } catch { res.status(502).json({ error: 'Submission failed' }) }
     return
