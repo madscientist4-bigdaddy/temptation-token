@@ -26,3 +26,6 @@ fail_on_revert = false
 
 [profile.default.fuzz]
 runs = 512
+
+[rpc_endpoints]
+base = "${BASE_RPC_URL}"

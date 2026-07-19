@@ -14,9 +14,15 @@ node analysis/depletion_model.mjs   # Gate E runway model
 |---|---|---|
 | A | Contract spec → impl (`src/TTSStaking.sol`) | ✅ compiles |
 | B | Foundry safety suite + Slither | ✅ 42/42, no high-sev |
-| C | Base Sepolia deploy + live-fire (`script/DeploySepolia.s.sol`) | ⏳ needs funded testnet key |
-| D | Integration: real V3d + website UI + admin dashboard + regression | ⏳ after C |
+| C | Live-fire: mainnet-fork (real TTS+V3d) ✅ · public Sepolia (`script/DeploySepolia.s.sol`) ⏳ needs funded key |
+| D | V3d reads tier through 7-day gate ✅ (fork) · website UI + admin controls ⏳ |
 | E | 10B depletion runway (`analysis/DEPLETION_RUNWAY.md`) | ✅ modeled + flagged |
+
+**Fork integration** (Gate C/D core): `BASE_RPC_URL=<alchemy> forge test
+--match-path test/ForkIntegration.t.sol --evm-version cancun -vv` → 3/3. Proves
+real V3d.tierVoteCap reads my `getStakingTier` (500 fallback pre-eligibility,
+correct tier cap after 7d), real 1% tax + exemption, and the full stake→claim→
+unstake→emergency lifecycle with real TTS — zero mainnet writes.
 
 - Gate A/B report: [`SPEC_AND_SECURITY.md`](./SPEC_AND_SECURITY.md)
 - Gate E report: [`analysis/DEPLETION_RUNWAY.md`](./analysis/DEPLETION_RUNWAY.md)
