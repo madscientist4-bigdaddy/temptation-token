@@ -5,3 +5,4 @@ broadcast/
 # Pinned OZ 4.9.6 — reproduce with staking/setup.sh (kept out of the tree to
 # avoid vendoring the full library; required for build/test/verify).
 vendor/
+.sepolia-deployer.txt

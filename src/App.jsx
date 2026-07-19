@@ -54,6 +54,8 @@ async function waitForReceipt(hash) {
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import TTSChatbot from './TTSChatbot.jsx'
+import StakePanel from './StakePanel.jsx'
+import { STAKING_ENABLED } from './config/staking.js'
 import { describeTxError } from './lib/txError.js'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
@@ -1376,7 +1378,9 @@ function BuySellScreen({ showToast, connected }) {
           </>
         )}
 
-        {tab === 'stake' && (
+        {tab === 'stake' && (STAKING_ENABLED ? (
+          <StakePanel showToast={showToast} />
+        ) : (
           <>
             <div style={{ textAlign:'center', padding:'28px 0 20px' }}>
               <div style={{ fontSize:'2.4rem', marginBottom:8 }}>🔒</div>
@@ -1408,7 +1412,7 @@ function BuySellScreen({ showToast, connected }) {
             </a>
             <div className="sub-note">Early stakers will receive bonus multipliers at launch</div>
           </>
-        )}
+        ))}
       </div>
     </div>
   )
@@ -1908,7 +1912,7 @@ function RulesScreen() {
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
     { t:'Prize Distribution', b:'Top Voter: 35% of winning pool.\nWinning Profile: 35% of pool.\nBlockchain Entertainment LLC: 20%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
-    { t:'Staking', b:'Lock $TTS to earn APR rewards and vote multipliers up to 3x. Once locked, funds cannot be accessed early under any circumstances.' },
+    { t:'Staking', b:'Stake $TTS to earn APR rewards and vote multipliers up to 3x. Your principal is withdrawable anytime; the vote multiplier activates 7 days after your last stake.' },
     { t:'Fairness & Privacy', b:'Voting is provably fair via Chainlink VRF on Base blockchain. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
   ]
   return (

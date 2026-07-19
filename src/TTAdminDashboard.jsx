@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { toFunctionSelector } from "viem";
 import { describeTxError } from "./lib/txError.js";
+import StakingAdmin from "./StakingAdmin.jsx";
 
 // I1: compute function selectors from their signatures so they can never drift
 // from the deployed V3d ABI again (getProfile was previously a wrong hardcode).
@@ -3051,6 +3052,8 @@ function SettingsScreen() {
       <BonusConfigSection showToast={showToast} />
 
       <ContractSettingsSection />
+
+      <StakingAdmin />
 
       <div style={{ background: "rgba(52,152,219,0.08)", border: "1px solid rgba(52,152,219,0.2)", borderRadius: 10, padding: "14px 18px", fontSize: "0.63rem", color: "var(--muted)", lineHeight: 1.8 }}>
         ℹ Contract Settings above require the admin wallet (deployer) connected via MetaMask. Bonus Configuration changes take effect immediately without MetaMask.
