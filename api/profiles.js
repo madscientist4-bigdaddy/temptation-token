@@ -184,12 +184,13 @@ async function handleSubmit(req, res) {
 
       // First-time wallet: record a PENDING verification tied to the wallet, carrying
       // the private ID/selfie paths + the linked submission so the admin can review all
-      // three together and approve both in one click. Paths live ONLY here (reference_id),
-      // never on the submission and never in any public response.
+      // three together and approve both in one click. Paths live ONLY in the dedicated
+      // columns (migration 0001) — never on the submission and never in any public
+      // response. reference_id is nulled for id_upload rows (Persona rows still use it
+      // for their inquiry id).
       if (!verified && submissionId != null) {
         const w = walletAddress.toLowerCase()
-        const meta = JSON.stringify({ i: idDocPath, s: selfiePath, sub: String(submissionId) })
-        const payload = { provider: 'id_upload', status: 'pending', reference_id: meta, rejection_reason: null, verified_at: null }
+        const payload = { provider: 'id_upload', status: 'pending', id_doc_path: idDocPath, selfie_path: selfiePath, submission_id: String(submissionId), reference_id: null, rejection_reason: null, verified_at: null }
         const ex = await sb(`/verified_submitters?wallet_address=eq.${w}&select=wallet_address&limit=1`).then(r => r.json()).catch(() => [])
         if (Array.isArray(ex) && ex.length > 0) {
           await sb(`/verified_submitters?wallet_address=eq.${w}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(payload) }).catch(() => {})

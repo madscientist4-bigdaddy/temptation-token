@@ -1367,8 +1367,13 @@ function VerificationsScreen({ showToast }) {
   const allChecked = (rowId) => REVIEW_CHECKS.every(c => reviewChecks[rowId]?.[c.k]);
 
   // ── In-dashboard ID review (provider='id_upload') ──────────────────────────
-  // reference_id on these rows is JSON { i: idPath, s: selfiePath, sub: submissionId }.
-  const parseIdMeta = (row) => { try { const m = JSON.parse(row.reference_id || '{}'); return (m && m.i && m.s) ? m : null; } catch { return null; } };
+  // ID/selfie paths + linked submission live in dedicated columns (migration 0001):
+  // id_doc_path / selfie_path / submission_id. Legacy rows may still carry the old
+  // reference_id JSON { i, s, sub }, so fall back to it for backward-compat.
+  const parseIdMeta = (row) => {
+    if (row.id_doc_path && row.selfie_path) return { i: row.id_doc_path, s: row.selfie_path, sub: row.submission_id };
+    try { const m = JSON.parse(row.reference_id || '{}'); return (m && m.i && m.s) ? { i: m.i, s: m.s, sub: m.sub } : null; } catch { return null; }
+  };
   const isIdUpload = (row) => row.provider === 'id_upload' || !!parseIdMeta(row);
   const [idMedia, setIdMedia] = useState({}); // { [rowId]: { loading|error|idUrl,selfieUrl,profileImg,profileName,paths,sub } }
 

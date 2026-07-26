@@ -307,8 +307,9 @@ export default async function handler(req, res) {
     }
     if (Array.isArray(vsRows) && vsRows.length > 0) {
       const row = vsRows[0]
-      // NOTE: reference_id is intentionally NOT returned — for provider='id_upload'
-      // rows it holds private ID/selfie storage paths, and this is a PUBLIC endpoint.
+      // NOTE: this is a PUBLIC endpoint. Only status/provider/verified_at are selected
+      // and returned — the private ID columns (id_doc_path/selfie_path/submission_id)
+      // and reference_id are never selected here, so they cannot leak.
       return res.status(200).json({ status: row.status, verified_at: row.verified_at, source: row.provider || 'persona' })
     }
     return res.status(200).json({ status: 'not_started' })
