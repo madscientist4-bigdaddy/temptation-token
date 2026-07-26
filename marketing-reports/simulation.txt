@@ -1,0 +1,44 @@
+════════ TTS MARKETING ENGINE — DRY_RUN SIMULATION ════════
+start: 2026-07-26T17:55:12.568Z  DRY_RUN=true
+
+──── PASS 1 (first invocation at each timestamp) ────
+
+▶ round_open @ 2026-07-27T09:05:00-04:00  (ET moment)
+  [render] roundOpen card = 40714 bytes
+  fired: [round_open]
+
+▶ midpoint @ 2026-07-29T20:05:00-04:00  (ET moment)
+  [render] midpoint card = 42265 bytes
+  fired: [midpoint]
+
+▶ friday_push @ 2026-07-31T12:05:00-04:00  (ET moment)
+  fired: [friday_push]
+
+▶ final_hours @ 2026-08-02T18:05:00-04:00  (ET moment)
+  fired: [final_hours]
+
+▶ winner @ 2026-08-02T00:15:00-04:00  (ET moment)
+  [render] winner card = 41032 bytes
+  fired: [winner]
+
+▶ weekly_report @ 2026-08-02T00:35:00-04:00  (ET moment)
+  fired: [weekly_report]
+
+──── PASS 2 (same timestamps — must dedupe to zero) ────
+▶ round_open: fired []
+▶ midpoint: fired []
+▶ friday_push: fired []
+▶ final_hours: fired []
+▶ winner: fired []
+▶ weekly_report: fired []
+
+──── ASSERTIONS ────
+✅ exactly six events fire (pass 1)  — 6 fired: [round_open, midpoint, friday_push, final_hours, winner, weekly_report]
+✅ all six distinct event ids covered  — round_open, midpoint, friday_push, final_hours, winner, weekly_report
+✅ round number > 0  — round=4
+✅ pool string non-empty  — poolUsd="$0.00"
+✅ every rendered card buffer > 10KB  — roundOpen:40714b, midpoint:42265b, winner:41032b
+✅ second invocation fires zero (dedupe)  — 0 fired
+
+════════ RESULT: 6/6 assertions passed ════════
+leader (real on-chain): #27ba31 · profiles: 18 · pool: $0.00
