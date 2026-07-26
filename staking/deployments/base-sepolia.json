@@ -1,0 +1,54 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "purpose": "Gate C/D deploy rehearsal — mock stack, NOT mainnet. Throwaway deployer.",
+  "deployedAt": "2026-07-25",
+  "deployer": "0x767651E74c290122Dd8CC934e471fCE091BbC5c2",
+  "safeStandin": "0x767651E74c290122Dd8CC934e471fCE091BbC5c2",
+  "contracts": {
+    "MockTTSTax": {
+      "address": "0x63892c3f4c3c68Fb00F3C42E608101181Cc775DF",
+      "note": "Mock TTS: 1% tax + isTaxExempt allowlist; treasury = safe standin",
+      "constructorArgs": { "treasury": "0x767651E74c290122Dd8CC934e471fCE091BbC5c2" }
+    },
+    "TimelockController": {
+      "address": "0xa3E4aA44E7E8b6b4bD24c54cF64cA2DDFfCB1375",
+      "note": "UPGRADER of staking (mirrors mainnet: never an EOA). 1h delay on testnet.",
+      "constructorArgs": {
+        "minDelay": 3600,
+        "proposers": ["0x767651E74c290122Dd8CC934e471fCE091BbC5c2"],
+        "executors": ["0x767651E74c290122Dd8CC934e471fCE091BbC5c2"],
+        "admin": "0x0000000000000000000000000000000000000000"
+      }
+    },
+    "TTSStakingImpl": {
+      "address": "0x59dd26D9A4eE609f72Bd291951071EB0f208bE16",
+      "note": "UUPS logic contract (no constructor args; state via initialize on proxy)"
+    },
+    "TTSStakingProxy": {
+      "address": "0xaAebcaBb5B0A22A39123b76Ef5f6bD7C985E1765",
+      "note": "PRIMARY staking entrypoint. TestProxy(impl, initialize(tts, admin=safe, manager=safe, upgrader=timelock))",
+      "initialize": {
+        "ttsToken": "0x63892c3f4c3c68Fb00F3C42E608101181Cc775DF",
+        "admin": "0x767651E74c290122Dd8CC934e471fCE091BbC5c2",
+        "manager": "0x767651E74c290122Dd8CC934e471fCE091BbC5c2",
+        "upgrader": "0xa3E4aA44E7E8b6b4bD24c54cF64cA2DDFfCB1375"
+      }
+    },
+    "StubVotingV3d": {
+      "address": "0x27E6463E5376f309a20418dFd8307b5b0cFFAd5a",
+      "note": "Gate D seam: replica of V3d tierVoteCap/multiplier reading getStakingTier",
+      "constructorArgs": { "staking": "0xaAebcaBb5B0A22A39123b76Ef5f6bD7C985E1765" }
+    }
+  },
+  "params": {
+    "tierThresholds": { "bronze": "50000e18", "silver": "100000e18", "gold": "250000e18", "diamond": "1000000e18", "vip": "5000000e18" },
+    "aprBps": { "bronze": 800, "silver": 1200, "gold": 1800, "diamond": 3200, "vip": 4500 },
+    "multiplierEligibilityDays": 7,
+    "rewardPoolFunded": "10000000000e18"
+  },
+  "explorer": {
+    "basescanBase": "https://sepolia.basescan.org/address/",
+    "blockscoutBase": "https://base-sepolia.blockscout.com/address/"
+  }
+}
