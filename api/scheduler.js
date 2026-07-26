@@ -436,6 +436,24 @@ async function firePost(post) {
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
+  // ── POST /api/scheduler?action=dispatch — marketing engine dispatcher ───────
+  // The Railway worker hits this every ~10 min (Vercel Hobby cron can't do intraday).
+  // Bearer CRON_SECRET auth. Exactly-once via posted_events; DST-safe ET schedule.
+  if (req.query?.action === 'dispatch') {
+    const secret = process.env.CRON_SECRET || ''
+    const auth = req.headers.authorization || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    if (!secret || token !== secret) return res.status(401).json({ error: 'Unauthorized' })
+    try {
+      const { runDispatch } = await import('../lib/marketing/dispatch.js')
+      const { makeDeps } = await import('../lib/marketing/integration.js')
+      const fired = await runDispatch(makeDeps())
+      return res.status(200).json({ ok: true, fired, dryRun: (process.env.DRY_RUN ?? 'true').toLowerCase() !== 'false' })
+    } catch (e) {
+      return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) })
+    }
+  }
+
   // ── GET /api/scheduler?action=ig_confirm&id=UUID ──────────────────────────
   // Called by the inline Telegram button. Marks IG post as posted, returns HTML.
   if (req.method === 'GET' && req.query?.action === 'ig_confirm') {

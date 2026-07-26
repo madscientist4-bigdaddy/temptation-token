@@ -59,6 +59,9 @@ const ALLOWED = new Set([
   'scheduled_posts', 'admin_config', 'admin_audit_log', 'age_acknowledgments',
   'verified_submitters', 'verified_wallet_links', 'wallet_verifications',
   'project_expenses', 'project_income',
+  // marketing engine tables (service-role only; CRM board reads/writes via this proxy)
+  'prospects', 'posted_events', 'content_queue', 'attribution_events',
+  'channel_spend', 'outbid_watchers', 'outreach_sequences',
 ])
 const METHODS = { get: 'GET', post: 'POST', patch: 'PATCH', delete: 'DELETE' }
 const PREFER_OK = new Set(['return=minimal', 'return=representation', 'resolution=merge-duplicates', 'resolution=ignore-duplicates'])
@@ -174,6 +177,34 @@ async function handleStorageDel(req, res, body) {
   } catch { res.status(502).json({ error: 'Delete failed' }) }
 }
 
+// ── action=crm-import — parse a prospects CSV and bulk-insert (admin-gated) ──────
+// Manual-DM rule: importing prospects never triggers any outreach; it only fills the
+// CRM pipeline for a human to action. (Instagram is never automated.)
+async function handleCrmImport(req, res, body) {
+  const auth = req.headers.authorization || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : (body.token || '')
+  if (!verifyToken(token)) { res.status(401).json({ error: 'Unauthorized' }); return }
+  if (!SERVICE_KEY) { res.status(500).json({ error: 'Server not configured: SUPABASE_SERVICE_KEY missing' }); return }
+  const csv = typeof body.csv === 'string' ? body.csv : ''
+  if (!csv.trim()) { res.status(400).json({ error: 'Missing csv' }); return }
+  let parsed
+  try {
+    const { parseProspectsCsv } = await import('../lib/marketing/crm/csv.js')
+    parsed = parseProspectsCsv(csv)
+  } catch (e) { res.status(400).json({ error: String(e.message || e).slice(0, 160) }); return }
+  if (parsed.rows.length === 0) { res.status(200).json({ ok: true, inserted: 0, ...parsed }); return }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/prospects`, {
+      method: 'POST',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json',
+        Prefer: 'return=minimal,resolution=ignore-duplicates' },
+      body: JSON.stringify(parsed.rows.map(p => ({ ...p, status: 'identified' }))),
+    })
+    if (!r.ok && r.status !== 409) { const t = await r.text(); res.status(502).json({ error: `Insert failed: ${t.slice(0,140)}` }); return }
+    res.status(200).json({ ok: true, inserted: parsed.rows.length, skipped: parsed.skipped, deduped: parsed.deduped })
+  } catch { res.status(502).json({ error: 'Upstream error' }) }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return }
   const action = req.query.action || ''
@@ -182,5 +213,6 @@ export default async function handler(req, res) {
   if (action === 'data') return handleData(req, res, body)
   if (action === 'storage-url') return handleStorageUrl(req, res, body)
   if (action === 'storage-del') return handleStorageDel(req, res, body)
+  if (action === 'crm-import') return handleCrmImport(req, res, body)
   res.status(400).json({ error: 'Unknown action' })
 }

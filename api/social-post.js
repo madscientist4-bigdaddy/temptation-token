@@ -204,6 +204,23 @@ function escHtml(s) {
 }
 
 export default async function handler(req, res) {
+  // ── GET /api/social-post?action=og-card&kind=roundOpen|midpoint|winner ───────
+  // Branded OG/social card as a PNG. Public (safe: no PII, marketing image only).
+  if (req.method === 'GET' && req.query?.action === 'og-card') {
+    try {
+      const { renderCard, fetchRoundState } = await import('../lib/marketing/integration.js')
+      const kind = ['roundOpen', 'midpoint', 'winner'].includes(req.query.kind) ? req.query.kind : 'roundOpen'
+      const state = await fetchRoundState()
+      if (!state.winner) { state.winner = state.leader; state.prizeUsd = state.poolUsd; state.burned = state.burned || '0' }
+      const png = await renderCard(kind, state)
+      res.setHeader('Content-Type', 'image/png')
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=600')
+      return res.status(200).end(png)
+    } catch (e) {
+      return res.status(500).json({ error: 'card render failed', detail: String(e.message || e).slice(0, 160) })
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).end()
 
   const body = req.body || {}
