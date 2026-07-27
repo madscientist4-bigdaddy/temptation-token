@@ -32,6 +32,39 @@ def _sb_patch(table, filter_query, body):
     except Exception as e:
         print(f"Supabase PATCH error: {e}"); return None
 
+def _sb_post(table, body, prefer="return=minimal,resolution=merge-duplicates"):
+    if not _SB_KEY: return None
+    url  = f"{_SB_URL}/rest/v1/{table}"
+    data = json.dumps(body).encode()
+    req  = urllib.request.Request(url, data, {
+        "Content-Type": "application/json",
+        "apikey": _SB_KEY,
+        "Authorization": f"Bearer {_SB_KEY}",
+        "Prefer": prefer,
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r: return r.status
+    except Exception as e:
+        print(f"Supabase POST error: {e}"); return None
+
+# /watch — opt into outbid alerts. The bot has no Telegram-uid→wallet map (by design),
+# so the caller supplies their wallet (and optionally a profile id). Upserts an
+# outbid_watchers row (wallet, profile_id) with this chat id; worker/outbid.ts DMs them
+# when they lose #1. profile_id defaults to 'ALL' (worker expands to led profiles).
+def on_watch(cid, txt):
+    parts = txt.split()
+    wallet = parts[1].strip() if len(parts) > 1 else ""
+    if not re.match(r"^0x[0-9a-fA-F]{40}$", wallet):
+        send(cid, "Usage: `/watch 0xYOURWALLET` — I'll DM you if you get outbid for #1 top-voter."); return
+    profile_id = parts[2].strip() if len(parts) > 2 else "ALL"
+    status = _sb_post("outbid_watchers", {
+        "wallet": wallet.lower(), "tg_chat_id": str(cid), "profile_id": profile_id,
+    })
+    if status in (200, 201, 204):
+        send(cid, f"⚔️ Watching *{wallet[:6]}…{wallet[-4:]}*. If you lose #1 top-voter, I'll ping you here (max 1/hr).")
+    else:
+        send(cid, "⚠️ Couldn't register the watch right now — try again shortly.")
+
 # VIP tiers are TELEGRAM-COMMUNITY perks only (access to the VIP Vault chat + content).
 # They do NOT grant on-chain vote multipliers, token grants, or NFT drops — the bot has
 # no contract access. Descriptions must not promise any on-chain benefit.
@@ -317,6 +350,8 @@ def run():
                             on_payment(cid, uid, m["successful_payment"]["invoice_payload"]); continue
                         if txt.startswith("/start"):
                             on_start(cid, uid, name, uname, txt[7:].strip())
+                        elif txt.startswith("/watch"):
+                            on_watch(cid, txt)
                         elif cid == ADMIN_CHAT_ID and txt.lower().strip() == "done" and m.get("reply_to_message"):
                             # Admin replied "done" to an IG handoff message — mark post as posted
                             reply_text = (m["reply_to_message"].get("text") or
