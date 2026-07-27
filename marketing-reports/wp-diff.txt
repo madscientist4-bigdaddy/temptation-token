@@ -1,0 +1,15 @@
+WP FIXES — SKIPPED
+==================
+Reason: WP_* environment variables (WP_BASE / WP_APP_USER / WP_APP_PASSWORD) are
+not set in .env or .env.local, AND per CLAUDE.md the tts-api-auth WordPress plugin
+is not yet installed (Hostinger blocks standard App-Password auth). scripts/wp_fixes.py
+therefore cannot authenticate to https://temptationtoken.io/wp-json/.
+
+The site is reachable (HTTP 200) but no credentials are available to this run.
+
+TO COMPLETE (human):
+1. Install wp-plugins/tts-api-auth/ on the WordPress site.
+2. Set WP_BASE=https://temptationtoken.io, WP_APP_USER, WP_APP_PASSWORD (or the
+   TTS_WP_API_KEY header the plugin expects).
+3. Re-run: python3 ~/Downloads/tts-marketing-engine/scripts/wp_fixes.py (dry-run),
+   review diff here, then --apply, then regenerate sitemap + submit to Search Console.

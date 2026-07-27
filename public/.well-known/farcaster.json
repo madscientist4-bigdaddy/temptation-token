@@ -1,0 +1,17 @@
+{
+  "accountAssociation": {
+    "header": "TODO_SIGN",
+    "payload": "TODO_SIGN",
+    "signature": "TODO_SIGN"
+  },
+  "frame": {
+    "version": "1",
+    "name": "Temptation Token",
+    "iconUrl": "https://app.temptationtoken.io/tts_logo.webp",
+    "homeUrl": "https://app.temptationtoken.io",
+    "imageUrl": "https://app.temptationtoken.io/api/og/card?kind=roundOpen",
+    "buttonTitle": "Vote to Win $TTS",
+    "splashImageUrl": "https://app.temptationtoken.io/tts_logo.webp",
+    "splashBackgroundColor": "#0B0B0F"
+  }
+}

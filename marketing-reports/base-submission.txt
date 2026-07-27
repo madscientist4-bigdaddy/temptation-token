@@ -1,0 +1,41 @@
+BUILD ON BASE — SUBMISSION DRAFT (buildonbase.deform.cc)
+========================================================
+
+Project name: Temptation Token ($TTS)
+
+Tagline (56 chars): Hot-or-Not on Base — vote $TTS, top voter wins the pool.
+
+One-liner:
+A weekly on-chain "Hot or Not" voting game. Players vote $TTS on profiles; the
+top voter and the winning profile split the prize pool, 10% goes to an
+anti-trafficking charity, and every losing vote is burned. Provably fair via
+Chainlink VRF; fully settled on Base mainnet.
+
+What's live on Base (mainnet, 8453):
+- TTSVotingV3d voting contract, Chainlink-automated weekly rounds (Keeper3).
+- $TTS token (UUPS), Uniswap v2 liquidity (locked), NFT round trophies.
+- Prize split 35% top voter / 35% winning profile / 10% charity / 20% house.
+- App: https://app.temptationtoken.io (Vite SPA + Vercel serverless).
+
+Why Base:
+- Cheap, fast settlement makes micro-stakes voting viable every week.
+- Chainlink VRF + Automation on Base gives provably-fair, hands-off rounds.
+- Onchain burns tie supply directly to engagement.
+
+Category: Social / Consumer / Gaming
+
+Links:
+- App: https://app.temptationtoken.io
+- Farcaster manifest: https://app.temptationtoken.io/.well-known/farcaster.json
+- X: @temptationtoken
+
+Assets attached (marketing/base-dev/):
+- app-icon-1024.png (app icon)
+- cover-1200x630.png (cover, no Base logo)
+- screen-1-vote.png / screen-2-standings.png / screen-3-winners.png (1284x2778)
+
+NEEDS A HUMAN before submitting:
+- Sign the farcaster.json accountAssociation (header/payload/signature) with the
+  project's Farcaster custody key — currently "TODO_SIGN".
+- Final copy review + choose category tags on the Deform form.
+- Confirm charity/compliance language is approved for public listing.
