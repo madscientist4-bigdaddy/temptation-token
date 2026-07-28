@@ -8,6 +8,7 @@
 import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+import { requireAdmin } from '../lib/adminAuth.js'
 
 const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const SUPABASE_URL   = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co'
@@ -18,6 +19,10 @@ const ABI = parseAbi(['function setClubWallet(string calldata code, address wall
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  // Admin-only: this endpoint signs a Bank-wallet (DEPLOYER_PRIVATE_KEY) tx that
+  // sets a club's on-chain payout wallet. Without this gate anyone could hijack a
+  // club code's 10% payout. Requires a valid admin session token.
+  if (!requireAdmin(req, res, req.body || {})) return
 
   const { clubName, clubCode, walletAddress } = req.body || {}
   if (!clubCode || typeof clubCode !== 'string' || !clubCode.trim()) {
@@ -46,7 +51,12 @@ export default async function handler(req, res) {
       functionName: 'setClubWallet',
       args: [code, walletAddress],
     })
-    await publicClient.waitForTransactionReceipt({ hash: txHash })
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+    // viem does NOT throw on an on-chain revert — check status explicitly so we
+    // never report a reverted tx as success.
+    if (receipt.status !== 'success') {
+      return res.status(500).json({ ok: false, error: 'setClubWallet reverted on-chain', txHash })
+    }
   } catch (e) {
     console.error('setClubWallet tx failed:', e)
     return res.status(500).json({ ok: false, error: e.message })

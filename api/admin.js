@@ -146,7 +146,7 @@ async function handleStorageUrl(req, res, body) {
     const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${ID_BUCKET}/${path}`, {
       method: 'POST',
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expiresIn: 60 }),
+      body: JSON.stringify({ expiresIn: 300 }),
     })
     if (!r.ok) { res.status(502).json({ error: 'Sign failed' }); return }
     const d = await r.json()

@@ -8,6 +8,7 @@
 import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+import { requireAdmin } from '../lib/adminAuth.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY ||
@@ -22,6 +23,10 @@ const ABI = parseAbi([
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  // Admin-only: signs Bank-wallet (DEPLOYER_PRIVATE_KEY) txs that approve a
+  // profile on-chain (making it votable) and link it to a club. Without this gate
+  // anyone could approve arbitrary/unverified submissions. Requires admin token.
+  if (!requireAdmin(req, res, req.body || {})) return
 
   const { submissionId } = req.body || {}
   if (!submissionId) {
@@ -68,7 +73,12 @@ export default async function handler(req, res) {
       functionName: 'batchApproveProfiles',
       args: [[submissionId], [walletAddress]],
     })
-    await publicClient.waitForTransactionReceipt({ hash: txHash })
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+    // viem doesn't throw on revert — verify status so we never report a reverted
+    // approval as success.
+    if (receipt.status !== 'success') {
+      return res.status(500).json({ ok: false, supabaseUpdated: true, error: 'batchApproveProfiles reverted on-chain', txHash })
+    }
   } catch (e) {
     return res.status(500).json({
       ok: false,
@@ -77,8 +87,34 @@ export default async function handler(req, res) {
     })
   }
 
+  // 2b. Mark the submitter's wallet verified so repeat submissions aren't forced
+  // back through ID upload. Approving a profile implies the admin reviewed this
+  // wallet's ID; keep verified_submitters in sync (lowercase wallet to match the
+  // gate in profiles.js/kyc.js). Non-fatal — the on-chain approval already landed.
+  {
+    const w = walletAddress.toLowerCase()
+    const vsPayload = { status: 'approved', verified_at: new Date().toISOString(), rejection_reason: null }
+    const exRes = await fetch(`${SUPABASE_URL}/rest/v1/verified_submitters?wallet_address=eq.${w}&select=wallet_address&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    }).then(r => r.json()).catch(() => [])
+    if (Array.isArray(exRes) && exRes.length > 0) {
+      await fetch(`${SUPABASE_URL}/rest/v1/verified_submitters?wallet_address=eq.${w}`, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(vsPayload),
+      }).catch(() => {})
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/verified_submitters`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ wallet_address: w, provider: 'admin_approve', created_at: new Date().toISOString(), reference_id: null, ...vsPayload }),
+      }).catch(() => {})
+    }
+  }
+
   // 3. If submission has a referral code, link the profile to the club on-chain
   let clubTxHash = null
+  let clubLinked = false
   if (referralCode) {
     try {
       clubTxHash = await walletClient.writeContract({
@@ -87,12 +123,14 @@ export default async function handler(req, res) {
         functionName: 'setProfileClub',
         args: [submissionId, referralCode],
       })
-      await publicClient.waitForTransactionReceipt({ hash: clubTxHash })
+      const clubReceipt = await publicClient.waitForTransactionReceipt({ hash: clubTxHash })
+      clubLinked = clubReceipt.status === 'success'
+      if (!clubLinked) console.error('setProfileClub reverted on-chain (non-fatal):', clubTxHash)
     } catch (e) {
       // Non-fatal: profile is approved, club link failed (club code may not be registered yet)
       console.error('setProfileClub failed (non-fatal):', e.message)
     }
   }
 
-  return res.status(200).json({ ok: true, txHash, clubTxHash, referralCode })
+  return res.status(200).json({ ok: true, txHash, clubTxHash, clubLinked, referralCode })
 }

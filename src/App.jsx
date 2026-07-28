@@ -600,7 +600,7 @@ function KYCGate({ address, showToast, onVerified }) {
             )}
           </div>
           <div style={{ fontSize:'.63rem', color:'var(--muted)', lineHeight:1.5, marginTop:10 }}>
-            We check you're <strong>18+</strong> and that the ID, selfie, and your profile photo are the same person. Documents are used only for review and never stored.
+            We check you're <strong>18+</strong> and that the ID, selfie, and your profile photo are the same person. Your ID and selfie are stored securely, access is restricted to our verification team, and they are retained on file as part of our identity &amp; compliance records.
           </div>
         </div>
         {status === 'pending' && (
@@ -801,6 +801,10 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const [photos, setPhotos] = useState(() => photoCache || FALLBACK_PHOTOS)
   const [photosLoading, setPhotosLoading] = useState(false)
   const [roundEndTime, setRoundEndTime] = useState(null)
+  // Round settlement state (getRound → settled=[4], vrfPending=[5]). Defaults assume a
+  // healthy/live round so the "settling" banner never flashes before data loads.
+  const [roundSettled, setRoundSettled] = useState(true)
+  const [roundVrfPending, setRoundVrfPending] = useState(false)
 
   useEffect(() => {
     if (photoCache && photoCache.length > 0) {
@@ -821,7 +825,11 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       // Fetch on-chain round end time for accurate countdown
       if (roundId != null) {
         readContract(VOTING_ADDRESS, VOTING_ABI, 'getRound', [roundId]).then(round => {
-          if (round) setRoundEndTime(Number(round[1]))
+          if (round) {
+            setRoundEndTime(Number(round[1]))
+            setRoundSettled(Boolean(round[4]))
+            setRoundVrfPending(Boolean(round[5]))
+          }
         }).catch(() => {})
       }
 
@@ -870,6 +878,9 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
   const shareTimerRef = useRef(null)
   const [idx, setIdx] = useState(0)
   const cd = useCountdown(roundEndTime)
+  // Round has ended on the clock but isn't settled yet (winner still being drawn / VRF
+  // pending). Re-evaluated every second because useCountdown re-renders this component.
+  const roundOver = !roundSettled && roundEndTime != null && Math.floor(Date.now() / 1000) > Number(roundEndTime)
   const max = Math.max(...photos.map(p => p.votes), 1)
   const touchStartX = useRef(null)
   const touchStartY = useRef(null)
@@ -909,11 +920,34 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
       const round = roundId != null ? await readContract(VOTING_ADDRESS, VOTING_ABI, 'getRound', [roundId]) : null
       const now = Math.floor(Date.now() / 1000)
       if (!round || Number(round[0]) > now || now > Number(round[1])) {
-        showToast('No active voting round right now — check back soon', 'e')
+        showToast('This round has ended and the winner is being drawn on-chain — voting reopens when the next round starts.', 'i')
         return
       }
 
       const amountWei = BigInt(Math.floor(a * 1e18))
+
+      // Client-side max-vote-cap pre-flight (MAX_VOTE_CAP_BPS=4000). The contract
+      // skips this on a voter's FIRST vote to a profile, so we do too — we only warn
+      // when the user has already voted on this profile (photo.myVotes > 0), which also
+      // keeps us from ever blocking a legitimate first vote. Best-effort: uses the
+      // on-chain round pool (round[3]=totalRawVotes) + this profile's current raw votes
+      // (getProfile[2]); if either read is unavailable we skip and let the contract decide.
+      if ((photo.myVotes || 0) > 0) {
+        try {
+          const poolRawWei = round[3] != null ? BigInt(round[3].toString()) : 0n
+          const profileData = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId, photo.profileId]).catch(() => null)
+          const profileRawWei = profileData && profileData[2] != null ? BigInt(profileData[2].toString()) : null
+          if (profileRawWei != null) {
+            const postProfile = profileRawWei + amountWei
+            const postPool = poolRawWei + amountWei
+            // profile share would exceed the cap → the contract would revert
+            if (postPool > 0n && postProfile * 10000n > 4000n * postPool) {
+              showToast("No single profile can hold more than 40% of the round's total votes. Try a smaller amount, or vote on another profile.", 'e')
+              return
+            }
+          }
+        } catch(_) { /* best-effort: fall through and let the contract enforce the cap */ }
+      }
 
       // Check current allowance
       const allowance = await readContract(TTS_ADDRESS, TTS_ABI, 'allowance', [address, VOTING_ADDRESS])
@@ -1037,8 +1071,17 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         <p>Swipe or use arrows · Place $TTS to win 35% of the pool</p>
       </div>
 
+      {roundOver && (
+        <div style={{ margin:'0 16px 16px', background:'var(--surface)', border:'1px solid var(--gold)', borderRadius:12, padding:'16px 18px', textAlign:'center' }}>
+          <div style={{ fontSize:'.9rem', fontWeight:700, color:'var(--gold)', marginBottom:6 }}>🏁 Round complete — the winner is being drawn on-chain</div>
+          <div style={{ fontSize:'.76rem', color:'var(--muted)', lineHeight:1.7 }}>
+            {roundVrfPending ? 'The winner is being selected on-chain via Chainlink VRF.' : 'Settlement is finalizing on-chain.'} Payouts and the next round will appear here shortly — thanks for your patience.
+          </div>
+        </div>
+      )}
+
       <div className="wtimer">
-        <div><div className="tl">Round Ends</div><div className="tv">{cd}</div></div>
+        <div><div className="tl">Round Ends</div><div className="tv">{roundOver ? 'Settling…' : cd}</div></div>
         <div className="live-row"><div className="ldot" /><span className="live-txt">Live</span></div>
       </div>
 
@@ -1257,7 +1300,7 @@ function NFTScreen({ address, connected }) {
           <span className="nft-ei">💎</span>
             <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>NFT trophies are awarded to Round winners 🏆</div>
           <div style={{ fontSize:'.85rem', color:'var(--muted)', lineHeight:1.6 }}>
-            Win a round to earn yours. Minting begins in Round 2 (after Round 1 settles).<br /><br />
+            Win a round to earn yours. Minting begins when a round settles with at least one vote.<br /><br />
             <strong style={{ color:'var(--gold)' }}>How to win:</strong> Vote on the winning profile and be the top voter — you earn 35% of the prize pool + an exclusive NFT trophy minted to your wallet on Base.
           </div>
         </div>
@@ -1386,8 +1429,8 @@ function BuySellScreen({ showToast, connected }) {
               <div style={{ fontSize:'2.4rem', marginBottom:8 }}>🔒</div>
               <div style={{ fontSize:'1.1rem', fontWeight:700, color:'var(--gold)', marginBottom:6 }}>Staking Coming Soon</div>
               <div style={{ fontSize:'.75rem', color:'var(--muted)', lineHeight:1.7, maxWidth:280, margin:'0 auto 24px' }}>
-                Lock $TTS to earn APR and multiply your voting power.<br />
-                Dashboard launching with Round 3.
+                When it launches, staking $TTS will earn APR and boost your voting power.<br />
+                Not live yet — join the community for launch updates.
               </div>
             </div>
             <div className="stk-info">
@@ -1582,7 +1625,19 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       showToast('Wallet not detected — reconnect wallet','e'); return
     }
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
-    if (balance < 5) { showToast('Insufficient $TTS — 5 TTS required','e'); return }
+    if (balance < 5) {
+      // Balance race: a fast submitter can arrive before the 500 TTS welcome bonus tx
+      // confirms. Re-check the true on-chain balance once before dead-ending; only block
+      // if the wallet genuinely can't cover the 5 TTS fee, and point them somewhere useful.
+      const onchain = await readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address])
+        .then(raw => raw != null ? Math.floor(Number(raw) / 1e18) : balance)
+        .catch(() => balance)
+      if (onchain < 5) {
+        showToast('Not enough $TTS yet — your 500 welcome bonus may still be confirming. Grab $TTS in the Buy tab, then try again in a moment.', 'i')
+        return
+      }
+      setBalance(onchain)
+    }
 
     // First-time identity check: unverified wallets must attach ID + selfie.
     const needId = verifyStatus !== 'approved'
@@ -1847,7 +1902,7 @@ function HowToWinScreen() {
   const tips = [
     { t:"Vote Early, Vote Big", b:"Lock in a large vote early. Other players see the total — they will have to outspend you to take the top spot." },
     { t:"Watch the Leaderboard", b:"Check live standings constantly. If your profile is climbing fast, top up your vote to protect your position." },
-    { t:"Stake for an Edge", b:"Stake $TTS in the Buy/Sell tab. Higher tiers multiply your vote weight 1.1x up to 3x — same TTS, more power." },
+    { t:"Staking — Coming Soon", b:"Staking isn't live yet. When it launches, higher tiers will boost your vote weight — for now every vote counts the same, no staking required. Watch for the announcement." },
     { t:"Focus Your TTS", b:"Only the winning profile pays out. TTS you put on losing profiles is burned. Pick one and go all in." },
   ]
   return (
@@ -1885,6 +1940,16 @@ function HowToWinScreen() {
           ))}
         </div>
       </div>
+      <div style={{padding:'0 16px',marginBottom:24}}>
+        <div style={{fontSize:'.65rem',letterSpacing:'.16em',textTransform:'uppercase',color:'var(--muted)',fontWeight:700,marginBottom:14,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Want to Be the One They Vote For?</div>
+        <div style={{display:'flex',gap:14,background:'rgba(212,175,55,0.06)',border:'1px solid var(--gold)',borderRadius:12,padding:16,alignItems:'flex-start'}}>
+          <div style={{fontSize:'1.6rem',flexShrink:0,width:36,textAlign:'center'}}>📸</div>
+          <div>
+            <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--gold-light)',marginBottom:5,lineHeight:1.4}}>Submit Your Photo</div>
+            <div style={{fontSize:'.76rem',color:'var(--muted)',lineHeight:1.78}}>Enter yourself in the weekly contest from the Submit tab. If your profile gets the most votes, the <strong style={{color:'var(--text)'}}>winning profile earns 35% of the round pool</strong> (of the 35/35/10/20 split) — paid straight to your wallet, every week.</div>
+          </div>
+        </div>
+      </div>
       <div style={{padding:'0 16px 32px'}}>
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:20}}>
           <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--text)',marginBottom:14}}>💰 Prize Breakdown — Every Week</div>
@@ -1912,7 +1977,7 @@ function RulesScreen() {
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
     { t:'Prize Distribution', b:'Top Voter: 35% of winning pool.\nWinning Profile: 35% of pool.\nBlockchain Entertainment LLC: 20%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
-    { t:'Staking', b:'Stake $TTS to earn APR rewards and vote multipliers up to 3x. Your principal is withdrawable anytime; the vote multiplier activates 7 days after your last stake.' },
+    { t:'Staking', b:'Staking is coming soon — it is not active yet, so today every vote counts the same regardless of holdings. At launch, staking $TTS will earn APR rewards and a vote-weight boost by tier, with principal withdrawable anytime.' },
     { t:'Fairness & Privacy', b:'Voting is provably fair via Chainlink VRF on Base blockchain. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
   ]
   return (
@@ -2137,6 +2202,10 @@ export default function App() {
                 <div style={{fontSize:'.78rem',color:'var(--text)',lineHeight:1.6}}><strong style={{color:'var(--gold-light)',display:'block',marginBottom:3}}>{t}</strong>{b}</div>
               </div>
             ))}
+          </div>
+          <div style={{width:'100%',maxWidth:340,display:'flex',alignItems:'flex-start',gap:14,background:'rgba(212,175,55,0.06)',border:'1px solid var(--gold)',borderRadius:12,padding:16,marginBottom:28}}>
+            <div style={{fontSize:'1.2rem',flexShrink:0,width:28}}>📸</div>
+            <div style={{fontSize:'.78rem',color:'var(--text)',lineHeight:1.6}}><strong style={{color:'var(--gold-light)',display:'block',marginBottom:3}}>Or Submit Your Photo</strong>Enter yourself in the weekly contest. The winning profile earns 35% of the round pool — every week.</div>
           </div>
           <button onClick={dismissWelcome} style={{background:'linear-gradient(135deg,var(--crimson),#a0203a)',color:'var(--text)',border:'none',borderRadius:10,padding:'18px 40px',fontFamily:'var(--font-b)',fontSize:'.86rem',letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,cursor:'pointer',width:'100%',maxWidth:340}}>
             Let's Go — Start Playing

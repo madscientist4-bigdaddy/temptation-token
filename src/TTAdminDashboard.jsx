@@ -2602,7 +2602,7 @@ function ReferralScreen({ showToast }) {
       <div style={{marginBottom:32}}>
         <div style={{fontSize:".82rem",fontWeight:700,color:"var(--text)",marginBottom:4,textTransform:"uppercase",letterSpacing:".08em"}}>Club Partners</div>
         <div style={{fontSize:".72rem",color:"var(--muted)",marginBottom:16,lineHeight:1.6}}>
-          Registered clubs receive <strong style={{color:"var(--gold)"}}>5% of each round pool</strong> when a winner was submitted with their referral code. House share reduces from 10% → 5%. Set via on-chain <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>setClubWallet(code, wallet)</code>.
+          Registered clubs receive <strong style={{color:"var(--gold)"}}>10% of each round pool</strong> when the winning profile was submitted with their referral code. House share reduces from 20% → 10%. Set via on-chain <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>setClubWallet(code, wallet)</code>. "Earned" totals are indexed live from on-chain <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>ClubPayoutSent</code> events.
         </div>
 
         {/* Add Club Form */}
@@ -2648,12 +2648,13 @@ function ReferralScreen({ showToast }) {
           : clubs.length === 0
             ? <div className="empty-state"><span className="empty-icon">🏢</span>No club partners registered yet.</div>
             : <table className="data-table" style={{width:"100%"}}>
-                <thead><tr><th>Club Name</th><th>Code</th><th>Wallet</th><th>Status</th><th>Action</th></tr></thead>
+                <thead><tr><th>Club Name</th><th>Code</th><th>Wallet</th><th>Earned</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>{clubs.map(c=>(
                   <tr key={c.club_code}>
                     <td style={{fontWeight:700}}>{c.club_name}</td>
                     <td><span style={{fontFamily:"monospace",fontSize:".82rem",color:"var(--gold)"}}>{c.club_code}</span></td>
                     <td><span style={{fontFamily:"monospace",fontSize:".7rem",color:"var(--muted)"}}>{c.wallet_address?.slice(0,10)}…{c.wallet_address?.slice(-6)}</span></td>
+                    <td>{(() => { const e = clubEarnings[c.wallet_address?.toLowerCase()]; return e ? <span style={{color:"var(--gold)",fontWeight:700,fontSize:".78rem"}}>{Math.round(e.tts).toLocaleString()} $TTS <span style={{color:"var(--muted)",fontWeight:400,fontSize:".62rem"}}>({e.count} round{e.count===1?'':'s'})</span></span> : <span style={{color:"var(--muted)",fontSize:".7rem"}}>—</span>; })()}</td>
                     <td>
                       <span style={{fontSize:".7rem",fontWeight:700,color:c.active?"var(--green)":"var(--rose)"}}>
                         {c.active ? '● Active' : '○ Inactive'}
