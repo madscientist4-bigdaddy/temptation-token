@@ -166,6 +166,79 @@ async function sendTelegram(chatId, text, token) {
   return r.json()
 }
 
+// ── VRF stall + subscription-funding monitor ──────────────────────────────────
+// A settlement request that the Chainlink DON never fulfills leaves the round
+// vrfPending forever (this is exactly what stranded Round 4 for 6 days). We flag:
+//   (1) STALL   — vrfPending=true AND now > endTime + 60 min (a genuine stall,
+//                 distinct from a round that just ended and is awaiting VRF).
+//   (2) SUB LOW — the VRF subscription's LINK balance is below the funding buffer.
+// (2) is the real guard against a gas-price spike stranding a request: VRF v2.5
+// will not fulfill unless the sub can cover the WORST-CASE gas at fulfillment
+// time, so a spike + thin balance = stranded. Keeping a buffer (alert to top up)
+// removes that failure mode. (The callback gas limit is already a generous 2.5M,
+// so the Round-4 analysis found NO contract gas-lane bug to fix — the durable fix
+// is funding-buffer monitoring, implemented here.)
+const VRF_COORDINATOR = '0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634'
+const VRF_SUB_ID      = 58222014484560539249027457203866883376041731162442592604288474822166186263722n
+const VRF_STALL_SECONDS = 3600   // 60 min past endTime
+const VRF_SUB_LINK_WARN = 2      // LINK funding buffer (matches upkeep thresholds)
+const VRF_ALERT_COOLDOWN_MS = 6 * 3600 * 1000
+
+// Pure read — no alert, no write. Used by ?action=vrf-status and checkVrfHealth.
+async function computeVrfStatus() {
+  const idHex = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: '0x9cbe5efd' }, 'latest'])
+  if (!idHex || idHex === '0x') return { error: 'currentRoundId read failed' }
+  const roundId = parseInt(idHex, 16)
+  const rData = await rpcCall('eth_call', [{ to: VOTING_ADDRESS, data: '0x8f1327c0' + roundId.toString(16).padStart(64, '0') }, 'latest'])
+  if (!rData || rData === '0x') return { roundId, error: 'getRound read failed' }
+  const c = []
+  for (let i = 0; i < rData.slice(2).length; i += 64) c.push(rData.slice(2 + i, 2 + i + 64))
+  const ZERO = '0'.repeat(64)
+  const endTime    = parseInt(c[1], 16)
+  const settled    = c[4] !== ZERO
+  const vrfPending = c[5] !== ZERO
+  const nowSec     = Math.floor(Date.now() / 1000)
+  const secPastEnd = (!settled && vrfPending) ? Math.max(0, nowSec - endTime) : 0
+  const stalled    = !settled && vrfPending && secPastEnd > VRF_STALL_SECONDS
+
+  let subLinkBalance = null
+  try {
+    const subRes = await rpcCall('eth_call', [{ to: VRF_COORDINATOR, data: '0xdc311dd3' + VRF_SUB_ID.toString(16).padStart(64, '0') }, 'latest'])
+    if (subRes && subRes !== '0x' && subRes.length >= 66) subLinkBalance = Number(BigInt('0x' + subRes.slice(2, 66))) / 1e18
+  } catch {}
+  const subLow = subLinkBalance != null && subLinkBalance < VRF_SUB_LINK_WARN
+
+  return { checkedAt: new Date().toISOString(), roundId, endTime, settled, vrfPending, secPastEnd, stalled, subLinkBalance, subLow }
+}
+
+// Read → (de-duped) alert → persist to admin_config.vrf_status (surfaced in System Health).
+async function checkVrfHealth(adminChatId) {
+  const status = await computeVrfStatus()
+  if (status.error) return status
+
+  // de-dupe on the last alert time stored alongside the status
+  let prior = {}
+  try { const pr = await (await sbService('/admin_config?key=eq.vrf_status&select=value&limit=1')).json(); if (Array.isArray(pr) && pr[0]?.value) prior = JSON.parse(pr[0].value) } catch {}
+  const lastAlertAt = Number(prior.lastAlertAt) || 0
+
+  let alertSent = false
+  const token = process.env.BROADCAST_BOT_TOKEN
+  if ((status.stalled || status.subLow) && token && (Date.now() - lastAlertAt > VRF_ALERT_COOLDOWN_MS)) {
+    const h = Math.floor(status.secPastEnd / 3600), m = Math.floor((status.secPastEnd % 3600) / 60)
+    const lines = ['🚨 <b>VRF ALERT — Temptation Token</b>']
+    if (status.stalled) lines.push(`⛔ Round ${status.roundId} settlement STALLED — vrfPending ${h}h ${m}m past round end (&gt;60&nbsp;min). Recovery: <code>outputs/round4_vrf_recovery_runbook.md</code>`)
+    if (status.subLow)  lines.push(`⚠️ VRF subscription LINK low: ${status.subLinkBalance.toFixed(3)} LINK (buffer ${VRF_SUB_LINK_WARN}). Top up so a gas-price spike can't strand fulfillment.`)
+    lines.push(`Round end: ${new Date(status.endTime * 1000).toISOString()}`)
+    try { await sendTelegram(adminChatId, lines.join('\n\n'), token); alertSent = true } catch {}
+  }
+
+  const persisted = { ...status, lastAlertAt: alertSent ? Date.now() : lastAlertAt }
+  try {
+    await sbService('/admin_config', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'vrf_status', value: JSON.stringify(persisted) }) })
+  } catch {}
+  return persisted
+}
+
 function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret, token) {
   const oauthParams = {
     oauth_consumer_key: consumerKey,
@@ -454,6 +527,14 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── GET /api/scheduler?action=vrf-status — read-only VRF health (no alert) ──
+  // For monitoring/testing: returns the current stall + sub-funding computation
+  // without sending Telegram or writing state.
+  if (req.query?.action === 'vrf-status') {
+    try { return res.status(200).json(await computeVrfStatus()) }
+    catch (e) { return res.status(200).json({ error: String(e.message || e).slice(0, 200) }) }
+  }
+
   // ── GET /api/scheduler?action=ig_confirm&id=UUID ──────────────────────────
   // Called by the inline Telegram button. Marks IG post as posted, returns HTML.
   if (req.method === 'GET' && req.query?.action === 'ig_confirm') {
@@ -682,6 +763,9 @@ export default async function handler(req, res) {
   } catch (e) {
     results.alerts_error = e.message
   }
+
+  // ── JOB 4: VRF stall + subscription-funding monitor (every run, de-duped) ──
+  try { results.vrf = await checkVrfHealth(adminChatId) } catch (e) { results.vrf_error = e.message }
 
   return res.status(200).json({ ok: true, time: nowISO, ...results })
 }

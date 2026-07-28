@@ -9,6 +9,7 @@ const SELECTORS = {
   currentRoundId: toFunctionSelector("currentRoundId()"),       // 0x9cbe5efd
   getRound:       toFunctionSelector("getRound(uint256)"),      // 0x8f1327c0
   getProfile:     toFunctionSelector("getProfile(uint256,string)"), // 0xd6ca8383
+  getSubscription: toFunctionSelector("getSubscription(uint256)"),  // 0xdc311dd3
 };
 
 // ─── SUPABASE CLIENT (via gated server proxy) ─────────────────────────────────
@@ -51,6 +52,8 @@ const DEPLOYER       = '0xb1e991bf617459b58964eef7756b350e675c53b5';
 const MAIN_CHANNEL_ID   = '-1002207667493';
 const COMMUNITY_CHAT_ID = '-1003930752060';
 const ROUND_SETTLED_TOPIC = '0xabf0728119ba3c53309b0f987eda834ecf31e54dfaeec92465c1512c5eb9c2b9';
+// ClubPayoutSent(uint256 indexed roundId, string clubCode, address indexed clubWallet, uint256 amount)
+const CLUB_PAYOUT_TOPIC = '0x1fdaf9e270dd288f02596ed65fa57029f29b68ec99c2e5790a4b0a2900447f78';
 
 function getCurrentWeekLabel() {
   const d = new Date();
@@ -1229,7 +1232,7 @@ function ReviewScreen({ showToast }) {
       try {
         const r = await fetch('/api/approve-profile', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` },
           body: JSON.stringify({ submissionId: id, walletAddress: wallet }),
         });
         const d = await r.json();
@@ -1411,7 +1414,7 @@ function VerificationsScreen({ showToast }) {
     let pubOk = true;
     if (meta.sub) {
       try {
-        const r = await fetch('/api/approve-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: meta.sub }) });
+        const r = await fetch('/api/approve-profile', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` }, body: JSON.stringify({ submissionId: meta.sub }) });
         pubOk = r.ok;
         if (!r.ok) { const d = await r.json().catch(() => ({})); showToast('Wallet verified, but profile publish failed: ' + (d.error || ('HTTP ' + r.status)), 'error'); }
       } catch { pubOk = false; showToast('Wallet verified, but profile publish failed (network)', 'error'); }
@@ -1698,14 +1701,19 @@ function VerificationsScreen({ showToast }) {
                         {row.status !== 'approved' && isIdUpload(row) && (
                           <button onClick={() => toggleIdReview(row)} style={{ background:'rgba(212,175,55,.12)', border:'1px solid rgba(212,175,55,.35)', color:'var(--gold)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap' }}>{expandedId === row.id ? '▲ Hide ID' : '🪪 Review ID + Selfie'}</button>
                         )}
-                        {row.status !== 'approved' && (
+                        {row.status !== 'approved' && (() => {
+                          // ID-upload rows require the image-comparison checklist; Persona/
+                          // manual rows have no images to compare, so they approve directly.
+                          const canApprove = isIdUpload(row) ? allChecked(row.id) : true;
+                          return (
                           <button
-                            onClick={() => allChecked(row.id) && (isIdUpload(row) ? approveIdUpload(row) : overrideApprove(row))}
-                            disabled={!allChecked(row.id)}
-                            title={allChecked(row.id) ? 'All checks complete — approve' : 'Complete all review checks below first'}
-                            style={{ background: allChecked(row.id) ? 'rgba(46,204,113,.1)' : 'var(--surface2)', border:`1px solid ${allChecked(row.id) ? 'rgba(46,204,113,.3)' : 'var(--border)'}`, color: allChecked(row.id) ? 'var(--green)' : 'var(--muted)', padding:'5px 12px', borderRadius:6, cursor: allChecked(row.id) ? 'pointer' : 'not-allowed', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap', opacity: allChecked(row.id) ? 1 : .6 }}
+                            onClick={() => canApprove && (isIdUpload(row) ? approveIdUpload(row) : overrideApprove(row))}
+                            disabled={!canApprove}
+                            title={canApprove ? (isIdUpload(row) ? 'All checks complete — approve' : 'Approve this wallet') : 'Complete all review checks below first'}
+                            style={{ background: canApprove ? 'rgba(46,204,113,.1)' : 'var(--surface2)', border:`1px solid ${canApprove ? 'rgba(46,204,113,.3)' : 'var(--border)'}`, color: canApprove ? 'var(--green)' : 'var(--muted)', padding:'5px 12px', borderRadius:6, cursor: canApprove ? 'pointer' : 'not-allowed', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap', opacity: canApprove ? 1 : .6 }}
                           >{isIdUpload(row) ? '✓ Verify & Publish' : '✓ Verify Wallet'}</button>
-                        )}
+                          );
+                        })()}
                         {row.status !== 'approved' && isIdUpload(row) && (
                           <button onClick={() => declineIdUpload(row)} style={{ background:'rgba(232,64,90,.08)', border:'1px solid rgba(232,64,90,.2)', color:'var(--rose)', padding:'5px 12px', borderRadius:6, cursor:'pointer', fontSize:'.6rem', fontWeight:700, whiteSpace:'nowrap' }}>✕ Decline</button>
                         )}
@@ -1719,7 +1727,7 @@ function VerificationsScreen({ showToast }) {
                     </div>
                     {isIdUpload(row) && expandedId === row.id && (
                       <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
-                        <div style={{ fontSize:'.6rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>REVIEW — compare all three (signed links expire in 60s; hide & reopen to refresh)</div>
+                        <div style={{ fontSize:'.6rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>REVIEW — compare all three (signed links expire in 5 min; hide & reopen to refresh)</div>
                         {(() => {
                           const m = idMedia[row.id];
                           if (!m || m.loading) return <div style={{ fontSize:'.7rem', color:'var(--muted)', padding:'12px 0' }}>Loading secure images…</div>;
@@ -1741,7 +1749,7 @@ function VerificationsScreen({ showToast }) {
                         })()}
                       </div>
                     )}
-                    {row.status !== 'approved' && (
+                    {row.status !== 'approved' && isIdUpload(row) && (
                       <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)' }}>
                         <div style={{ fontSize:'.6rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>
                           MANUAL REVIEW CHECKLIST — confirm each before verifying
@@ -2154,7 +2162,7 @@ function PayoutsScreen({ showToast }) {
             No rounds settled yet on TTSVotingV3.<br />
             {roundInfo && !roundInfo.error
               ? `Round ${roundInfo.roundId} ends ${new Date(roundInfo.endTime * 1000).toLocaleDateString()}.`
-              : 'Round 1 ends soon — settlement fires automatically via Chainlink.'
+              : 'The next round settles automatically via Chainlink.'
             }
           </div>
         ) : (
@@ -2236,7 +2244,7 @@ function PayoutsScreen({ showToast }) {
           return (<>
             🏆 <strong style={{ color:'var(--gold)' }}>Round {roundInfo.roundId} status:</strong> Active — closes <strong>{endStr}</strong>.
             {offSchedule && <span style={{ marginLeft:6, color:'#f39c12', fontWeight:700 }}>⚠ Off canonical schedule — expected Sunday 11:59 PM EDT. Round may have started mid-week instead of via Monday Chainlink keeper.</span>}
-            {' '}NFT Champion Trophy mints automatically at settlement starting Round 2. NFT minting requires V3b redeployment — see Daily Priorities.
+            {' '}NFT Champion Trophy mints automatically at settlement (winner, top voter, house) once a round settles with at least one vote.
           </>)
         })() : <span>🏆 <strong style={{ color:'var(--gold)' }}>Round status:</strong> {roundInfo?.error ? `Error reading chain: ${roundInfo.error}` : 'Loading from chain…'}</span>}
       </div>
@@ -2374,6 +2382,7 @@ function ReferralScreen({ showToast }) {
   const [loading, setLoading] = React.useState(true)
   const [clubs, setClubs] = React.useState([])
   const [clubsLoading, setClubsLoading] = React.useState(true)
+  const [clubEarnings, setClubEarnings] = React.useState({}) // walletLower -> { tts, count } from on-chain ClubPayoutSent
   const [newClub, setNewClub] = React.useState({ clubName:'', clubCode:'', walletAddress:'' })
   const [addingClub, setAddingClub] = React.useState(false)
   const [removingClub, setRemovingClub] = React.useState(null) // I6: in-flight guard (holds the code being removed)
@@ -2431,6 +2440,31 @@ function ReferralScreen({ showToast }) {
       setClubs(Array.isArray(d) ? d : [])
       setClubsLoading(false)
     }).catch(()=>setClubsLoading(false))
+    loadClubEarnings()
+  }
+
+  // Index on-chain ClubPayoutSent events → total TTS paid per club wallet. This is
+  // the only source of truth for what a club has actually earned (the contract pays
+  // the club wallet directly at settlement). Non-indexed data = (string clubCode,
+  // uint256 amount) → amount is the 2nd 32-byte word; clubWallet is topics[2].
+  const loadClubEarnings = async () => {
+    try {
+      const logs = await rpcCall('eth_getLogs', [{ address: V3_ADDRESS, topics: [CLUB_PAYOUT_TOPIC], fromBlock: '0x0', toBlock: 'latest' }])
+      if (!Array.isArray(logs)) return
+      const acc = {}
+      for (const lg of logs) {
+        const wallet = lg.topics && lg.topics[2] ? ('0x' + lg.topics[2].slice(26)).toLowerCase() : null
+        if (!wallet) continue
+        const data = lg.data || '0x'
+        const amtHex = data.length >= 130 ? data.slice(66, 130) : '0'
+        let tts = 0
+        try { tts = Number(BigInt('0x' + amtHex)) / 1e18 } catch {}
+        if (!acc[wallet]) acc[wallet] = { tts: 0, count: 0 }
+        acc[wallet].tts += tts
+        acc[wallet].count += 1
+      }
+      setClubEarnings(acc)
+    } catch {}
   }
 
   const addClub = async () => {
@@ -2440,7 +2474,7 @@ function ReferralScreen({ showToast }) {
     try {
       const r = await fetch('/api/set-club-wallet', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${adminToken()}`},
         body: JSON.stringify({ clubName: newClub.clubName, clubCode: newClub.clubCode.trim().toLowerCase(), walletAddress: newClub.walletAddress })
       })
       const d = await r.json()
@@ -2462,7 +2496,7 @@ function ReferralScreen({ showToast }) {
     try {
       const r = await fetch('/api/set-club-wallet', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${adminToken()}`},
         body: JSON.stringify({ clubCode: code, walletAddress: '0x0000000000000000000000000000000000000000' })
       })
       const d = await r.json()
@@ -3076,6 +3110,11 @@ const CHAINLINK_REGISTRY = '0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743';
 const UPKEEPS = [
   { name: 'TTS Game Keeper V3d', known: 10, id: '113446314522587151772280129999432062856069985411437977877707978564657748455208' },
 ];
+// VRF v2.5 coordinator + subscription (funds settlement fulfillment — distinct from
+// the automation upkeep above). A round strands here if the DON never fulfills.
+const VRF_COORDINATOR = '0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634';
+const VRF_SUB_ID = '58222014484560539249027457203866883376041731162442592604288474822166186263722';
+const VRF_STALL_SECONDS = 3600; // vrfPending > 60 min past endTime = stalled
 const BASE_RPC = '/api/rpc';
 
 async function rpcCall(method, params) {
@@ -3132,6 +3171,17 @@ async function getLinkBalance(upkeepId) {
   } catch(e) { return null; }
 }
 
+// VRF subscription LINK balance — getSubscription() returns (uint96 balance, ...);
+// balance is the first word. This funds settlement RANDOMNESS (not the upkeep).
+async function getVrfSubBalance() {
+  try {
+    const subHex = BigInt(VRF_SUB_ID).toString(16).padStart(64, '0');
+    const result = await ethCall(VRF_COORDINATOR, SELECTORS.getSubscription + subHex);
+    if (!result || result === '0x' || result.length < 66) return null;
+    return Number(BigInt('0x' + result.slice(2, 66))) / 1e18;
+  } catch(e) { return null; }
+}
+
 function StatusBadge({ status }) {
   const colors = { ok: '#2ecc71', warn: '#f39c12', critical: '#e84040', unknown: '#666' };
   const labels = { ok: '● Healthy', warn: '● Warning', critical: '● Critical', unknown: '● Unknown' };
@@ -3141,6 +3191,7 @@ function StatusBadge({ status }) {
 function SystemScreen() {
   const [round, setRound] = React.useState(null);
   const [links, setLinks] = React.useState([]);
+  const [vrfSub, setVrfSub] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [lastRefresh, setLastRefresh] = React.useState(null);
   const [referralStats, setReferralStats] = React.useState(null);
@@ -3148,11 +3199,13 @@ function SystemScreen() {
   const load = async () => {
     setLoading(true);
     try {
-      const [roundInfo, ...linkBals] = await Promise.all([
+      const [roundInfo, vrfBal, ...linkBals] = await Promise.all([
         getRoundInfo(),
+        getVrfSubBalance(),
         ...UPKEEPS.map(u => getLinkBalance(u.id))
       ]);
       setRound(roundInfo);
+      setVrfSub(vrfBal);
       setLinks(UPKEEPS.map((u, i) => ({ ...u, balance: linkBals[i] ?? u.known })));
       setLastRefresh(new Date().toLocaleTimeString());
     } catch(e) {}
@@ -3178,6 +3231,11 @@ function SystemScreen() {
   const hrs = Math.floor((roundEndsIn % 86400) / 3600);
   const mins = Math.floor((roundEndsIn % 3600) / 60);
 
+  // VRF stall: vrfPending true for > 60 min past endTime (the Round-4 failure mode).
+  const vrfAgeSec = round && round.vrfPending && !round.settled ? Math.max(0, now - round.endTime) : null;
+  const vrfStalled = vrfAgeSec != null && vrfAgeSec > VRF_STALL_SECONDS;
+  const fmtAge = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h ${m}m` : `${h}h ${m}m`; };
+
   return (
     <div>
       <div className="page-header">
@@ -3192,11 +3250,21 @@ function SystemScreen() {
         {lastRefresh && <div style={{ fontSize:'.65rem', color:'var(--muted)', marginTop:4 }}>Last updated: {lastRefresh}</div>}
       </div>
 
+      {/* VRF STALL BANNER */}
+      {vrfStalled && (
+        <div style={{ background:'#3a1416', border:'1px solid #e84040', borderLeft:'4px solid #e84040', borderRadius:10, padding:'14px 18px', marginBottom:20, color:'#ffb3b3' }}>
+          <div style={{ fontWeight:800, fontSize:'.9rem', color:'#ff6b6b', marginBottom:4 }}>⛔ VRF SETTLEMENT STALLED — Round {round.roundId}</div>
+          <div style={{ fontSize:'.75rem', lineHeight:1.6 }}>
+            <code>vrfPending</code> has been true for <strong>{fmtAge(vrfAgeSec)}</strong> past round end (&gt; 60 min) — the Chainlink DON has not fulfilled the randomness request. Recover via <code>outputs/round4_vrf_recovery_runbook.md</code>. An alert is also pushed to the admin Telegram.
+          </div>
+        </div>
+      )}
+
       {/* ROUND STATUS */}
       <div className="table-card" style={{ marginBottom: 20 }}>
         <div className="table-head">
           <div className="table-head-title">🔄 Round Status</div>
-          {round && <StatusBadge status={round.error ? 'unknown' : round.vrfPending ? 'warn' : roundOverdue ? 'critical' : 'ok'} />}
+          {round && <StatusBadge status={round.error ? 'unknown' : roundOverdue ? 'critical' : round.vrfPending ? 'warn' : 'ok'} />}
         </div>
         {loading && !round ? <div style={{ padding: 20, color: 'var(--muted)', fontSize: '.8rem' }}>Loading round data...</div> : round && !round.error ? (
           <table className="adm-table">
@@ -3216,9 +3284,28 @@ function SystemScreen() {
               <tr><td style={{ color:'var(--muted)' }}>Profiles</td><td>{round.profileCount}</td></tr>
               <tr><td style={{ color:'var(--muted)' }}>Settled</td><td>{round.settled ? '✅ Yes' : '❌ No'}</td></tr>
               <tr><td style={{ color:'var(--muted)' }}>VRF Pending</td><td>{round.vrfPending ? '⏳ Yes' : '✅ No'}</td></tr>
+              <tr><td style={{ color:'var(--muted)' }}>VRF Request Age</td><td>
+                {round.vrfPending && !round.settled
+                  ? <strong style={{ color: vrfStalled ? '#e84040' : '#f39c12' }}>{fmtAge(vrfAgeSec)} past round end{vrfStalled ? ' — STALLED' : ''}</strong>
+                  : <span style={{ color:'var(--muted)' }}>—</span>}
+              </td></tr>
             </tbody>
           </table>
         ) : <div style={{ padding: 20, color: '#e84040', fontSize: '.8rem' }}>Failed to load round data</div>}
+      </div>
+
+      {/* VRF SUBSCRIPTION BALANCE (settlement randomness — distinct from the upkeep) */}
+      <div className="table-card" style={{ marginBottom: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">🎲 VRF Subscription</div>
+          <StatusBadge status={vrfSub == null ? 'unknown' : vrfSub < 1 ? 'critical' : vrfSub < 2 ? 'warn' : 'ok'} />
+        </div>
+        <table className="adm-table"><tbody>
+          <tr><td style={{ color:'var(--muted)' }}>LINK Balance</td>
+            <td><strong style={{ color: vrfSub == null ? 'var(--muted)' : vrfSub < 1 ? '#e84040' : vrfSub < 2 ? '#f39c12' : '#2ecc71' }}>{vrfSub == null ? '—' : vrfSub.toFixed(3) + ' LINK'}</strong></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Role</td><td style={{ fontSize:'.72rem' }}>Funds settlement randomness (fulfillRandomWords). A thin balance during a gas-price spike can strand a request — keep ≥ 2 LINK.</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Fund</td><td><a href="https://vrf.chain.link" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>vrf.chain.link →</a></td></tr>
+        </tbody></table>
       </div>
 
       {/* CHAINLINK UPKEEP BALANCES */}
@@ -4219,7 +4306,7 @@ function CommandScreen({ setActive }) {
   const timeClass = round?.settled ? '' : roundOverdue ? 'danger' : timeLeft < 3600 ? 'danger' : timeLeft < 86400 ? 'warn' : 'ok';
 
   const health = [
-    { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
+    { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending && !roundOverdue, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
     { label: 'Chainlink Crons', ok: true, warn: false, text: '✅ Confirmed — starts Mon 12AM EDT · settles Sun 11:59PM EDT', href: null, nav: null },
     { label: 'Railway Bot', ok: true, warn: false, text: `${RAILWAY_PLAN} Plan · Online`, href: 'https://railway.app', nav: null },
     { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting`, href: null, nav: 'review' },
