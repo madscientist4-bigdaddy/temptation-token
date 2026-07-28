@@ -1,0 +1,22 @@
+{
+  "cli": { "version": ">= 5.9.0" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "//": "Internal testing: TestFlight (iOS) + Play internal track (Android).",
+      "distribution": "internal",
+      "ios": { "simulator": false },
+      "channel": "preview"
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
