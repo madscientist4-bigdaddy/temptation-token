@@ -67,6 +67,17 @@ export default function TTSChatbot() {
         })
       })
 
+      // Graceful degrade: a 5xx means the assistant backend is down (e.g. an
+      // Anthropic credit lapse) — show a friendly message, never a raw error.
+      if (!res.ok) {
+        const msg = res.status >= 500
+          ? 'The assistant is taking a quick break — try again shortly.'
+          : 'Sorry, I couldn’t process that. Please try again or email support@temptationtoken.io'
+        setMsgs(m => [...m, { role: 'assistant', content: msg }])
+        setLoading(false); setSearching(false)
+        return
+      }
+
       const data = await res.json()
 
       const toolUse = data.content?.find(b => b.type === 'tool_use')
@@ -87,6 +98,11 @@ export default function TTSChatbot() {
               messages: [...apiMsgs, { role: 'assistant', content: data.content }]
             })
           })
+          if (!followRes.ok) {
+            setMsgs(m => [...m, { role: 'assistant', content: 'The assistant is taking a quick break — try again shortly.' }])
+            setLoading(false); setSearching(false)
+            return
+          }
           const followData = await followRes.json()
           const reply = followData.content?.filter(b => b.type === 'text').map(b => b.text).join(' ') || 'Sorry, try again or email support@temptationtoken.io'
           const assistantMsg = { role: 'assistant', content: reply, searched: true }

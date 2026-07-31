@@ -767,5 +767,43 @@ export default async function handler(req, res) {
   // ── JOB 4: VRF stall + subscription-funding monitor (every run, de-duped) ──
   try { results.vrf = await checkVrfHealth(adminChatId) } catch (e) { results.vrf_error = e.message }
 
+  // ── JOB 5: Ask TTS chatbot health check (daily, 13:00 UTC) ─────────────────
+  // POST a tiny message to /api/chat; alert admin Telegram on failure so a credit
+  // lapse (or any API outage) can never go unnoticed. Same channel as the VRF alert.
+  if (nowHour === 13) {
+    try { results.chatbot = await checkChatbotHealth() } catch (e) { results.chatbot_error = e.message }
+  }
+
   return res.status(200).json({ ok: true, time: nowISO, ...results })
+}
+
+// Live probe of the Ask TTS assistant. Healthy = HTTP 200 with a text content block.
+// A 5xx (e.g. Anthropic credit lapse) or missing content → alert ADMIN_CHAT_ID.
+async function checkChatbotHealth() {
+  const url = (process.env.APP_URL || 'https://app.temptationtoken.io') + '/api/chat'
+  let ok = false, detail = ''
+  try {
+    const r = await fetch(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system: 'You are a health check. Reply with only the word OK.', messages: [{ role: 'user', content: 'ping' }] }),
+    })
+    if (r.ok) {
+      const d = await r.json().catch(() => ({}))
+      ok = Array.isArray(d.content) && d.content.some(b => b.type === 'text')
+      if (!ok) detail = `HTTP 200 but no text content: ${JSON.stringify(d).slice(0, 180)}`
+    } else {
+      const t = await r.text().catch(() => '')
+      detail = `HTTP ${r.status}: ${t.slice(0, 220)}`
+    }
+  } catch (e) { detail = `request failed: ${String(e.message || e).slice(0, 180)}` }
+
+  if (!ok) {
+    const token = process.env.BROADCAST_BOT_TOKEN
+    const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+    const safe = String(detail).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    await sendTelegram(adminChatId,
+      `🚨 <b>Ask TTS chatbot health check FAILED</b>\n\n<code>${safe}</code>\n\nLikely an Anthropic credit lapse or API outage — check console.anthropic.com → Plans &amp; Billing. Users see a graceful "taking a quick break" message meanwhile.`,
+      token).catch(() => {})
+  }
+  return { ok, detail: ok ? 'healthy' : detail }
 }
