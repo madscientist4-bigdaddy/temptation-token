@@ -4,10 +4,11 @@
 //   2. AT 10AM UTC daily: post round status update to Telegram
 
 import crypto from 'crypto'
-import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
+import { createWalletClient, createPublicClient, http, parseAbi, encodeAbiParameters } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 import { evaluateAutoFund } from './_lib/autofund.js'
+import { evaluateVrfAutoFund } from './_lib/vrf_autofund.js'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
@@ -192,7 +193,20 @@ const VRF_STALL_SECONDS = 3600   // 60 min past endTime
 const VRF_CALLBACK_GAS   = 2_500_000
 const VRF_LANE_MAX_GWEI  = 30
 const VRF_RESERVE_ETH    = VRF_CALLBACK_GAS * VRF_LANE_MAX_GWEI * 1e-9   // 0.075 ETH/request
+// Reserve expressed in LINK (monitor math): 0.075 ETH ÷ ~0.005 ETH/LINK ≈ 15 LINK at
+// current prices. Named so the auto-funder can scale its threshold/target off it; bump
+// (or make price-feed-driven) if the LINK/ETH ratio drifts materially.
+const VRF_RESERVE_LINK   = 15
 const VRF_SUB_LINK_WARN  = 25    // ≈ reserve (~15 LINK) + 25% + generous price-swing headroom
+
+// VRF auto-funder — Bank tops up OUR sub via LINK ERC-677 transferAndCall. Destination
+// is the coordinator + hard-coded subId: funds can only ever land in our own sub.
+const LINK_TOKEN     = '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196'  // Base mainnet LINK
+const BANK_WALLET    = '0xb1e991bf617459b58964eef7756b350e675c53b5'
+const LINK_ABI       = parseAbi([
+  'function balanceOf(address) view returns (uint256)',
+  'function transferAndCall(address to, uint256 value, bytes data) returns (bool)',
+])
 const VRF_ALERT_COOLDOWN_MS = 6 * 3600 * 1000
 
 // Pure read — no alert, no write. Used by ?action=vrf-status and checkVrfHealth.
@@ -248,6 +262,85 @@ async function checkVrfHealth(adminChatId) {
     await sbService('/admin_config', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'vrf_status', value: JSON.stringify(persisted) }) })
   } catch {}
   return persisted
+}
+
+// ── VRF SUBSCRIPTION AUTO-FUNDER ──────────────────────────────────────────────
+// Keeps the sub above the per-request reserve so a draw can never strand for LINK.
+// Sends from BANK via LINK.transferAndCall(coordinator, amount, encode(subId)) — the
+// destination is our own sub and CANNOT be redirected. All caps/floor live in the pure
+// evaluateVrfAutoFund(). Kill switch: admin_config.vrf_autofund_enabled (default TRUE).
+async function runVrfAutoFunder() {
+  // Kill switch (default TRUE — own-sub destination makes on-by-default acceptable).
+  let enabled = true
+  try {
+    const d = await (await sbService('/admin_config?key=eq.vrf_autofund_enabled&select=value&limit=1')).json()
+    if (Array.isArray(d) && d[0] && (d[0].value === 'false' || d[0].value === false)) enabled = false
+  } catch {}
+  if (!enabled) return { skipped: 'vrf auto-funder disabled' } // no reads/writes when off
+
+  const hasBankKey = !!process.env.DEPLOYER_PRIVATE_KEY
+
+  // Sub balance (reuse the monitor's read) + Bank LINK fuel + trailing-7d top-up total.
+  const vstat = await computeVrfStatus()
+  const subBalance = vstat.subLinkBalance
+  if (subBalance == null) return { skipped: 'sub balance read failed' }
+
+  const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  let bankLink = 0
+  try { bankLink = Number(await pub.readContract({ address: LINK_TOKEN, abi: LINK_ABI, functionName: 'balanceOf', args: [BANK_WALLET] })) / 1e18 } catch {}
+
+  let sevenDayTopupTotal = 0
+  try {
+    const ago = new Date(Date.now() - 7 * 864e5).toISOString()
+    const rows = await (await sbService(`/admin_audit_log?action=eq.vrf_auto_fund&created_at=gte.${ago}&select=detail`)).json()
+    if (Array.isArray(rows)) for (const r of rows) { try { sevenDayTopupTotal += Number(JSON.parse(r.detail)?.amount) || 0 } catch {} }
+  } catch {}
+
+  const decision = evaluateVrfAutoFund({ enabled, hasBankKey, subBalance, reserveLink: VRF_RESERVE_LINK, bankLinkBalance: bankLink, sevenDayTopupTotal })
+
+  // Persist status for the System Health card every run (whether or not we top up).
+  const statusBlob = {
+    checkedAt: new Date().toISOString(), enabled, subBalance, reserveLink: VRF_RESERVE_LINK,
+    bankLink, sevenDayTopupTotal, sevenDayCap: 60,
+    lastDecision: decision.topUp ? `top-up ${decision.amount} LINK` : decision.reason,
+  }
+  const persistStatus = async (extra = {}) => {
+    try { await sbService('/admin_config', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'vrf_autofund_status', value: JSON.stringify({ ...statusBlob, ...extra }) }) }) } catch {}
+  }
+
+  if (!decision.topUp) { await persistStatus(); return { skipped: decision.reason, subBalance, bankLink, sevenDayTopupTotal } }
+
+  // SEND — from Bank, ERC-677 transferAndCall to the coordinator with abi.encode(subId).
+  // Destination is HARD-CODED to our sub; nothing here is user- or config-controlled.
+  const pk = process.env.DEPLOYER_PRIVATE_KEY
+  const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
+  const account = privateKeyToAccount(pkHex)
+  const wallet = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
+  const amountWei = BigInt(Math.floor(decision.amount * 1e18))
+  const data = encodeAbiParameters([{ type: 'uint256' }], [VRF_SUB_ID])
+  let txHash
+  try {
+    txHash = await wallet.writeContract({ address: LINK_TOKEN, abi: LINK_ABI, functionName: 'transferAndCall', args: [VRF_COORDINATOR, amountWei, data] })
+    await pub.waitForTransactionReceipt({ hash: txHash })
+  } catch (e) {
+    await persistStatus({ lastError: String(e.message || e).slice(0, 160) })
+    return { error: `transferAndCall failed: ${String(e.message || e).slice(0, 160)}` }
+  }
+  const newSub = subBalance + decision.amount
+
+  // Telegram receipt on EVERY top-up + audit log.
+  const token = process.env.BROADCAST_BOT_TOKEN
+  const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+  await sendTelegram(adminChatId,
+    `⛽ <b>VRF sub auto-funded</b>\n+${decision.amount} LINK → subscription (destination hard-coded to our subId — cannot be redirected)\nBalance ${subBalance.toFixed(2)} → ${newSub.toFixed(2)} LINK · reserve ~${VRF_RESERVE_LINK}\ntx <code>${txHash.slice(0, 16)}…</code>`,
+    token).catch(() => {})
+  await sbService('/admin_audit_log', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ action: 'vrf_auto_fund', source: 'bank_wallet', detail: JSON.stringify({ amount: decision.amount, old: subBalance, new: newSub, target: decision.target, tx_hash: txHash }), created_at: new Date().toISOString() }),
+  }).catch(() => {})
+
+  await persistStatus({ lastTopupAt: new Date().toISOString(), lastTopupAmount: decision.amount, lastTopupTx: txHash })
+  return { topUp: true, amount: decision.amount, old: subBalance, new: newSub, txHash }
 }
 
 function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret, token) {
@@ -777,6 +870,11 @@ export default async function handler(req, res) {
 
   // ── JOB 4: VRF stall + subscription-funding monitor (every run, de-duped) ──
   try { results.vrf = await checkVrfHealth(adminChatId) } catch (e) { results.vrf_error = e.message }
+
+  // ── JOB 4b: VRF subscription auto-funder (every run = 7×/day) ──────────────
+  // Tops up OUR sub from Bank if it dips below the reserve. Hard caps + solvency
+  // floor + kill switch in evaluateVrfAutoFund(); destination is our subId only.
+  try { results.vrfAutoFund = await runVrfAutoFunder() } catch (e) { results.vrfAutoFund_error = e.message }
 
   // ── JOB 5: Ask TTS chatbot health check (daily, 13:00 UTC) ─────────────────
   // POST a tiny message to /api/chat; alert admin Telegram on failure so a credit

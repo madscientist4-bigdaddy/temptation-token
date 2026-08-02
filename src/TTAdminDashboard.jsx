@@ -3196,6 +3196,7 @@ function SystemScreen() {
   const [loading, setLoading] = React.useState(true);
   const [lastRefresh, setLastRefresh] = React.useState(null);
   const [referralStats, setReferralStats] = React.useState(null);
+  const [autofund, setAutofund] = React.useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -3219,6 +3220,11 @@ function SystemScreen() {
       const count = Array.isArray(referred) ? referred.length : 0;
       const bonus = Array.isArray(settings) && settings[0] ? (settings[0].referrer_bonus || 100) : 100;
       setReferralStats({ count, totalTTS: count * bonus, lastDate: count > 0 ? 'Active' : 'None yet' });
+    } catch {}
+    // VRF auto-funder status (persisted by the scheduler each run)
+    try {
+      const cfg = await sb.get('admin_config', 'key=eq.vrf_autofund_status&select=value');
+      if (Array.isArray(cfg) && cfg[0]?.value) setAutofund(JSON.parse(cfg[0].value));
     } catch {}
     setLoading(false);
   };
@@ -3306,6 +3312,27 @@ function SystemScreen() {
             <td><strong style={{ color: vrfSub == null ? 'var(--muted)' : vrfSub < 15 ? '#e84040' : vrfSub < 25 ? '#f39c12' : '#2ecc71' }}>{vrfSub == null ? '—' : vrfSub.toFixed(3) + ' LINK'}</strong>{vrfSub != null && vrfSub < 25 && <span style={{ fontSize:'.66rem', color: vrfSub < 15 ? '#e84040' : '#f39c12', marginLeft:6 }}>{vrfSub < 15 ? '⛔ below reserve — will strand' : '⚠️ below buffer'}</span>}</td></tr>
           <tr><td style={{ color:'var(--muted)' }}>Reserve / Buffer</td><td style={{ fontSize:'.72rem' }}>Each settlement draw needs a <strong>~15 LINK reserve</strong> held up front (2.5M callback × 30-gwei lane) before the DON will fulfill. Round 4 stranded twice at ~8 LINK and settled at ~32. <strong>Keep ≥ 25 LINK</strong> (reserve + 25% + price-swing headroom); alert fires below 25.</td></tr>
           <tr><td style={{ color:'var(--muted)' }}>Fund</td><td><a href="https://vrf.chain.link/base" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>vrf.chain.link/base →</a></td></tr>
+        </tbody></table>
+      </div>
+
+      {/* VRF AUTO-FUNDER (keeps the sub above reserve automatically; Bank → our subId) */}
+      <div className="table-card" style={{ marginBottom: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">⛽ VRF Auto-Funder</div>
+          <StatusBadge status={autofund == null ? 'unknown' : autofund.enabled === false ? 'warn' : 'ok'} />
+        </div>
+        <table className="adm-table"><tbody>
+          {autofund == null ? (
+            <tr><td colSpan={2} style={{ color:'var(--muted)', fontSize:'.72rem' }}>No run recorded yet — status appears after the next scheduler tick (7×/day).</td></tr>
+          ) : (<>
+            <tr><td style={{ color:'var(--muted)' }}>Status</td><td>{autofund.enabled === false ? <span style={{ color:'#f39c12' }}>⏸️ Disabled (kill switch)</span> : <span style={{ color:'#2ecc71' }}>✅ Armed</span>}</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Rule</td><td style={{ fontSize:'.72rem' }}>Top up when sub &lt; 25 LINK → to 30. Reserve ~{autofund.reserveLink ?? 15} LINK. Caps: 30/top-up, 60/7&nbsp;days. Bank floor 5 LINK.</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Bank LINK (fuel)</td><td><strong style={{ color: (autofund.bankLink ?? 0) < 5 ? '#e84040' : '#2ecc71' }}>{autofund.bankLink != null ? autofund.bankLink.toFixed(3) : '—'} LINK</strong>{(autofund.bankLink ?? 0) < 5 && <span style={{ fontSize:'.66rem', color:'#e84040', marginLeft:6 }}>⛔ below floor — no fuel (withdraw from deprecated upkeep)</span>}</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>7-day topped up</td><td>{(autofund.sevenDayTopupTotal ?? 0).toFixed(2)} / {autofund.sevenDayCap ?? 60} LINK</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Last decision</td><td style={{ fontSize:'.72rem' }}>{autofund.lastDecision || '—'}</td></tr>
+            {autofund.lastTopupAt && <tr><td style={{ color:'var(--muted)' }}>Last top-up</td><td style={{ fontSize:'.72rem' }}>+{autofund.lastTopupAmount} LINK · {new Date(autofund.lastTopupAt).toLocaleString()}</td></tr>}
+            <tr><td style={{ color:'var(--muted)' }}>Checked</td><td style={{ fontSize:'.66rem', color:'var(--muted)' }}>{autofund.checkedAt ? new Date(autofund.checkedAt).toLocaleString() : '—'}</td></tr>
+          </>)}
         </tbody></table>
       </div>
 
