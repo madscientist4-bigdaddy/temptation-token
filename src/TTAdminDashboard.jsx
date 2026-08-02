@@ -3299,13 +3299,13 @@ function SystemScreen() {
       <div className="table-card" style={{ marginBottom: 20 }}>
         <div className="table-head">
           <div className="table-head-title">🎲 VRF Subscription</div>
-          <StatusBadge status={vrfSub == null ? 'unknown' : vrfSub < 1 ? 'critical' : vrfSub < 2 ? 'warn' : 'ok'} />
+          <StatusBadge status={vrfSub == null ? 'unknown' : vrfSub < 15 ? 'critical' : vrfSub < 25 ? 'warn' : 'ok'} />
         </div>
         <table className="adm-table"><tbody>
           <tr><td style={{ color:'var(--muted)' }}>LINK Balance</td>
-            <td><strong style={{ color: vrfSub == null ? 'var(--muted)' : vrfSub < 1 ? '#e84040' : vrfSub < 2 ? '#f39c12' : '#2ecc71' }}>{vrfSub == null ? '—' : vrfSub.toFixed(3) + ' LINK'}</strong></td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Role</td><td style={{ fontSize:'.72rem' }}>Funds settlement randomness (fulfillRandomWords). A thin balance during a gas-price spike can strand a request — keep ≥ 2 LINK.</td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Fund</td><td><a href="https://vrf.chain.link" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>vrf.chain.link →</a></td></tr>
+            <td><strong style={{ color: vrfSub == null ? 'var(--muted)' : vrfSub < 15 ? '#e84040' : vrfSub < 25 ? '#f39c12' : '#2ecc71' }}>{vrfSub == null ? '—' : vrfSub.toFixed(3) + ' LINK'}</strong>{vrfSub != null && vrfSub < 25 && <span style={{ fontSize:'.66rem', color: vrfSub < 15 ? '#e84040' : '#f39c12', marginLeft:6 }}>{vrfSub < 15 ? '⛔ below reserve — will strand' : '⚠️ below buffer'}</span>}</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Reserve / Buffer</td><td style={{ fontSize:'.72rem' }}>Each settlement draw needs a <strong>~15 LINK reserve</strong> held up front (2.5M callback × 30-gwei lane) before the DON will fulfill. Round 4 stranded twice at ~8 LINK and settled at ~32. <strong>Keep ≥ 25 LINK</strong> (reserve + 25% + price-swing headroom); alert fires below 25.</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Fund</td><td><a href="https://vrf.chain.link/base" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>vrf.chain.link/base →</a></td></tr>
         </tbody></table>
       </div>
 

@@ -181,7 +181,18 @@ async function sendTelegram(chatId, text, token) {
 const VRF_COORDINATOR = '0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634'
 const VRF_SUB_ID      = 58222014484560539249027457203866883376041731162442592604288474822166186263722n
 const VRF_STALL_SECONDS = 3600   // 60 min past endTime
-const VRF_SUB_LINK_WARN = 2      // LINK funding buffer (matches upkeep thresholds)
+// Per-request LINK RESERVE the DON holds before it will fulfill:
+//   callbackGasLimit (2.5M) × lane max gas price (30 gwei) = 0.075 ETH worth of LINK
+//   ≈ 15 LINK at ~$3.8k ETH / ~$19 LINK. Empirically confirmed: Round 4 STRANDED
+//   twice at ~8 LINK and FULFILLED at ~32 LINK.
+// The old 2-LINK threshold was far below the reserve, so it never fired even while
+// the sub was too thin to fulfill (silent strand). We now alert at reserve + 25%,
+// set GENEROUSLY HIGH (25) so an ETH/LINK price swing can't quietly drop us under
+// the reserve without warning. Bump if the lane cap or callback gas limit changes.
+const VRF_CALLBACK_GAS   = 2_500_000
+const VRF_LANE_MAX_GWEI  = 30
+const VRF_RESERVE_ETH    = VRF_CALLBACK_GAS * VRF_LANE_MAX_GWEI * 1e-9   // 0.075 ETH/request
+const VRF_SUB_LINK_WARN  = 25    // ≈ reserve (~15 LINK) + 25% + generous price-swing headroom
 const VRF_ALERT_COOLDOWN_MS = 6 * 3600 * 1000
 
 // Pure read — no alert, no write. Used by ?action=vrf-status and checkVrfHealth.
@@ -227,7 +238,7 @@ async function checkVrfHealth(adminChatId) {
     const h = Math.floor(status.secPastEnd / 3600), m = Math.floor((status.secPastEnd % 3600) / 60)
     const lines = ['🚨 <b>VRF ALERT — Temptation Token</b>']
     if (status.stalled) lines.push(`⛔ Round ${status.roundId} settlement STALLED — vrfPending ${h}h ${m}m past round end (&gt;60&nbsp;min). Recovery: <code>outputs/round4_vrf_recovery_runbook.md</code>`)
-    if (status.subLow)  lines.push(`⚠️ VRF subscription LINK low: ${status.subLinkBalance.toFixed(3)} LINK (buffer ${VRF_SUB_LINK_WARN}). Top up so a gas-price spike can't strand fulfillment.`)
+    if (status.subLow)  lines.push(`⚠️ VRF subscription LINK low: ${status.subLinkBalance.toFixed(3)} LINK — below the ${VRF_SUB_LINK_WARN}-LINK safety buffer (per-request reserve is ~15 LINK: 2.5M callback × 30-gwei lane). Top up to ≥${VRF_SUB_LINK_WARN} at vrf.chain.link/base so a fulfillment can't strand.`)
     lines.push(`Round end: ${new Date(status.endTime * 1000).toISOString()}`)
     try { await sendTelegram(adminChatId, lines.join('\n\n'), token); alertSent = true } catch {}
   }
