@@ -193,11 +193,40 @@ const VRF_STALL_SECONDS = 3600   // 60 min past endTime
 const VRF_CALLBACK_GAS   = 2_500_000
 const VRF_LANE_MAX_GWEI  = 30
 const VRF_RESERVE_ETH    = VRF_CALLBACK_GAS * VRF_LANE_MAX_GWEI * 1e-9   // 0.075 ETH/request
-// Reserve expressed in LINK (monitor math): 0.075 ETH ÷ ~0.005 ETH/LINK ≈ 15 LINK at
-// current prices. Named so the auto-funder can scale its threshold/target off it; bump
-// (or make price-feed-driven) if the LINK/ETH ratio drifts materially.
-const VRF_RESERVE_LINK   = 15
-const VRF_SUB_LINK_WARN  = 25    // ≈ reserve (~15 LINK) + 25% + generous price-swing headroom
+// Reserve in ETH is fixed (0.075). Its LINK value is PRICE-AWARE: reserveLink =
+// reserveEth × (ETH/USD ÷ LINK/USD), read live from Chainlink feeds on Base so the
+// monitor threshold + auto-funder trigger scale when ETH rises or LINK falls. If a feed
+// read fails/looks stale we fall back to this fixed estimate. 25/30 LINK stay as hard floors.
+const VRF_RESERVE_LINK_FALLBACK = 15
+const VRF_SUB_LINK_WARN  = 25    // hard MINIMUM alert floor (dynamic threshold = max(25, reserveLink×1.25))
+const CHAINLINK_ETH_USD  = '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70'
+const CHAINLINK_LINK_USD = '0x17CAb8FE31E32f08326e5E27412894e49B0f9D65'
+const AGG_ABI = parseAbi([
+  'function latestRoundData() view returns (uint80,int256 answer,uint256,uint256 updatedAt,uint80)',
+  'function decimals() view returns (uint8)',
+])
+// Live worst-case reserve in LINK (price-aware, with a safe fallback + staleness guard).
+async function computeReserveLink() {
+  try {
+    const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+    const read = async (a) => {
+      const [dec, rd] = await Promise.all([
+        pub.readContract({ address: a, abi: AGG_ABI, functionName: 'decimals' }),
+        pub.readContract({ address: a, abi: AGG_ABI, functionName: 'latestRoundData' }),
+      ])
+      const price = Number(rd[1]) / 10 ** Number(dec)
+      const ageSec = Math.floor(Date.now() / 1000) - Number(rd[3])
+      return { price, ageSec }
+    }
+    const [eth, link] = await Promise.all([read(CHAINLINK_ETH_USD), read(CHAINLINK_LINK_USD)])
+    // reject bad/stale data (>24h) → fall back
+    if (!(eth.price > 0) || !(link.price > 0) || eth.ageSec > 86400 || link.ageSec > 86400) return VRF_RESERVE_LINK_FALLBACK
+    const reserveLink = VRF_RESERVE_ETH * (eth.price / link.price)
+    // sanity clamp so a feed glitch can't produce an absurd threshold
+    if (!(reserveLink > 1) || reserveLink > 500) return VRF_RESERVE_LINK_FALLBACK
+    return reserveLink
+  } catch { return VRF_RESERVE_LINK_FALLBACK }
+}
 
 // VRF auto-funder — Bank tops up OUR sub via LINK ERC-677 transferAndCall. Destination
 // is the coordinator + hard-coded subId: funds can only ever land in our own sub.
@@ -231,9 +260,12 @@ async function computeVrfStatus() {
     const subRes = await rpcCall('eth_call', [{ to: VRF_COORDINATOR, data: '0xdc311dd3' + VRF_SUB_ID.toString(16).padStart(64, '0') }, 'latest'])
     if (subRes && subRes !== '0x' && subRes.length >= 66) subLinkBalance = Number(BigInt('0x' + subRes.slice(2, 66))) / 1e18
   } catch {}
-  const subLow = subLinkBalance != null && subLinkBalance < VRF_SUB_LINK_WARN
+  // Price-aware alert threshold: max(25, reserveLink × 1.25). 25 stays as a hard floor.
+  const reserveLink = await computeReserveLink()
+  const warnThreshold = Math.max(VRF_SUB_LINK_WARN, reserveLink * 1.25)
+  const subLow = subLinkBalance != null && subLinkBalance < warnThreshold
 
-  return { checkedAt: new Date().toISOString(), roundId, endTime, settled, vrfPending, secPastEnd, stalled, subLinkBalance, subLow }
+  return { checkedAt: new Date().toISOString(), roundId, endTime, settled, vrfPending, secPastEnd, stalled, subLinkBalance, subLow, reserveLink: Math.round(reserveLink * 100) / 100, warnThreshold: Math.round(warnThreshold * 100) / 100 }
 }
 
 // Read → (de-duped) alert → persist to admin_config.vrf_status (surfaced in System Health).
@@ -252,7 +284,7 @@ async function checkVrfHealth(adminChatId) {
     const h = Math.floor(status.secPastEnd / 3600), m = Math.floor((status.secPastEnd % 3600) / 60)
     const lines = ['🚨 <b>VRF ALERT — Temptation Token</b>']
     if (status.stalled) lines.push(`⛔ Round ${status.roundId} settlement STALLED — vrfPending ${h}h ${m}m past round end (&gt;60&nbsp;min). Recovery: <code>outputs/round4_vrf_recovery_runbook.md</code>`)
-    if (status.subLow)  lines.push(`⚠️ VRF subscription LINK low: ${status.subLinkBalance.toFixed(3)} LINK — below the ${VRF_SUB_LINK_WARN}-LINK safety buffer (per-request reserve is ~15 LINK: 2.5M callback × 30-gwei lane). Top up to ≥${VRF_SUB_LINK_WARN} at vrf.chain.link/base so a fulfillment can't strand.`)
+    if (status.subLow)  lines.push(`⚠️ VRF subscription LINK low: ${status.subLinkBalance.toFixed(3)} LINK — below the ${status.warnThreshold}-LINK threshold (live reserve ~${status.reserveLink} LINK from Chainlink price feeds; 2.5M callback × 30-gwei lane). Top up at vrf.chain.link/base so a fulfillment can't strand.`)
     lines.push(`Round end: ${new Date(status.endTime * 1000).toISOString()}`)
     try { await sendTelegram(adminChatId, lines.join('\n\n'), token); alertSent = true } catch {}
   }
@@ -296,11 +328,12 @@ async function runVrfAutoFunder() {
     if (Array.isArray(rows)) for (const r of rows) { try { sevenDayTopupTotal += Number(JSON.parse(r.detail)?.amount) || 0 } catch {} }
   } catch {}
 
-  const decision = evaluateVrfAutoFund({ enabled, hasBankKey, subBalance, reserveLink: VRF_RESERVE_LINK, bankLinkBalance: bankLink, sevenDayTopupTotal })
+  const reserveLink = await computeReserveLink() // price-aware (Chainlink ETH/USD ÷ LINK/USD)
+  const decision = evaluateVrfAutoFund({ enabled, hasBankKey, subBalance, reserveLink, bankLinkBalance: bankLink, sevenDayTopupTotal })
 
   // Persist status for the System Health card every run (whether or not we top up).
   const statusBlob = {
-    checkedAt: new Date().toISOString(), enabled, subBalance, reserveLink: VRF_RESERVE_LINK,
+    checkedAt: new Date().toISOString(), enabled, subBalance, reserveLink: Math.round(reserveLink * 100) / 100,
     bankLink, sevenDayTopupTotal, sevenDayCap: 60,
     lastDecision: decision.topUp ? `top-up ${decision.amount} LINK` : decision.reason,
   }
@@ -332,7 +365,7 @@ async function runVrfAutoFunder() {
   const token = process.env.BROADCAST_BOT_TOKEN
   const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
   await sendTelegram(adminChatId,
-    `⛽ <b>VRF sub auto-funded</b>\n+${decision.amount} LINK → subscription (destination hard-coded to our subId — cannot be redirected)\nBalance ${subBalance.toFixed(2)} → ${newSub.toFixed(2)} LINK · reserve ~${VRF_RESERVE_LINK}\ntx <code>${txHash.slice(0, 16)}…</code>`,
+    `⛽ <b>VRF sub auto-funded</b>\n+${decision.amount} LINK → subscription (destination hard-coded to our subId — cannot be redirected)\nBalance ${subBalance.toFixed(2)} → ${newSub.toFixed(2)} LINK · live reserve ~${Math.round(reserveLink * 10) / 10}\ntx <code>${txHash.slice(0, 16)}…</code>`,
     token).catch(() => {})
   await sbService('/admin_audit_log', {
     method: 'POST', headers: { Prefer: 'return=minimal' },

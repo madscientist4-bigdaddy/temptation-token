@@ -3305,12 +3305,12 @@ function SystemScreen() {
       <div className="table-card" style={{ marginBottom: 20 }}>
         <div className="table-head">
           <div className="table-head-title">🎲 VRF Subscription</div>
-          <StatusBadge status={vrfSub == null ? 'unknown' : vrfSub < 15 ? 'critical' : vrfSub < 25 ? 'warn' : 'ok'} />
+          <StatusBadge status={vrfSub == null ? 'unknown' : vrfSub < (autofund?.reserveLink ?? 15) ? 'critical' : vrfSub < Math.max(25, (autofund?.reserveLink ?? 15) * 1.25) ? 'warn' : 'ok'} />
         </div>
         <table className="adm-table"><tbody>
           <tr><td style={{ color:'var(--muted)' }}>LINK Balance</td>
-            <td><strong style={{ color: vrfSub == null ? 'var(--muted)' : vrfSub < 15 ? '#e84040' : vrfSub < 25 ? '#f39c12' : '#2ecc71' }}>{vrfSub == null ? '—' : vrfSub.toFixed(3) + ' LINK'}</strong>{vrfSub != null && vrfSub < 25 && <span style={{ fontSize:'.66rem', color: vrfSub < 15 ? '#e84040' : '#f39c12', marginLeft:6 }}>{vrfSub < 15 ? '⛔ below reserve — will strand' : '⚠️ below buffer'}</span>}</td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Reserve / Buffer</td><td style={{ fontSize:'.72rem' }}>Each settlement draw needs a <strong>~15 LINK reserve</strong> held up front (2.5M callback × 30-gwei lane) before the DON will fulfill. Round 4 stranded twice at ~8 LINK and settled at ~32. <strong>Keep ≥ 25 LINK</strong> (reserve + 25% + price-swing headroom); alert fires below 25.</td></tr>
+            <td><strong style={{ color: vrfSub == null ? 'var(--muted)' : vrfSub < (autofund?.reserveLink ?? 15) ? '#e84040' : vrfSub < Math.max(25, (autofund?.reserveLink ?? 15) * 1.25) ? '#f39c12' : '#2ecc71' }}>{vrfSub == null ? '—' : vrfSub.toFixed(3) + ' LINK'}</strong>{vrfSub != null && vrfSub < Math.max(25, (autofund?.reserveLink ?? 15) * 1.25) && <span style={{ fontSize:'.66rem', color: vrfSub < (autofund?.reserveLink ?? 15) ? '#e84040' : '#f39c12', marginLeft:6 }}>{vrfSub < (autofund?.reserveLink ?? 15) ? '⛔ below reserve — will strand' : '⚠️ below buffer'}</span>}</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Reserve / Buffer</td><td style={{ fontSize:'.72rem' }}>Live reserve <strong>~{(autofund?.reserveLink ?? 15).toFixed ? (autofund?.reserveLink ?? 15).toFixed(1) : (autofund?.reserveLink ?? 15)} LINK</strong> — price-aware from Chainlink ETH/USD ÷ LINK/USD (2.5M callback × 30-gwei lane). <strong>Keep ≥ {Math.max(25, Math.round((autofund?.reserveLink ?? 15) * 1.25))} LINK</strong>; alert + auto-fund trigger below that. Hard floors 25/30.</td></tr>
           <tr><td style={{ color:'var(--muted)' }}>Fund</td><td><a href="https://vrf.chain.link/base" target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)', fontSize:'.7rem' }}>vrf.chain.link/base →</a></td></tr>
         </tbody></table>
       </div>

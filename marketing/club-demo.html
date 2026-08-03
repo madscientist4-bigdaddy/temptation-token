@@ -1,0 +1,200 @@
+<title>Temptation Token — Club Sheet</title>
+<style>
+  :root{
+    --void:#0B0B0F; --panel:#15151D; --panel-2:#1c1c26; --line:#2a2a36;
+    --ink:#F4F2F7; --dim:#8A8797; --gold:#F2C14E; --gold-soft:#e9c877; --hot:#FF2D6E;
+    --good:#48c78e;
+    --serif:Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(120% 60% at 50% -10%, #1a1020 0%, rgba(26,16,32,0) 60%),
+      var(--void);
+    color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.55;
+  }
+  .wrap{max-width:468px; margin:0 auto; padding:0 18px 56px}
+  a{color:inherit}
+
+  /* ---- hero ---- */
+  header{padding:44px 0 8px; text-align:center}
+  .eyebrow{font-family:var(--mono); font-size:.64rem; letter-spacing:.28em; text-transform:uppercase; color:var(--hot); margin:0 0 18px}
+  .eyebrow .dot{color:var(--good)}
+  h1{font-family:var(--serif); font-style:italic; font-weight:400; font-size:2.5rem; line-height:1.06; letter-spacing:-.01em; text-wrap:balance; margin:0 0 14px}
+  h1 em{font-style:normal; color:var(--gold)}
+  .lede{color:var(--dim); font-size:.98rem; max-width:34ch; margin:0 auto 22px; text-wrap:balance}
+
+  /* countdown chip */
+  .live{display:inline-flex; align-items:center; gap:12px; background:var(--panel);
+    border:1px solid var(--line); border-radius:100px; padding:9px 8px 9px 16px; margin-bottom:20px}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--good); box-shadow:0 0 0 0 rgba(72,199,142,.6); animation:p 2.4s infinite}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(72,199,142,.5)}70%{box-shadow:0 0 0 9px rgba(72,199,142,0)}100%{box-shadow:0 0 0 0 rgba(72,199,142,0)}}
+  .live b{font-size:.74rem; letter-spacing:.04em; text-transform:uppercase; color:var(--dim); font-weight:600}
+  .live .cd{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:.82rem; background:var(--panel-2); border:1px solid var(--line); border-radius:100px; padding:5px 12px; color:var(--gold-soft)}
+
+  .cta{display:block; text-align:center; text-decoration:none; font-weight:700; letter-spacing:.02em;
+    background:linear-gradient(135deg,var(--hot),#c31d54); color:#fff; padding:16px; border-radius:13px;
+    box-shadow:0 8px 30px -12px rgba(255,45,110,.7); transition:transform .15s ease}
+  .cta:hover{transform:translateY(-2px)}
+  .cta .sub{display:block; font-weight:500; font-size:.72rem; opacity:.85; margin-top:3px; letter-spacing:.01em}
+
+  /* ---- section scaffolding ---- */
+  section{margin-top:40px}
+  .kicker{display:flex; align-items:baseline; gap:12px; margin:0 2px 16px}
+  .kicker h2{font-family:var(--serif); font-style:italic; font-weight:400; font-size:1.5rem; margin:0}
+  .kicker .rule{flex:1; height:1px; background:linear-gradient(90deg,var(--line),transparent)}
+  .note{color:var(--dim); font-size:.85rem; margin:-6px 2px 18px; text-wrap:balance}
+
+  /* ---- receipt card ---- */
+  .receipt{background:var(--panel); border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:16px}
+  .r-head{display:flex; justify-content:space-between; align-items:center; padding:15px 18px; border-bottom:1px dashed var(--line)}
+  .r-head .rd{font-family:var(--mono); font-size:.66rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim)}
+  .r-head .pool{font-family:var(--mono); font-size:.82rem; color:var(--ink)}
+  .r-head .pool b{color:var(--gold)}
+  .r-win{padding:13px 18px; background:var(--panel-2); border-bottom:1px solid var(--line); font-size:.82rem}
+  .r-win span{color:var(--dim)} .r-win b{color:var(--gold-soft); font-family:var(--serif); font-style:italic; font-size:1.05rem; font-weight:400}
+  .items{list-style:none; margin:0; padding:6px 18px 8px}
+  .items li{display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid rgba(42,42,54,.5)}
+  .items li:last-child{border-bottom:0}
+  .items .lbl{font-size:.9rem}
+  .items .lbl small{display:block; color:var(--dim); font-size:.7rem; font-family:var(--mono); letter-spacing:.03em; margin-top:1px}
+  .items .amt{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:.9rem; color:var(--ink)}
+  .items .amt .pct{color:var(--dim); font-size:.72rem; margin-left:6px}
+  .items li.charity .lbl{color:var(--good)}
+  .r-foot{display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-top:1px dashed var(--line)}
+  .r-foot .verify{font-size:.72rem; color:var(--dim)}
+  .txlink{font-family:var(--mono); font-size:.72rem; color:var(--hot); text-decoration:none; border-bottom:1px solid rgba(255,45,110,.35); padding-bottom:1px}
+  .txlink:hover{color:var(--gold)}
+
+  /* ---- trophies ---- */
+  .trophies{display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px}
+  .trophy{background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:15px 10px; text-align:center; text-decoration:none; display:block; transition:border-color .15s}
+  .trophy:hover{border-color:var(--gold)}
+  .trophy .ic{font-size:1.5rem; line-height:1}
+  .trophy .id{font-family:var(--mono); font-size:.82rem; color:var(--gold); margin:7px 0 2px}
+  .trophy .who{font-size:.66rem; color:var(--dim); letter-spacing:.02em}
+  .trophy .go{font-family:var(--mono); font-size:.58rem; color:var(--hot); margin-top:6px; letter-spacing:.08em}
+
+  /* ---- club pitch ---- */
+  .club{background:linear-gradient(160deg,#1a1220,#141019); border:1px solid #33223a; border-radius:18px; padding:24px 20px}
+  .club .lead{font-family:var(--serif); font-style:italic; font-size:1.24rem; color:var(--gold-soft); margin:0 0 18px; text-wrap:balance}
+  .step{display:flex; gap:14px; padding:13px 0; border-top:1px solid var(--line)}
+  .step:first-of-type{border-top:0; padding-top:2px}
+  .step .n{font-family:var(--mono); font-size:.7rem; color:var(--hot); border:1px solid #40263a; border-radius:8px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; margin-top:2px}
+  .step h3{font-size:.94rem; margin:0 0 3px}
+  .step p{margin:0; color:var(--dim); font-size:.84rem}
+  .step p b{color:var(--ink); font-weight:600}
+  .share{display:flex; align-items:center; gap:14px; margin:18px 0; padding:16px; background:var(--void); border:1px solid var(--line); border-radius:13px}
+  .share .big{font-family:var(--serif); font-style:italic; font-size:2.1rem; color:var(--gold); line-height:1}
+  .share .t b{display:block; font-size:.9rem} .share .t span{color:var(--dim); font-size:.78rem}
+  .oneline{text-align:center; font-size:.82rem; color:var(--dim); margin:16px 2px 20px}
+  .oneline b{color:var(--ink)}
+
+  footer{margin-top:44px; padding-top:22px; border-top:1px solid var(--line); text-align:center}
+  footer .split{font-family:var(--mono); font-size:.7rem; color:var(--dim); letter-spacing:.03em; line-height:1.9}
+  footer .split b{color:var(--gold-soft)}
+  footer .addr{font-family:var(--mono); font-size:.6rem; color:#55545f; margin-top:14px; word-break:break-all}
+  footer .addr a{color:#6a6976; text-decoration:none; border-bottom:1px solid #33323c}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow"><span class="dot">●</span> Temptation Token · Live on Base</p>
+    <h1>Real prizes,<br>paid <em>on-chain</em>,<br>every week.</h1>
+    <p class="lede">A weekly “hot-or-not” contest. Players vote with $TTS; a smart contract splits the pot and pays winners automatically — nothing to trust, everything to verify.</p>
+    <div class="live">
+      <span class="pulse"></span>
+      <b>Round&nbsp;6 ends in</b>
+      <span class="cd" id="cd">—</span>
+    </div>
+    <a class="cta" href="https://app.temptationtoken.io" target="_blank" rel="noopener">
+      Open the live app
+      <span class="sub">app.temptationtoken.io</span>
+    </a>
+  </header>
+
+  <section>
+    <div class="kicker"><h2>The receipts</h2><span class="rule"></span></div>
+    <p class="note">Every settlement is a public transaction. These are the last two — tap any hash to check it yourself on BaseScan. Early rounds are small on purpose; the machine is live and paying out.</p>
+
+    <div class="receipt">
+      <div class="r-head"><span class="rd">Round 4 · settled</span><span class="pool">pool <b>10 $TTS</b></span></div>
+      <div class="r-win"><span>Winner —</span> <b>Holly</b></div>
+      <ul class="items">
+        <li><span class="lbl">Winning profile<small>0xE15D…51c5</small></span><span class="amt">3.5<span class="pct">35%</span></span></li>
+        <li><span class="lbl">Top voter<small>0xB1C9…4887</small></span><span class="amt">3.5<span class="pct">35%</span></span></li>
+        <li class="charity"><span class="lbl">Polaris Project · charity<small>anti-trafficking</small></span><span class="amt">1.0<span class="pct">10%</span></span></li>
+        <li><span class="lbl">House<small>Blockchain Entertainment LLC</small></span><span class="amt">2.0<span class="pct">20%</span></span></li>
+      </ul>
+      <div class="r-foot"><span class="verify">Verified on-chain</span><a class="txlink" href="https://basescan.org/tx/0xbc5791cb405f532a055456297c3856d4f7494e8ac824b103e37e1053a1319ad8" target="_blank" rel="noopener">tx 0xbc5791cb… ↗</a></div>
+    </div>
+
+    <div class="receipt">
+      <div class="r-head"><span class="rd">Round 5 · settled</span><span class="pool">pool <b>5 $TTS</b></span></div>
+      <div class="r-win"><span>Winner —</span> <b>Holly</b></div>
+      <ul class="items">
+        <li><span class="lbl">Winning profile<small>0xE15D…51c5</small></span><span class="amt">1.75<span class="pct">35%</span></span></li>
+        <li><span class="lbl">Top voter<small>0xB1C9…4887</small></span><span class="amt">1.75<span class="pct">35%</span></span></li>
+        <li class="charity"><span class="lbl">Polaris Project · charity<small>anti-trafficking</small></span><span class="amt">0.5<span class="pct">10%</span></span></li>
+        <li><span class="lbl">House<small>Blockchain Entertainment LLC</small></span><span class="amt">1.0<span class="pct">20%</span></span></li>
+      </ul>
+      <div class="r-foot"><span class="verify">Verified on-chain</span><a class="txlink" href="https://basescan.org/tx/0x12010ff383e78f3775613a591e88a7c0d44f314c171c476599cf0926cb16d8d0" target="_blank" rel="noopener">tx 0x12010ff3… ↗</a></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>Trophy NFTs</h2><span class="rule"></span></div>
+    <p class="note">Each settlement mints three trophies — to the winner, the top voter, and the house — as permanent, ownable proof. Round 4 minted #1–#3; Round 5 minted #4–#6.</p>
+    <div class="trophies">
+      <a class="trophy" href="https://basescan.org/nft/0x0768e862D3AB14d85213BfeF8f1D012E77721da2/1" target="_blank" rel="noopener"><div class="ic">👑</div><div class="id">#1</div><div class="who">Winner</div><div class="go">VIEW ↗</div></a>
+      <a class="trophy" href="https://basescan.org/nft/0x0768e862D3AB14d85213BfeF8f1D012E77721da2/2" target="_blank" rel="noopener"><div class="ic">🗳️</div><div class="id">#2</div><div class="who">Top voter</div><div class="go">VIEW ↗</div></a>
+      <a class="trophy" href="https://basescan.org/nft/0x0768e862D3AB14d85213BfeF8f1D012E77721da2/3" target="_blank" rel="noopener"><div class="ic">🏛️</div><div class="id">#3</div><div class="who">House</div><div class="go">VIEW ↗</div></a>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>For clubs</h2><span class="rule"></span></div>
+    <div class="club">
+      <p class="lead">Send us your creators. Earn 10% of every pot they win — paid straight to your wallet, on-chain.</p>
+
+      <div class="step"><span class="n">1</span><div><h3>You get a club code</h3><p>A short word — <b>VIXENS</b>, <b>DOLLHOUSE</b>, whatever you like. You hand it to your creators.</p></div></div>
+      <div class="step"><span class="n">2</span><div><h3>Your creators enter it when they submit</h3><p>When we approve a profile carrying your code, the smart contract <b>links it to your wallet on-chain</b>. No spreadsheets, no chasing.</p></div></div>
+      <div class="step"><span class="n">3</span><div><h3>They win → you get paid, automatically</h3><p>If a club-linked profile wins the week, the contract sends <b>10% of the pot to your wallet</b> in the same settlement transaction. You never invoice anyone.</p></div></div>
+
+      <div class="share">
+        <div class="big">10%</div>
+        <div class="t"><b>of every winning pot</b><span>paid on-chain by the contract — not a promise, it’s code</span></div>
+      </div>
+
+      <p class="oneline">The only thing you give us: <b>one Base wallet address.</b><br>That’s the entire setup.</p>
+      <a class="cta" href="https://app.temptationtoken.io" target="_blank" rel="noopener">
+        Get your club code
+        <span class="sub">Reply to this sheet or open the app</span>
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <p class="split">Standard split — winner <b>35%</b> · top voter <b>35%</b> · charity <b>10%</b> · house <b>20%</b><br>With a club — winner <b>35%</b> · top voter <b>35%</b> · charity <b>10%</b> · <b>club 10%</b> · house 10%</p>
+    <p class="addr">Voting contract <a href="https://basescan.org/address/0x783b8cd80b586b723188c93ef94ee1beede617b4" target="_blank" rel="noopener">0x783b…617b4</a> · Trophy NFTs <a href="https://basescan.org/address/0x0768e862D3AB14d85213BfeF8f1D012E77721da2" target="_blank" rel="noopener">0x0768…21da2</a> · Base mainnet</p>
+  </footer>
+</div>
+
+<script>
+  // Round 6 ends 2026-08-10 04:59:00 UTC (Sunday 11:59 PM EST anchor).
+  var END = 1786337940 * 1000;
+  var el = document.getElementById('cd');
+  function tick(){
+    var s = Math.floor((END - Date.now())/1000);
+    if (s <= 0){ el.textContent = 'settling…'; return; }
+    var d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60), sec = s%60;
+    var p = function(n){ return (n<10?'0':'')+n; };
+    el.textContent = (d>0 ? d+'d ' : '') + p(h)+':'+p(m)+':'+p(sec);
+  }
+  tick(); setInterval(tick, 1000);
+</script>
