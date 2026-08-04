@@ -159,10 +159,13 @@ async function handleStorageUrl(req, res, body) {
       const wallet = path.split('/')[0] || ''
       const kind = /-selfie\./i.test(path) ? 'selfie' : /-id\./i.test(path) ? 'id' : 'doc'
       const session = crypto.createHash('sha256').update(token).digest('hex').slice(0, 10)
+      // admin_audit_log schema is (created_at, changed_by, config_key[NOT NULL], old_value,
+      // new_value). We record each ID/selfie view as a row keyed config_key='id_view',
+      // reviewer session in changed_by, and the view detail JSON in new_value.
       await fetch(`${SUPABASE_URL}/rest/v1/admin_audit_log`, {
         method: 'POST',
         headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ action: 'id_view', source: 'admin', detail: JSON.stringify({ wallet, kind, path, session }), created_at: new Date().toISOString() }),
+        body: JSON.stringify({ config_key: 'id_view', changed_by: session, new_value: JSON.stringify({ wallet, kind, path }), created_at: new Date().toISOString() }),
       }).catch(() => {})
     } catch {}
     res.setHeader('Cache-Control', 'no-store')

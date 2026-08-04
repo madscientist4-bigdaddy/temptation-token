@@ -1447,12 +1447,12 @@ function VerificationsScreen({ showToast }) {
       sb.get('verified_submitters', 'order=created_at.desc'),
       sb.get('age_acknowledgments', 'order=acknowledged_at.desc&limit=200'),
       sb.get('verified_wallet_links', 'order=linked_at.desc'),
-      sb.get('admin_audit_log', 'action=eq.id_view&order=created_at.desc&limit=40'),
+      sb.get('admin_audit_log', 'config_key=eq.id_view&order=created_at.desc&limit=40'),
     ]).then(([ks, as, ls, iv]) => {
       setKycRows(Array.isArray(ks) ? ks : []);
       setAckRows(Array.isArray(as) ? as : []);
       setLinks(Array.isArray(ls) ? ls : []);
-      setIdViews((Array.isArray(iv) ? iv : []).map(r => { let d = {}; try { d = JSON.parse(r.detail || '{}'); } catch {} return { at: r.created_at, ...d }; }));
+      setIdViews((Array.isArray(iv) ? iv : []).map(r => { let d = {}; try { d = JSON.parse(r.new_value || '{}'); } catch {} return { at: r.created_at, session: r.changed_by, ...d }; }));
       setLoading(false);
     }).catch(() => setLoading(false));
   };
