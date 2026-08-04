@@ -2,38 +2,18 @@
   "name": "tts-mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Temptation Token mobile app (Expo + React Native). Phase 1 skeleton — NOT yet installed/built.",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start --dev-client",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "prebuild": "expo prebuild",
-    "build:internal": "eas build --profile preview",
-    "build:prod": "eas build --profile production"
+    "start": "expo start",
+    "tunnel": "expo start --tunnel",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
   },
-  "//deps": "Versions are indicative targets for Phase-1 setup; pin exactly at install time via `npx create-expo-app` + `npx expo install`.",
   "dependencies": {
-    "expo": "~51.0.0",
-    "expo-dev-client": "~4.0.0",
-    "expo-notifications": "~0.28.0",
-    "expo-secure-store": "~13.0.0",
-    "expo-image-picker": "~15.0.0",
-    "react": "19.0.0",
-    "react-native": "0.76.0",
-    "@reown/appkit-wagmi-react-native": "^1.2.0",
-    "@walletconnect/react-native-compat": "^2.13.0",
-    "wagmi": "^2.12.0",
-    "viem": "^2.21.0",
-    "@tanstack/react-query": "^5.51.0",
-    "@react-native-async-storage/async-storage": "^2.0.0",
-    "react-native-get-random-values": "^1.11.0",
-    "react-native-svg": "^15.0.0",
-    "@react-navigation/native": "^6.1.0",
-    "@react-navigation/bottom-tabs": "^6.6.0"
-  },
-  "devDependencies": {
-    "@types/react": "~19.0.0",
-    "typescript": "~5.5.0"
+    "@expo/ngrok": "^4.1.3",
+    "expo": "^57.0.10",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.2"
   }
 }

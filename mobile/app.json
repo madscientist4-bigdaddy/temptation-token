@@ -6,29 +6,9 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "primaryColor": "#0B0B0F",
-    "ios": {
-      "bundleIdentifier": "io.temptationtoken.app",
-      "buildNumber": "1",
-      "supportsTablet": false,
-      "config": { "usesNonExemptEncryption": false },
-      "infoPlist": {
-        "NSCameraUsageDescription": "Used to capture your government ID and verification selfie when you submit a profile.",
-        "NSPhotoLibraryUsageDescription": "Used to upload your profile photo and verification images.",
-        "LSApplicationQueriesSchemes": ["metamask", "rainbow", "cbwallet", "trust", "ledgerlive"]
-      }
-    },
-    "android": {
-      "package": "io.temptationtoken.app",
-      "versionCode": 1,
-      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"]
-    },
-    "plugins": [
-      "expo-dev-client",
-      "expo-secure-store",
-      ["expo-image-picker", { "photosPermission": "Upload your profile photo and verification images." }],
-      ["expo-notifications", { "icon": "./assets/notification-icon.png" }]
-    ],
+    "backgroundColor": "#0B0B0F",
+    "ios": { "bundleIdentifier": "io.temptationtoken.app", "supportsTablet": false },
+    "android": { "package": "io.temptationtoken.app" },
     "extra": {
       "//": "Public, client-safe values only. NEVER put service keys or private keys here.",
       "appUrl": "https://app.temptationtoken.io",
