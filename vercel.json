@@ -15,6 +15,7 @@
     { "source": "/api/referral-credit", "destination": "/api/bonus?action=referral" },
     { "source": "/api/nft/(.*)",         "destination": "/api/profiles?action=nft-metadata&id=$1" },
     { "source": "/api/nft-metadata",     "destination": "/api/profiles?action=nft-metadata" },
+    { "source": "/api/nft-collection",   "destination": "/api/profiles?action=nft-collection" },
     { "source": "/api/cron/dispatch",   "destination": "/api/scheduler?action=dispatch" },
     { "source": "/api/og/card",         "destination": "/api/social-post?action=og-card" },
     { "source": "/api/crm/import",       "destination": "/api/admin?action=crm-import" },

@@ -365,16 +365,23 @@ async function handleSync(req, res) {
 // Image is the GENERIC branded SVG (permanent fallback). PHOTO composite stays OFF
 // (NFT_PHOTO_MODE!=='on') until legal approves the consent copy — even for opted-in wallets.
 const ROLE_KEYS = ['champion', 'topvoter', 'house']
-// Current on-chain contract minted 3/round starting round 4 (tokens 1-3=r4, 4-6=r5).
-const ROUND5_SETTLE = 1785733161, ROUND4_SETTLE = 1785703281
-function handleNftMetadata(req, res) {
+// NEW trophy contract (V3d mints here from Round 6 on). Its tokenURI points at this API;
+// it stores per-token {round, role} on-chain via trophyOf(id) — we read that as the truth.
+const TROPHY_NFT = '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5'
+const TROPHY_ABI = parseAbi(['function trophyOf(uint256) view returns (uint32 round, uint8 role)'])
+async function handleNftMetadata(req, res) {
   const id = parseInt(req.query.id, 10)
-  let round = req.query.round, role = req.query.role, date = req.query.date
+  let round = req.query.round, role = req.query.role
+  let date = req.query.date
   const handle = (req.query.handle || '').toString().slice(0, 40)
+  // id mode: read the NEW contract's on-chain round/role (authoritative). Explicit
+  // round/role params override (preview). Non-minted / unreadable → generic fallback.
   if (Number.isInteger(id) && id > 0 && round == null) {
-    round = 4 + Math.floor((id - 1) / 3)
-    role = ROLE_KEYS[(id - 1) % 3]
-    date = round === 4 ? ROUND4_SETTLE : round === 5 ? ROUND5_SETTLE : undefined
+    try {
+      const pub = createPublicClient({ chain: base, transport: http(RPC_URL) })
+      const t = await pub.readContract({ address: TROPHY_NFT, abi: TROPHY_ABI, functionName: 'trophyOf', args: [BigInt(id)] })
+      if (Number(t[0]) > 0) { round = Number(t[0]); role = ROLE_KEYS[Number(t[1])] || 'champion' }
+    } catch {}
   }
   round = Number(round) || 0
   role = ROLE_KEYS.includes(role) ? role : 'champion'
@@ -386,21 +393,61 @@ function handleNftMetadata(req, res) {
     { trait_type: 'Role', value: r.title },
   ]
   if (date) attributes.push({ trait_type: 'Settlement Date', display_type: 'date', value: Number(date) })
+
+  // PHOTO-COMPOSITE PIPELINE — server-side pre-rendered PNG (so wallets never depend on
+  // SVG image filters). Wired but GATED OFF: runs only if NFT_PHOTO_MODE==='on' AND the
+  // token is the champion AND the winner consented (nft_consent). Stays dark pending
+  // legal sign-off on the consent copy. Generic SVG is the permanent default.
+  let finalImage = image
+  if (process.env.NFT_PHOTO_MODE === 'on' && role === 'champion') {
+    try { const png = await renderPhotoCompositePng({ round, date, handle }); if (png) finalImage = png } catch {}
+  }
+
   res.setHeader('Content-Type', 'application/json')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=600')
   res.status(200).json({
     name: `TTS Round ${round} ${r.title}`,
     description: `Temptation Token on-chain trophy — ${r.blurb}. A weekly hot-or-not voting game on Base; the winning profile, the top voter, and the house each receive a commemorative trophy at settlement. Metadata served from temptationtoken.io (not IPFS) so likeness content can be honored on request.`,
-    image,
+    image: finalImage,
     external_url: 'https://app.temptationtoken.io',
     attributes,
   })
 }
 
+// Pre-render the photo composite to a PNG data URI (server-side). DISABLED by default.
+// When enabled it must: (1) confirm the round winner's nft_consent=true, (2) fetch the
+// consented photo, (3) apply the poster/cartoon treatment, (4) composite + rasterize.
+// For now it renders the composite frame with a placeholder — the consented-photo fetch
+// + stylization is the remaining step, intentionally not run while NFT_PHOTO_MODE is off.
+async function renderPhotoCompositePng({ round, date, handle }) {
+  const { composePhotoSVG } = await import('../lib/nft/art.js')
+  const { Resvg } = await import('@resvg/resvg-js')
+  const svg = composePhotoSVG({ round, role: 'champion', date, handle /*, photoHref: <consented, stylized> */ })
+  const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1000 } }).render().asPng()
+  return 'data:image/png;base64,' + Buffer.from(png).toString('base64')
+}
+
+// ── action=nft-collection — OpenSea collection-level metadata (contractURI) ──────
+function handleNftCollection(req, res) {
+  const svg = generateTrophySVG({ round: '', role: 'champion' })
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'public, max-age=3600')
+  res.status(200).json({
+    name: 'TTS Round Trophies',
+    description: 'On-chain commemorative trophies from Temptation Token — a weekly hot-or-not voting game on Base. Each settlement mints a Champion, Top Voter, and House trophy. Metadata served from temptationtoken.io (not IPFS) so likeness content can be honored on request.',
+    image: 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'),
+    external_link: 'https://app.temptationtoken.io',
+    seller_fee_basis_points: 500,
+    fee_recipient: '0xb1e991bf617459b58964eef7756b350e675c53b5',
+  })
+}
+
 export default async function handler(req, res) {
   const action = req.query.action || ''
-  if (action === 'nft-metadata') return handleNftMetadata(req, res) // public, no service key needed
+  if (action === 'nft-metadata') return handleNftMetadata(req, res)   // public, no service key needed
+  if (action === 'nft-collection') return handleNftCollection(req, res)
   if (!SERVICE_KEY) { res.status(500).json({ error: 'Server not configured: SUPABASE_SERVICE_KEY missing' }); return }
   if (action === 'list') return handleList(req, res)
   if (action === 'submit') return handleSubmit(req, res)
