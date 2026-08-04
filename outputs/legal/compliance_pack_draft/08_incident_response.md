@@ -17,8 +17,9 @@ systems, or exposure of the Supabase service key / admin credentials.
    - Preserve evidence — do not wipe logs.
 
 2. **ASSESS.**
-   - What data, whose, how many records? Pull the **`admin_audit_log` (`id_view`)** access log
-     to see exactly which IDs were viewed and by which admin session.
+   - What data, whose, how many records? Pull the **`admin_audit_log` where
+     `config_key='id_view'`** access log to see exactly which IDs were viewed and by which
+     admin session (session fingerprint in `changed_by`; wallet/kind/path in `new_value`).
    - Determine cause (leaked key, RLS gap, phishing, etc.) and whether it is ongoing.
    - Classify severity + whether personal/biometric data was actually exposed.
 
@@ -40,7 +41,7 @@ systems, or exposure of the Supabase service key / admin credentials.
 
 ## Quick reference
 - Private ID bucket: `id-verifications` (Supabase `gmlikdxykgviyprqtqwz`), service-role only.
-- Access log: `admin_audit_log` where `action='id_view'`.
+- Access log: `admin_audit_log` where `config_key='id_view'`.
 - Takedown / data contact: **support@temptationtoken.io**.
 - On-chain data is public + immutable — not subject to deletion.
 
