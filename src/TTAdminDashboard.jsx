@@ -1357,6 +1357,7 @@ function VerificationsScreen({ showToast }) {
   const [loading, setLoading] = useState(true);
   const [kycFilter, setKycFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
+  const [idViews, setIdViews] = useState([]); // access log of admin ID/selfie views
   // Per-row manual-review checklist (keyed by row id). All items must be ticked before
   // the approve button arms — enforces the reviewer actually confirmed each criterion.
   const REVIEW_CHECKS = [
@@ -1446,10 +1447,12 @@ function VerificationsScreen({ showToast }) {
       sb.get('verified_submitters', 'order=created_at.desc'),
       sb.get('age_acknowledgments', 'order=acknowledged_at.desc&limit=200'),
       sb.get('verified_wallet_links', 'order=linked_at.desc'),
-    ]).then(([ks, as, ls]) => {
+      sb.get('admin_audit_log', 'action=eq.id_view&order=created_at.desc&limit=40'),
+    ]).then(([ks, as, ls, iv]) => {
       setKycRows(Array.isArray(ks) ? ks : []);
       setAckRows(Array.isArray(as) ? as : []);
       setLinks(Array.isArray(ls) ? ls : []);
+      setIdViews((Array.isArray(iv) ? iv : []).map(r => { let d = {}; try { d = JSON.parse(r.detail || '{}'); } catch {} return { at: r.created_at, ...d }; }));
       setLoading(false);
     }).catch(() => setLoading(false));
   };
@@ -1668,6 +1671,30 @@ function VerificationsScreen({ showToast }) {
                 </button>
               </div>
               <div style={{ fontSize:'.6rem', color:'var(--muted)', marginTop:8 }}>Creates/updates a verified_submitters row at status <strong>approved</strong> — unblocks profile approval for this wallet immediately.</div>
+            </div>
+
+            {/* Recent ID views — every admin open of a private ID/selfie is logged (audit). */}
+            <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px', marginBottom:14 }}>
+              <div style={{ fontSize:'.65rem', color:'var(--muted)', fontWeight:700, letterSpacing:'.06em', marginBottom:8 }}>🔒 RECENT ID VIEWS <span style={{ fontWeight:400, textTransform:'none', letterSpacing:0 }}>— every open of a government ID / selfie is access-logged</span></div>
+              {idViews.length === 0 ? (
+                <div style={{ fontSize:'.62rem', color:'var(--muted)' }}>No ID views recorded yet.</div>
+              ) : (
+                <div style={{ maxHeight:200, overflowY:'auto' }}>
+                  <table className="adm-table" style={{ fontSize:'.62rem' }}>
+                    <thead><tr><th>When</th><th>Wallet viewed</th><th>Doc</th><th>Admin session</th></tr></thead>
+                    <tbody>
+                      {idViews.map((v, i) => (
+                        <tr key={i}>
+                          <td style={{ whiteSpace:'nowrap' }}>{v.at ? new Date(v.at).toLocaleString() : '—'}</td>
+                          <td style={{ fontFamily:'monospace' }}>{v.wallet ? `${v.wallet.slice(0,10)}…${v.wallet.slice(-4)}` : '—'}</td>
+                          <td>{v.kind || '—'}</td>
+                          <td style={{ fontFamily:'monospace', color:'var(--muted)' }}>{v.session || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
             <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
               {['all','approved','pending','needs_review','declined'].map(s => (

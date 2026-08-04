@@ -152,6 +152,19 @@ async function handleStorageUrl(req, res, body) {
     const d = await r.json()
     const signed = d.signedURL || d.signedUrl
     if (!signed) { res.status(502).json({ error: 'No signed URL' }); return }
+    // Access log: every admin view of a private ID/selfie is recorded (who = admin
+    // session fingerprint, which wallet's document, when). The bucket has no other read
+    // path, so this captures 100% of ID views. Best-effort — never blocks the view.
+    try {
+      const wallet = path.split('/')[0] || ''
+      const kind = /-selfie\./i.test(path) ? 'selfie' : /-id\./i.test(path) ? 'id' : 'doc'
+      const session = crypto.createHash('sha256').update(token).digest('hex').slice(0, 10)
+      await fetch(`${SUPABASE_URL}/rest/v1/admin_audit_log`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ action: 'id_view', source: 'admin', detail: JSON.stringify({ wallet, kind, path, session }), created_at: new Date().toISOString() }),
+      }).catch(() => {})
+    } catch {}
     res.setHeader('Cache-Control', 'no-store')
     res.status(200).json({ url: `${SUPABASE_URL}/storage/v1${signed}` })
   } catch { res.status(502).json({ error: 'Upstream error' }) }
