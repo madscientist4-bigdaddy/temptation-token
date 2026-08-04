@@ -301,6 +301,59 @@ async function checkVrfHealth(adminChatId) {
 // Sends from BANK via LINK.transferAndCall(coordinator, amount, encode(subId)) — the
 // destination is our own sub and CANNOT be redirected. All caps/floor live in the pure
 // evaluateVrfAutoFund(). Kill switch: admin_config.vrf_autofund_enabled (default TRUE).
+// New trophy contract (V3d mints here from Round 6 on). One-shot verifier: on the first
+// mint, confirm tokenURI(1) → our API and the image is a valid SVG (renders in wallets).
+const TROPHY_NFT = '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5'
+const TROPHY_ABI = parseAbi([
+  'function totalSupply() view returns (uint256)',
+  'function tokenURI(uint256) view returns (string)',
+])
+async function checkTrophyMint() {
+  // one-shot guard
+  try {
+    const d = await (await sbService('/admin_config?key=eq.trophy_mint_verified&select=value&limit=1')).json()
+    if (Array.isArray(d) && d[0]?.value) { try { if (JSON.parse(d[0].value).done) return { skipped: 'already verified' } } catch {} }
+  } catch {}
+
+  const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  let supply
+  try { supply = Number(await pub.readContract({ address: TROPHY_NFT, abi: TROPHY_ABI, functionName: 'totalSupply' })) } catch { return { error: 'totalSupply read failed' } }
+  if (supply < 1) return { skipped: 'no trophy minted yet', supply }
+
+  // First mint has happened — verify token #1 end-to-end.
+  let ok = true, detail = ''
+  try {
+    const uri = await pub.readContract({ address: TROPHY_NFT, abi: TROPHY_ABI, functionName: 'tokenURI', args: [1n] })
+    if (!/\/api\/nft\/1$/.test(uri)) { ok = false; detail = `tokenURI(1) unexpected: ${uri}` }
+    else {
+      const r = await fetch(uri)
+      if (!r.ok) { ok = false; detail = `metadata HTTP ${r.status}` }
+      else {
+        const j = await r.json().catch(() => ({}))
+        const imgOk = typeof j.image === 'string' && j.image.startsWith('data:image/svg+xml;base64,')
+        let svgOk = false
+        if (imgOk) { try { const svg = Buffer.from(j.image.split(',')[1], 'base64').toString(); svgOk = svg.includes('<svg') && svg.includes('</svg>') } catch {} }
+        if (!j.name || !imgOk || !svgOk) { ok = false; detail = `metadata incomplete (name:${!!j.name} img:${imgOk} svg:${svgOk})` }
+        else detail = `${j.name} · image renders`
+      }
+    }
+  } catch (e) { ok = false; detail = `verify error: ${String(e.message || e).slice(0, 120)}` }
+
+  const token = process.env.BROADCAST_BOT_TOKEN
+  const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+  const safe = String(detail).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const msg = ok
+    ? `🏆 <b>First branded trophy minted &amp; verified</b>\nThe new contract minted token #1 at settlement.\n${safe}\ntokenURI resolves to our API and the art renders in-wallet.\nView: https://basescan.org/nft/${TROPHY_NFT}/1`
+    : `⚠️ <b>Trophy mint verify FAILED</b>\nA token minted on the new contract but the metadata/art check failed:\n<code>${safe}</code>\nCheck https://app.temptationtoken.io/api/nft/1`
+  await sendTelegram(adminChatId, msg, token).catch(() => {})
+
+  // mark done either way so it alerts exactly once
+  try {
+    await sbService('/admin_config', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'trophy_mint_verified', value: JSON.stringify({ done: true, ok, detail, at: new Date().toISOString() }) }) })
+  } catch {}
+  return { verified: ok, detail }
+}
+
 async function runVrfAutoFunder() {
   // Kill switch (default TRUE — own-sub destination makes on-by-default acceptable).
   let enabled = true
@@ -908,6 +961,12 @@ export default async function handler(req, res) {
   // Tops up OUR sub from Bank if it dips below the reserve. Hard caps + solvency
   // floor + kill switch in evaluateVrfAutoFund(); destination is our subId only.
   try { results.vrfAutoFund = await runVrfAutoFunder() } catch (e) { results.vrfAutoFund_error = e.message }
+
+  // ── JOB 4c: first-trophy-mint verifier (one-shot, every run until it fires) ──
+  // When the new trophy contract mints its first token (Round 6 settlement, ~Aug 10),
+  // confirm tokenURI(1) resolves to our API + the art is a valid SVG, then alert admin
+  // Telegram EITHER way and mark done so it never re-fires.
+  try { results.trophyMint = await checkTrophyMint() } catch (e) { results.trophyMint_error = e.message }
 
   // ── JOB 5: Ask TTS chatbot health check (daily, 13:00 UTC) ─────────────────
   // POST a tiny message to /api/chat; alert admin Telegram on failure so a credit
