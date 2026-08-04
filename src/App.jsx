@@ -1498,8 +1498,9 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [clubCode, setClubCode] = useState('')
   const [a1, setA1] = useState(false)
   const [a2, setA2] = useState(false)
-  // Optional, explicit opt-in for likeness use in commemorative NFTs. Default FALSE;
-  // never required to submit. (Placeholder copy — pending legal review.)
+  // REQUIRED, explicit opt-in for likeness use in commemorative NFTs. Default FALSE;
+  // submit is blocked until it's affirmatively ticked. (Placeholder copy — pending legal
+  // review; NFT_PHOTO_MODE stays OFF until legal approves the final copy.)
   const [nftConsent, setNftConsent] = useState(false)
   const fRef = useRef()
 
@@ -1628,6 +1629,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
       showToast('Wallet not detected — reconnect wallet','e'); return
     }
     if (!a1 || !a2) { showToast('You must agree to all terms','e'); return }
+    if (!nftConsent) { showToast('Please tick the NFT/photo consent box to submit — it’s required.','e'); return }
     if (balance < 5) {
       // Balance race: a fast submitter can arrive before the 500 TTS welcome bonus tx
       // confirms. Re-check the true on-chain balance once before dead-ending; only block
@@ -1796,9 +1798,9 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
           <input type="checkbox" checked={a2} onChange={e => setA2(e.target.checked)} />
           <span className="chk-lbl">I confirm I am 18+ years of age, the Content is SFW compliant, I own all rights to this photo, and I <strong>accept sole responsibility</strong> for the accuracy of my wallet address.</span>
         </label>
-        <label className="chk-row">
-          <input type="checkbox" checked={nftConsent} onChange={e => setNftConsent(e.target.checked)} />
-          <span className="chk-lbl"><span style={{ color:'var(--gold-dim)', fontWeight:600 }}>Optional.</span> I agree my submitted photo may be used in stylized commemorative NFTs awarded to round participants. <span style={{ color:'var(--muted)' }}>(You can leave this unchecked — it doesn’t affect your entry.)</span></span>
+        <label className="chk-row" style={{ background:'rgba(212,175,55,0.06)', border:'1px solid var(--gold-dim)', borderRadius:10, padding:'12px 14px' }}>
+          <input type="checkbox" checked={nftConsent} onChange={e => setNftConsent(e.target.checked)} style={{ accentColor:'var(--gold)' }} />
+          <span className="chk-lbl"><span style={{ color:'var(--gold)', fontWeight:700 }}>Required.</span> I agree my submitted photo may be used in stylized commemorative NFTs awarded to round participants. <strong>You must check this box to submit.</strong></span>
         </label>
         <div className="cost-note"><span>💳</span><span>Submission costs <strong>5 $TTS</strong> — signed on Base blockchain</span></div>
         <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
