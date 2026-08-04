@@ -16,6 +16,7 @@
 import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+import { generateTrophySVG, roleOf } from '../lib/nft/art.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
@@ -130,8 +131,11 @@ async function handleSubmit(req, res) {
 
   if (req.method === 'POST') {
     const body = parseBody(req)
-    const { walletAddress, payoutWallet, displayName, linkTitle, linkUrl, imageUrl, referralCode, roundId } = body
+    const { walletAddress, payoutWallet, displayName, linkTitle, linkUrl, imageUrl, referralCode, roundId, nftConsent } = body
     if (!isAddr(walletAddress)) { res.status(400).json({ error: 'Invalid wallet address' }); return }
+    // Explicit opt-in for likeness use in stylized commemorative NFTs. Default FALSE;
+    // never inferred. Stored per submission; existing profiles are NOT opted in.
+    const nft_consent = nftConsent === true
     const payout = isAddr(payoutWallet) ? payoutWallet : walletAddress
     const name = (displayName || '').trim()
     if (!/^[\p{L}\p{N} '_-]{1,30}$/u.test(name)) { res.status(400).json({ error: 'Invalid display name' }); return }
@@ -181,6 +185,16 @@ async function handleSubmit(req, res) {
       }
       const created = await ins.json().catch(() => [])
       const submissionId = Array.isArray(created) && created[0] ? created[0].id : null
+
+      // Record NFT-likeness consent (best-effort; no-op until the nft_consent column
+      // exists — see outputs/migrations/0002_nft_consent.sql). Never blocks the submit,
+      // and only ever stores TRUE when the user explicitly ticked the box.
+      if (submissionId != null && nft_consent) {
+        await sb(`/submissions?id=eq.${submissionId}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ nft_consent: true }),
+        }).catch(() => {})
+      }
 
       // First-time wallet: record a PENDING verification tied to the wallet, carrying
       // the private ID/selfie paths + the linked submission so the admin can review all
@@ -343,9 +357,51 @@ async function handleSync(req, res) {
   res.status(200).json({ ok: true, round, added: batch.length, approved: rows.length, txHash })
 }
 
+// ── action=nft-metadata ──────────────────────────────────────────────────────
+// Serves ERC-721 tokenURI JSON from OUR API (deliberately NOT IPFS) so a consent
+// revocation / likeness takedown can be honored. Wallets/OpenSea fetch it cross-origin.
+//   GET ?id=N                         -> derives round+role from the current mint order
+//   GET ?round=&role=&date=&handle=   -> explicit (preview / future contract)
+// Image is the GENERIC branded SVG (permanent fallback). PHOTO composite stays OFF
+// (NFT_PHOTO_MODE!=='on') until legal approves the consent copy — even for opted-in wallets.
+const ROLE_KEYS = ['champion', 'topvoter', 'house']
+// Current on-chain contract minted 3/round starting round 4 (tokens 1-3=r4, 4-6=r5).
+const ROUND5_SETTLE = 1785733161, ROUND4_SETTLE = 1785703281
+function handleNftMetadata(req, res) {
+  const id = parseInt(req.query.id, 10)
+  let round = req.query.round, role = req.query.role, date = req.query.date
+  const handle = (req.query.handle || '').toString().slice(0, 40)
+  if (Number.isInteger(id) && id > 0 && round == null) {
+    round = 4 + Math.floor((id - 1) / 3)
+    role = ROLE_KEYS[(id - 1) % 3]
+    date = round === 4 ? ROUND4_SETTLE : round === 5 ? ROUND5_SETTLE : undefined
+  }
+  round = Number(round) || 0
+  role = ROLE_KEYS.includes(role) ? role : 'champion'
+  const r = roleOf(role)
+  const svg = generateTrophySVG({ round, role, date, handle })
+  const image = 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64')
+  const attributes = [
+    { trait_type: 'Round', value: round },
+    { trait_type: 'Role', value: r.title },
+  ]
+  if (date) attributes.push({ trait_type: 'Settlement Date', display_type: 'date', value: Number(date) })
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=600')
+  res.status(200).json({
+    name: `TTS Round ${round} ${r.title}`,
+    description: `Temptation Token on-chain trophy — ${r.blurb}. A weekly hot-or-not voting game on Base; the winning profile, the top voter, and the house each receive a commemorative trophy at settlement. Metadata served from temptationtoken.io (not IPFS) so likeness content can be honored on request.`,
+    image,
+    external_url: 'https://app.temptationtoken.io',
+    attributes,
+  })
+}
+
 export default async function handler(req, res) {
-  if (!SERVICE_KEY) { res.status(500).json({ error: 'Server not configured: SUPABASE_SERVICE_KEY missing' }); return }
   const action = req.query.action || ''
+  if (action === 'nft-metadata') return handleNftMetadata(req, res) // public, no service key needed
+  if (!SERVICE_KEY) { res.status(500).json({ error: 'Server not configured: SUPABASE_SERVICE_KEY missing' }); return }
   if (action === 'list') return handleList(req, res)
   if (action === 'submit') return handleSubmit(req, res)
   if (action === 'vote') return handleVote(req, res)

@@ -1498,6 +1498,9 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [clubCode, setClubCode] = useState('')
   const [a1, setA1] = useState(false)
   const [a2, setA2] = useState(false)
+  // Optional, explicit opt-in for likeness use in commemorative NFTs. Default FALSE;
+  // never required to submit. (Placeholder copy — pending legal review.)
+  const [nftConsent, setNftConsent] = useState(false)
   const fRef = useRef()
 
   useEffect(() => { setWallet(address || '') }, [address])
@@ -1599,7 +1602,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     const ok = await saveSubmission(pendingSubmit)
     if (ok) {
       setPendingSubmit(null)
-      setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
+      setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode(''); setNftConsent(false)
     }
     setSubmitting(false)
   }
@@ -1684,12 +1687,12 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
     // payload is preserved so the user can retry the save without paying again.
     setBalance(b => b - 5)
     const currentRoundId = await readContract(VOTING_ADDRESS, VOTING_ABI, 'currentRoundId').then(r => r != null ? Number(r) : 1).catch(() => 1)
-    const payload = { walletAddress: address, payoutWallet: address, displayName: name.trim(), linkTitle: lt.trim(), linkUrl: lu.trim(), imageUrl: prev, referralCode: clubCode.trim().toLowerCase() || null, roundId: currentRoundId, feeTxHash: feeTx, idDocPath: idPaths?.idDocPath, selfiePath: idPaths?.selfiePath }
+    const payload = { walletAddress: address, payoutWallet: address, displayName: name.trim(), linkTitle: lt.trim(), linkUrl: lu.trim(), imageUrl: prev, referralCode: clubCode.trim().toLowerCase() || null, roundId: currentRoundId, feeTxHash: feeTx, idDocPath: idPaths?.idDocPath, selfiePath: idPaths?.selfiePath, nftConsent }
 
     const ok = await saveSubmission(payload)
     if (ok) {
       setPendingSubmit(null)
-      setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode('')
+      setPrev(null); setName(''); setLt(''); setLu(''); setA1(false); setA2(false); setClubCode(''); setNftConsent(false)
       setIdFile(null); setIdPrev(null); setSelfieFile(null); setSelfiePrev(null)
       if (needId) setVerifyStatus('pending')
     } else {
@@ -1792,6 +1795,10 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         <label className="chk-row">
           <input type="checkbox" checked={a2} onChange={e => setA2(e.target.checked)} />
           <span className="chk-lbl">I confirm I am 18+ years of age, the Content is SFW compliant, I own all rights to this photo, and I <strong>accept sole responsibility</strong> for the accuracy of my wallet address.</span>
+        </label>
+        <label className="chk-row">
+          <input type="checkbox" checked={nftConsent} onChange={e => setNftConsent(e.target.checked)} />
+          <span className="chk-lbl"><span style={{ color:'var(--gold-dim)', fontWeight:600 }}>Optional.</span> I agree my submitted photo may be used in stylized commemorative NFTs awarded to round participants. <span style={{ color:'var(--muted)' }}>(You can leave this unchecked — it doesn’t affect your entry.)</span></span>
         </label>
         <div className="cost-note"><span>💳</span><span>Submission costs <strong>5 $TTS</strong> — signed on Base blockchain</span></div>
         <div className="support-note">📩 Rejection questions? Contact: <strong style={{ color:'var(--gold-dim)' }}>photos@temptationtoken.io</strong></div>
