@@ -77,16 +77,16 @@
       "destination": "/api/admin?action=crm-import"
     },
     {
+      "source": "/api/paymaster",
+      "destination": "/api/rpc?action=paymaster"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
     {
       "source": "/(.*)",
       "destination": "/index.html"
-    },
-    {
-      "source": "/api/paymaster",
-      "destination": "/api/rpc?action=paymaster"
     }
   ],
   "crons": [
