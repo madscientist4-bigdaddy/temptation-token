@@ -1523,7 +1523,10 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   const [lt, setLt] = useState('')
   const [lu, setLu] = useState('')
   const [wallet, setWallet] = useState(address || '')
-  const [clubCode, setClubCode] = useState('')
+  const [clubCode, setClubCode] = useState(() => {
+    // Prefilled when the performer arrived from a club's QR / link (?club=<code>).
+    try { return localStorage.getItem('tts_club') || '' } catch { return '' }
+  })
   const [a1, setA1] = useState(false)
   const [a2, setA2] = useState(false)
   // REQUIRED, explicit opt-in for likeness use in commemorative NFTs. Default FALSE;
@@ -2148,6 +2151,21 @@ export default function App() {
     try {
       const ref = new URLSearchParams(window.location.search).get('ref')
       if (ref && /^0x[0-9a-fA-F]{40}$/.test(ref)) localStorage.setItem('tts_ref', ref)
+    } catch {}
+  }, [])
+
+  // Persist an inbound CLUB code (?club=<code>) so it prefills the submit form.
+  //
+  // Deliberately a separate param from ?ref=. ?ref= is the user-referral system and is
+  // validated as a 40-hex wallet, so a club code passed there is silently discarded —
+  // which would make a printed club QR a dead link. Club codes are short slugs and route
+  // the club's 10% cut at settlement, so they get their own param.
+  useEffect(() => {
+    try {
+      const club = new URLSearchParams(window.location.search).get('club')
+      if (club && /^[a-z0-9_-]{2,32}$/i.test(club)) {
+        localStorage.setItem('tts_club', club.trim().toLowerCase())
+      }
     } catch {}
   }, [])
 

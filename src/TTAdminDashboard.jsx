@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { openClubOnePager } from './lib/clubKit.js'
 import { toFunctionSelector } from "viem";
 import { describeTxError } from "./lib/txError.js";
 import StakingAdmin from "./StakingAdmin.jsx";
@@ -689,6 +690,19 @@ const injectStyles = () => {
     ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
 
     /* RESPONSIVE */
+    /* Add-club form. Was an inline grid, which media queries cannot override — on a
+       phone the wallet field collapsed to ~80px and you could not check a pasted address.
+       Now a class so it can stack. */
+    .club-add-grid { display:grid; grid-template-columns:1fr 1fr 2fr auto; gap:10px; align-items:end; }
+    @media (max-width: 900px) {
+      .club-add-grid { grid-template-columns:1fr 1fr; }
+      .club-add-grid > :nth-child(3), .club-add-grid > :nth-child(4) { grid-column:1 / -1; }
+    }
+    @media (max-width: 560px) {
+      .club-add-grid { grid-template-columns:1fr; }
+      .club-add-grid > * { grid-column:1 / -1; }
+      .club-add-grid button { width:100%; }
+    }
     @media (max-width: 768px) {
       :root { --sidebar-w: 0px; }
       .sidebar { transform: translateX(-220px); }
@@ -2510,6 +2524,9 @@ function ReferralScreen({ showToast }) {
       const d = await r.json()
       if (d.ok) {
         showToast(`Club ${newClub.clubCode} registered · tx: ${d.txHash?.slice(0,12)}…`,'success')
+        // Hand the operator the printable kit straight away — registering a club and then
+        // hunting for its row to get the QR is the annoying version of this flow.
+        openKit({ club_name: newClub.clubName, club_code: newClub.clubCode.trim().toLowerCase(), wallet_address: newClub.walletAddress })
         setNewClub({ clubName:'', clubCode:'', walletAddress:'' })
         loadClubs()
       } else {
@@ -2517,6 +2534,18 @@ function ReferralScreen({ showToast }) {
       }
     } catch(e) { showToast('Request failed','error') }
     setAddingClub(false)
+  }
+
+  // Print-ready one-pager for a club: QR (?club=<code>), their code, and a plain-English
+  // pitch. Generated in the browser so it needs no extra serverless function (we are at
+  // the Hobby 12-function ceiling).
+  const openKit = async (c) => {
+    try {
+      const ok = await openClubOnePager({
+        clubName: c.club_name, clubCode: c.club_code, walletAddress: c.wallet_address,
+      })
+      if (!ok) showToast('Allow pop-ups for this site to open the club kit','error')
+    } catch (e) { showToast(`Could not build kit: ${e.message}`,'error') }
   }
 
   const removeClub = async (code) => {
@@ -2638,7 +2667,7 @@ function ReferralScreen({ showToast }) {
         {/* Add Club Form */}
         <div className="stat-card" style={{marginBottom:16}}>
           <div style={{fontSize:".75rem",fontWeight:700,color:"var(--gold)",marginBottom:14,textTransform:"uppercase",letterSpacing:".08em"}}>Add Club Partner</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr auto",gap:10,alignItems:"end"}}>
+          <div className="club-add-grid">
             <div>
               <div style={{fontSize:".62rem",color:"var(--muted)",marginBottom:5,textTransform:"uppercase",letterSpacing:".08em"}}>Club Name</div>
               <input
@@ -2690,7 +2719,10 @@ function ReferralScreen({ showToast }) {
                         {c.active ? '● Active' : '○ Inactive'}
                       </span>
                     </td>
-                    <td>
+                    <td style={{whiteSpace:"nowrap"}}>
+                      <button onClick={()=>openKit(c)} style={{background:"rgba(212,175,55,.1)",border:"1px solid var(--border-gold)",borderRadius:4,color:"var(--gold)",padding:"4px 10px",fontSize:".68rem",cursor:"pointer",marginRight:6}}>
+                        Club Kit
+                      </button>
                       <button onClick={()=>removeClub(c.club_code)} disabled={!!removingClub} style={{background:"rgba(232,64,90,.1)",border:"1px solid rgba(232,64,90,.3)",borderRadius:4,color:"var(--rose)",padding:"4px 10px",fontSize:".68rem",cursor: removingClub ? "not-allowed" : "pointer", opacity: removingClub ? 0.5 : 1}}>
                         {removingClub === c.club_code ? 'Removing…' : 'Remove'}
                       </button>
