@@ -2281,11 +2281,14 @@ function PayoutsScreen({ showToast }) {
 
 const STAKING_ADDRESS = '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d';
 const STAKING_TIERS = [
-  { name: 'Bronze',  minUSD: 50,   apr: '8%',  boost: '1.1x' },
-  { name: 'Silver',  minUSD: 100,  apr: '12%', boost: '1.25x' },
-  { name: 'Gold',    minUSD: 250,  apr: '18%', boost: '1.5x' },
-  { name: 'Diamond', minUSD: 1000, apr: '32%', boost: '2x' },
-  { name: 'VIP',     minUSD: 5000, apr: '45%', boost: '3x' },
+  // On-chain thresholds are FIXED TTS amounts, not USD. minTTS mirrors
+  // tierThreshold* on 0x7848cceE…; the USD column is only the design intent they
+  // were derived from ($0.008333/TTS) and drifts with price — never treat it as the rule.
+  { name: 'Bronze',  minTTS: 6000,   designUSD: 50,   apr: '8%',  boost: '1.1x' },
+  { name: 'Silver',  minTTS: 12000,  designUSD: 100,  apr: '12%', boost: '1.25x' },
+  { name: 'Gold',    minTTS: 30000,  designUSD: 250,  apr: '18%', boost: '1.5x' },
+  { name: 'Diamond', minTTS: 120000, designUSD: 1000, apr: '32%', boost: '2x' },
+  { name: 'VIP',     minTTS: 600000, designUSD: 5000, apr: '45%', boost: '3x' },
 ];
 
 function StakingScreen() {
@@ -2356,7 +2359,7 @@ function StakingScreen() {
             {STAKING_TIERS.map(t => (
               <tr key={t.name}>
                 <td><span className="badge" style={{background:'rgba(212,175,55,0.1)',color:'var(--gold)',border:'1px solid rgba(212,175,55,0.25)'}}>{t.name}</span></td>
-                <td style={{fontFamily:'var(--font-display)',color:'var(--gold-light)'}}>${t.minUSD.toLocaleString()}+</td>
+                <td style={{fontFamily:'var(--font-display)',color:'var(--gold-light)'}}>{t.minTTS.toLocaleString()} TTS<span style={{color:'var(--muted)',fontSize:'.6rem'}}> (~${t.designUSD.toLocaleString()} at design price)</span></td>
                 <td style={{color:'var(--green)',fontWeight:700}}>{t.apr}</td>
                 <td style={{color:'var(--rose)',fontWeight:700}}>{t.boost}</td>
               </tr>
