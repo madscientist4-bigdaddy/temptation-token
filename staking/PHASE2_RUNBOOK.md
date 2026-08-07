@@ -132,6 +132,49 @@ HOLD Phase 4 (X/Telegram APR announcement) until owner says "announce".
 9. Update web + bot + chatbot copy from "coming soon" → live tiers/APRs.
 10. Commit + push.
 
+## PHASE 3.5 — DEFAULT_ADMIN handoff (closes the timelock bypass) — ARMED
+
+Runs AFTER Phase 2 migration + Phase 3 E2E are complete and verified.
+Script: `outputs/staking_admin_handoff.mjs` (dry-run default; `--execute` to send).
+
+**Confirmed: no Phase-2 or Phase-3 step needs Bank's `DEFAULT_ADMIN_ROLE` on the new
+staking proxy.** Every step is authorized by something else:
+
+| Step | Authority actually used | Needs staking DEFAULT_ADMIN? |
+|---|---|---|
+| 1 gate `setTaxExempt` | Safe 2/2 on the TTS token | no |
+| 2a `oldProxy.upgradeTo(Rescue)` | UPGRADER on the **OLD** proxy (separate contract) | no |
+| 2c/6 `rescue(...)` | `RescueUUPS.onlyBank` — hardcoded Bank constant | no |
+| 3 fund staking | plain `TTS.transfer` / `fundRewards()` (permissionless) | no |
+| 4 `V3d.setStakingContract` | V3d `admin` = Bank | no |
+| 5 stake/unstake/claim E2E | public functions | no |
+| 7–10 flip flag, build, deploy | code only | no |
+
+The only staking-proxy roles ever exercised are `MANAGER_ROLE` (thresholds/APR/pause —
+Bank keeps it) and `UPGRADER_ROLE` (Timelock only). So handing off DEFAULT_ADMIN cannot
+strand any remaining step.
+
+**Order is load-bearing** — `DEFAULT_ADMIN_ROLE` is its own role admin in OZ
+AccessControl, so renouncing with no other holder orphans role administration forever:
+
+1. `grantRole(DEFAULT_ADMIN_ROLE, Safe 0xeFb59d88…)` from Bank → **read back on-chain**
+2. only if confirmed: `renounceRole(DEFAULT_ADMIN_ROLE, Bank)` from Bank
+3. verify `hasRole(DEFAULT_ADMIN, Bank)==false`, `(Safe)==true`,
+   `hasRole(UPGRADER, Timelock)==true`, `(Bank)==false`
+
+Preconditions the script hard-aborts on: old proxy balance ≠ 0, staking < 9B, V3d not
+wired to the new proxy, staking paused, Timelock missing UPGRADER, Bank holding UPGRADER.
+Both txs are simulated before either is sent.
+
+Result: upgrades require Safe 2/2 → Timelock propose → 2-day delay → execute. Bank keeps
+`MANAGER_ROLE` (thresholds/APRs/pause/`recoverRewardTokens`, which is bounded by
+`rewardSurplus()` so staker principal stays untouchable) but gains no upgrade path.
+
+⚠️ Residual, not addressed here: the Safe is proposer AND executor on the Timelock, so a
+Safe 2/2 can still self-grant UPGRADER and skip the delay. Assigning DEFAULT_ADMIN to the
+**Timelock** instead of the Safe would close that too; Jim chose the Safe. Raises the bar
+from one hot EOA key to a 2/2 multisig either way.
+
 ## PHASE 4 — HOLD
 Do NOT post to X/Telegram. Report "ready to announce" with the drafted copy and wait for
 the explicit word "announce".
