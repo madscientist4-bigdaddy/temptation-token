@@ -112,22 +112,56 @@ ok('renounceRole(DEFAULT_ADMIN, Bank) simulates clean')
 
 if (!EXECUTE) { console.log('\nDRY RUN — all preconditions green. Re-run with --execute to send.\n'); process.exit(0) }
 
+let renBlock = 0n
 const send = async (label, request) => {
   const hash = await wallet.writeContract(request)
   console.log(`  ${label} → ${hash}`)
   const r = await pub.waitForTransactionReceipt({ hash })
   if (r.status !== 'success') die(`${label} REVERTED (${hash})`)
   ok(`${label} mined in block ${r.blockNumber}`)
+  renBlock = r.blockNumber
+  return r
 }
 
 console.log('\n── EXECUTE ────────────────────────────────────────────────────')
 
 // STEP 1 — grant to Safe, then READ BACK before touching the renounce.
+//
+// The readback is polled, not single-shot. Alchemy load-balances across nodes at
+// different heights, so a read issued right after the receipt can land on a node that
+// has not yet applied the block and return a FALSE negative. That happened on the first
+// real run: the grant was mined (RoleGranted in block 49671451) but the immediate read
+// said false and the script aborted. Aborting was correct — but the fix is to confirm
+// against a node that has actually reached the mining block, not to trust one read.
+//
+// This stays fail-closed: if the grant is never observed true, we still refuse.
+const confirmGrant = async (blockNumber) => {
+  for (let i = 0; i < 12; i++) {
+    try {
+      const head = await pub.getBlockNumber()
+      if (head >= blockNumber) {
+        const v = await pub.readContract({
+          address: STAKING, abi: ABI, functionName:'hasRole',
+          args:[DEFAULT_ADMIN_ROLE, SAFE], blockNumber,   // pin to the mining block
+        })
+        if (v) return true
+      }
+    } catch { /* transient RPC error — retry */ }
+    await new Promise(r => setTimeout(r, 2500))
+  }
+  return false
+}
+
 if (grantReq) {
-  await send('grantRole(DEFAULT_ADMIN, Safe)', grantReq)
-  const confirmed = await pub.readContract({ address: STAKING, abi: ABI, functionName:'hasRole', args:[DEFAULT_ADMIN_ROLE, SAFE] })
-  if (!confirmed) die('grant did not take effect on-chain — REFUSING to renounce (would orphan the role)')
-  ok('Safe confirmed as DEFAULT_ADMIN on-chain')
+  const gHash = await wallet.writeContract(grantReq)
+  console.log(`  grantRole(DEFAULT_ADMIN, Safe) → ${gHash}`)
+  const gr = await pub.waitForTransactionReceipt({ hash: gHash })
+  if (gr.status !== 'success') die(`grantRole REVERTED (${gHash})`)
+  ok(`grantRole mined in block ${gr.blockNumber}`)
+  if (!(await confirmGrant(gr.blockNumber))) {
+    die('grant not observable on-chain after polling — REFUSING to renounce (would orphan the role)')
+  }
+  ok('Safe confirmed as DEFAULT_ADMIN on-chain (pinned to the mining block)')
 }
 
 // STEP 2 — only now is it safe for Bank to drop its own admin.
@@ -135,10 +169,21 @@ const { request: renReq } = await pub.simulateContract({ account, address: STAKI
 await send('renounceRole(DEFAULT_ADMIN, Bank)', renReq)
 
 console.log('\n── VERIFY ─────────────────────────────────────────────────────')
-const fBank = await pub.readContract({ address: STAKING, abi: ABI, functionName:'hasRole', args:[DEFAULT_ADMIN_ROLE, BANK] })
-const fSafe = await pub.readContract({ address: STAKING, abi: ABI, functionName:'hasRole', args:[DEFAULT_ADMIN_ROLE, SAFE] })
-const fUpTl = await pub.readContract({ address: STAKING, abi: ABI, functionName:'hasRole', args:[UPGRADER_ROLE, TIMELOCK] })
-const fUpBk = await pub.readContract({ address: STAKING, abi: ABI, functionName:'hasRole', args:[UPGRADER_ROLE, BANK] })
+// Pin every post-state read to the renounce block. Reading "latest" against a
+// load-balanced RPC can hit a node that has not applied it yet and report the PRE-state,
+// which reads as a terrifying "post-state mismatch" on a perfectly good handoff.
+const at = renBlock
+const roleAt = (role, who) => pub.readContract({
+  address: STAKING, abi: ABI, functionName:'hasRole', args:[role, who], blockNumber: at,
+})
+for (let i = 0; i < 12; i++) {
+  if ((await pub.getBlockNumber()) >= at) break
+  await new Promise(r => setTimeout(r, 2500))
+}
+const fBank = await roleAt(DEFAULT_ADMIN_ROLE, BANK)
+const fSafe = await roleAt(DEFAULT_ADMIN_ROLE, SAFE)
+const fUpTl = await roleAt(UPGRADER_ROLE, TIMELOCK)
+const fUpBk = await roleAt(UPGRADER_ROLE, BANK)
 console.log(`  DEFAULT_ADMIN: Bank=${fBank} Safe=${fSafe}`)
 console.log(`  UPGRADER:      Bank=${fUpBk} Timelock=${fUpTl}`)
 if (fBank || !fSafe || !fUpTl || fUpBk) die('post-state mismatch — investigate immediately')
