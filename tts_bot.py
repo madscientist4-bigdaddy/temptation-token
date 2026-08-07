@@ -88,6 +88,11 @@ SIGNUP_BONUS       = 500   # active — paid by /api/signup-bonus on wallet conn
 # flipping this is an env change + restart, never a code edit.
 STAKING_LIVE = os.environ.get("STAKING_LIVE", "false").strip().lower() == "true"
 
+# Separate from STAKING_LIVE on purpose. STAKING_LIVE only changes how the bot ANSWERS a
+# user who asks. STAKING_ANNOUNCE is what lets the bot BROADCAST the launch to the channel
+# via DAILY_POSTS — that is the announcement, and it stays false until Jim says "announce".
+STAKING_ANNOUNCE = os.environ.get("STAKING_ANNOUNCE", "false").strip().lower() == "true"
+
 DB_PATH = os.environ.get("DB_PATH", "/tmp/tts.db")
 
 def init_db():
@@ -311,9 +316,15 @@ def on_payment(cid, uid, payload):
 
 DAILY_POSTS = [
     "🏆 *Weekly voting is LIVE!* Top voter wins 35% of the prize pool.\n\nVote now 👉 t.me/TTSGameBot",
-    ("💰 *$TTS staking is LIVE* — earn up to 45% APR and up to 3× vote weight. Principal withdrawable anytime.\n\nStake now 👉 t.me/TTSGameBot"
-     if STAKING_LIVE else
-     "💰 $TTS staking is coming soon — tiers & rewards announced at launch.\n\nStay tuned 👉 t.me/TTSGameBot"),
+    # Broadcast copy is gated SEPARATELY from STAKING_LIVE. Flipping STAKING_LIVE makes the
+    # bot answer honestly when a user asks; it must NOT push an unsolicited launch post to
+    # the channel — that is the announcement, and it waits for STAKING_ANNOUNCE=true.
+    # While staking is live but unannounced we simply omit the staking post rather than
+    # keep broadcasting "coming soon", which would be false.
+    *([ "💰 *$TTS staking is LIVE* — earn up to 45% APR and up to 3× vote weight. Principal withdrawable anytime.\n\nStake now 👉 t.me/TTSGameBot" ]
+      if STAKING_ANNOUNCE else
+      ([] if STAKING_LIVE else
+       [ "💰 $TTS staking is coming soon — tiers & rewards announced at launch.\n\nStay tuned 👉 t.me/TTSGameBot" ])),
     "🔗 Refer a friend and grow the game — referral rewards coming soon.\n\nGet your link 👉 t.me/TTSGameBot",
     "🔥 $TTS is deflationary — every losing vote gets BURNED forever.\n\nBuy $TTS 👉 t.me/TTSGameBot",
     "⭐ VIP Vault is open — exclusive Telegram community access & early content previews.\n\nJoin 👉 t.me/TTSGameBot",
