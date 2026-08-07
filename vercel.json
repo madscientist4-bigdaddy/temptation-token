@@ -1,35 +1,126 @@
 {
   "rewrites": [
-    { "source": "/api/kyc-session",     "destination": "/api/kyc?action=session" },
-    { "source": "/api/kyc-webhook",     "destination": "/api/kyc?action=webhook" },
-    { "source": "/api/kyc-status",      "destination": "/api/kyc?action=status" },
-    { "source": "/api/age-acknowledge", "destination": "/api/kyc?action=age" },
-    { "source": "/api/bot-health",      "destination": "/api/community-stats?action=heartbeat" },
-    { "source": "/api/notify",          "destination": "/api/social-post?action=notify" },
-    { "source": "/api/admin-auth",      "destination": "/api/admin?action=auth" },
-    { "source": "/api/admin-data",      "destination": "/api/admin?action=data" },
-    { "source": "/api/public-profiles", "destination": "/api/profiles?action=list" },
-    { "source": "/api/submit-profile",  "destination": "/api/profiles?action=submit" },
-    { "source": "/api/signup-bonus",    "destination": "/api/bonus?action=signup" },
-    { "source": "/api/vote-match",      "destination": "/api/bonus?action=vote-match" },
-    { "source": "/api/referral-credit", "destination": "/api/bonus?action=referral" },
-    { "source": "/api/nft/(.*)",         "destination": "/api/profiles?action=nft-metadata&id=$1" },
-    { "source": "/api/nft-metadata",     "destination": "/api/profiles?action=nft-metadata" },
-    { "source": "/api/nft-collection",   "destination": "/api/profiles?action=nft-collection" },
-    { "source": "/api/cron/dispatch",   "destination": "/api/scheduler?action=dispatch" },
-    { "source": "/api/og/card",         "destination": "/api/social-post?action=og-card" },
-    { "source": "/api/crm/import",       "destination": "/api/admin?action=crm-import" },
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/kyc-session",
+      "destination": "/api/kyc?action=session"
+    },
+    {
+      "source": "/api/kyc-webhook",
+      "destination": "/api/kyc?action=webhook"
+    },
+    {
+      "source": "/api/kyc-status",
+      "destination": "/api/kyc?action=status"
+    },
+    {
+      "source": "/api/age-acknowledge",
+      "destination": "/api/kyc?action=age"
+    },
+    {
+      "source": "/api/bot-health",
+      "destination": "/api/community-stats?action=heartbeat"
+    },
+    {
+      "source": "/api/notify",
+      "destination": "/api/social-post?action=notify"
+    },
+    {
+      "source": "/api/admin-auth",
+      "destination": "/api/admin?action=auth"
+    },
+    {
+      "source": "/api/admin-data",
+      "destination": "/api/admin?action=data"
+    },
+    {
+      "source": "/api/public-profiles",
+      "destination": "/api/profiles?action=list"
+    },
+    {
+      "source": "/api/submit-profile",
+      "destination": "/api/profiles?action=submit"
+    },
+    {
+      "source": "/api/signup-bonus",
+      "destination": "/api/bonus?action=signup"
+    },
+    {
+      "source": "/api/vote-match",
+      "destination": "/api/bonus?action=vote-match"
+    },
+    {
+      "source": "/api/referral-credit",
+      "destination": "/api/bonus?action=referral"
+    },
+    {
+      "source": "/api/nft/(.*)",
+      "destination": "/api/profiles?action=nft-metadata&id=$1"
+    },
+    {
+      "source": "/api/nft-metadata",
+      "destination": "/api/profiles?action=nft-metadata"
+    },
+    {
+      "source": "/api/nft-collection",
+      "destination": "/api/profiles?action=nft-collection"
+    },
+    {
+      "source": "/api/cron/dispatch",
+      "destination": "/api/scheduler?action=dispatch"
+    },
+    {
+      "source": "/api/og/card",
+      "destination": "/api/social-post?action=og-card"
+    },
+    {
+      "source": "/api/crm/import",
+      "destination": "/api/admin?action=crm-import"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/api/paymaster",
+      "destination": "/api/rpc?action=paymaster"
+    }
   ],
   "crons": [
-    { "path": "/api/scheduler",         "schedule": "0 0 * * *" },
-    { "path": "/api/scheduler",         "schedule": "0 12 * * *" },
-    { "path": "/api/scheduler",         "schedule": "0 13 * * *" },
-    { "path": "/api/scheduler",         "schedule": "0 15 * * *" },
-    { "path": "/api/scheduler",         "schedule": "0 17 * * *" },
-    { "path": "/api/scheduler",         "schedule": "0 18 * * *" },
-    { "path": "/api/scheduler",         "schedule": "0 19 * * *" },
-    { "path": "/api/content-generator", "schedule": "0 8 * * 1" }
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/scheduler",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/content-generator",
+      "schedule": "0 8 * * 1"
+    }
   ]
 }

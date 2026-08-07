@@ -3,6 +3,8 @@ import { base } from 'wagmi/chains'
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { QueryClient } from '@tanstack/react-query'
+import { coinbaseWallet } from 'wagmi/connectors'
+import { GASLESS_ENABLED } from './gasless.js'
 
 // Public WalletConnect/Reown client id — env-driven (rotatable without a code change).
 // Falls back to the known public id so a missing env var never breaks the build.
@@ -18,10 +20,26 @@ const metadata = {
 
 const networks = [base]
 
+// Coinbase Smart Wallet — passkey (Face ID / Touch ID) or email onboarding that creates
+// an ERC-4337 smart account. Paired with the paymaster this is what lets a brand-new user
+// sign up, submit and vote holding ZERO ETH.
+//
+// Added only when GASLESS_ENABLED so production connect options are unchanged while the
+// flag is off. `smartWalletOnly` keeps us off the legacy CBW extension path, which is an
+// EOA and cannot be sponsored.
+const gaslessConnectors = GASLESS_ENABLED
+  ? [coinbaseWallet({
+      appName: 'Temptation Token',
+      appLogoUrl: metadata.icons[0],
+      preference: 'smartWalletOnly',
+    })]
+  : []
+
 export const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
-  ssr: false
+  ssr: false,
+  connectors: gaslessConnectors,
 })
 
 export const wagmiConfig = wagmiAdapter.wagmiConfig

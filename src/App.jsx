@@ -57,6 +57,7 @@ import TTSChatbot from './TTSChatbot.jsx'
 import StakePanel from './StakePanel.jsx'
 import { STAKING_ENABLED } from './config/staking.js'
 import { describeTxError } from './lib/txError.js'
+import { useSendMaybeSponsored, useSponsorshipAvailable, waitForCallsTxHash } from './lib/gasless.js'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
 import { createPublicClient, http, parseAbi } from 'viem'
@@ -798,6 +799,11 @@ let photoCache = null
 
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
 function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
+  // Gasless: when the connected wallet is a smart account and our paymaster grants it,
+  // approve+vote go out as ONE sponsored batch (one Face ID prompt, zero ETH). Falls back
+  // to the exact legacy path for EOAs, capped-out users, or a declining paymaster.
+  const sendMaybeSponsored = useSendMaybeSponsored()
+  const sponsorable = useSponsorshipAvailable()
   const [photos, setPhotos] = useState(() => photoCache || FALLBACK_PHOTOS)
   const [photosLoading, setPhotosLoading] = useState(false)
   const [roundEndTime, setRoundEndTime] = useState(null)
@@ -951,19 +957,41 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
 
       // Check current allowance
       const allowance = await readContract(TTS_ADDRESS, TTS_ABI, 'allowance', [address, VOTING_ADDRESS])
-      if (!allowance || BigInt(allowance.toString()) < amountWei) {
-        showToast('Approving $TTS... confirm in wallet', 's')
-        const approveTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, 2n ** 256n - 1n])
-        showToast('Waiting for approval...', 's')
-        await waitForReceipt(approveTx)
-        showToast('Approved! Casting vote...', 's')
-      } else {
-        showToast('Casting vote on-chain...', 's')
-      }
+      const needsApproval = !allowance || BigInt(allowance.toString()) < amountWei
 
-      // Cast the vote
-      const voteTx = await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
-      await waitForReceipt(voteTx)
+      let voteTx
+      if (sponsorable) {
+        // One batch, one prompt, gas on us. Approval (when needed) and the vote land
+        // atomically, so a user can never end up approved-but-not-voted.
+        showToast(needsApproval ? 'Confirm to vote — gas is on us' : 'Casting vote — gas is on us', 's')
+        const calls = []
+        if (needsApproval) {
+          calls.push({ to: TTS_ADDRESS, abi: parseAbi(TTS_ABI), functionName: 'approve', args: [VOTING_ADDRESS, 2n ** 256n - 1n] })
+        }
+        calls.push({ to: VOTING_ADDRESS, abi: parseAbi(VOTING_ABI), functionName: 'vote', args: [photo.profileId, amountWei] })
+        const r = await sendMaybeSponsored(calls)
+        voteTx = r.hash
+        if (r.id && !voteTx) {
+          // Sponsored batch: resolve the batch id to a real tx hash for the receipt +
+          // the server-side vote/bonus records, which key off a tx hash.
+          voteTx = await waitForCallsTxHash(r.id)
+        }
+        if (voteTx) await waitForReceipt(voteTx)
+      } else {
+        if (needsApproval) {
+          showToast('Approving $TTS... confirm in wallet', 's')
+          const approveTx = await writeContract(walletClient, TTS_ADDRESS, TTS_ABI, 'approve', [VOTING_ADDRESS, 2n ** 256n - 1n])
+          showToast('Waiting for approval...', 's')
+          await waitForReceipt(approveTx)
+          showToast('Approved! Casting vote...', 's')
+        } else {
+          showToast('Casting vote on-chain...', 's')
+        }
+
+        // Cast the vote
+        voteTx = await writeContract(walletClient, VOTING_ADDRESS, VOTING_ABI, 'vote', [photo.profileId, amountWei])
+        await waitForReceipt(voteTx)
+      }
 
       // Record vote via server (service key) — non-blocking, enables dashboard metrics
       fetch('/api/profiles?action=vote', {
