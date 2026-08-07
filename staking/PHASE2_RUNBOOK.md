@@ -224,7 +224,7 @@ the entire migration.**
 on-chain APRs `800/1200/1800/3200/4500` bps = 8/12/18/32/45% — match design exactly.
 Residual dust: Bank has ~0.00377 TTS accrued-but-unclaimed from the E2E stake (harmless).
 
-## PHASE 3 — code READY, go-live is env-only (NOT yet flipped)
+## PHASE 3 — DONE 2026-08-07 (go-live executed)
 All copy is now gated so the code is safe to ship while staking still reads "Coming Soon":
 - Frontend/chatbot gate on `STAKING_ENABLED` (`VITE_STAKING_ENABLED` + `VITE_STAKING_ADDRESS`).
 - Bot gates on a new `STAKING_LIVE` env var (**default false**) — added because
@@ -249,3 +249,35 @@ Corrections shipped in the same pass (these were wrong regardless of go-live):
 
 ## PHASE 4 — STILL HELD
 No X/Telegram announcement. Awaiting the explicit word "announce".
+
+---
+
+## PHASE 3 — EXECUTED 2026-08-07 · STAKING IS LIVE
+
+- Vercel prod env set: `VITE_STAKING_ENABLED=true`, `VITE_STAKING_ADDRESS=0x7848cceE…`,
+  plus `CHAIN_ID=8453`, `RPC=https://mainnet.base.org`, `EXPLORER=https://basescan.org`,
+  `TTS=0x5570eA97…`. Deployed to `app.temptationtoken.io`.
+- Railway `STAKING_LIVE=true` on service `worker`; bot redeployed, heartbeat alive.
+
+### Deploy bug caught on the live bundle (fixed, worth remembering)
+The FIRST prod deploy shipped a staking UI pointed at **Base Sepolia**. `.env` is
+gitignored but is still uploaded to the Vercel builder, so every `VITE_STAKING_*` I had
+not explicitly set in Vercel silently inherited the Gate C/D **Sepolia** leftovers —
+`CHAIN_ID=84532`, a Sepolia RPC and explorer — combined with the *mainnet* staking
+address. Reads would have resolved against a chain where that contract does not exist.
+Fixed by setting the complete var set in Vercel and redeploying; the live bundle was then
+grepped to confirm the baked values. **Always verify the deployed bundle, not just the
+dashboard.**
+
+### Announcement gating (Phase 4 still held)
+`STAKING_LIVE` and `STAKING_ANNOUNCE` are deliberately separate. `STAKING_LIVE=true`
+only changes how the bot answers a user who asks. `STAKING_ANNOUNCE` (unset ⇒ false) is
+what allows the launch post into `DAILY_POSTS` → @temptationtoken. While live-but-
+unannounced the staking daily post is omitted entirely rather than repeating "coming
+soon", which would now be false. Flip `STAKING_ANNOUNCE=true` only on the word "announce".
+
+### Verified live state
+On-chain: pool 10,000,000,000.00 TTS · old proxy 0.00 · `isTaxExempt` true · `paused`
+false · V3d → `0x7848cc…` · thresholds 6k/12k/30k/120k/600k.
+Frontend bundle: `ENABLED=true`, `ADDRESS=0x7848cceE…`, `CHAIN_ID=8453`, no Sepolia, no
+dead-proxy references. Bot: alive, `STAKING_LIVE=true`, `STAKING_ANNOUNCE` unset.
