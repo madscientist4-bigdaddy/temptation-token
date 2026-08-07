@@ -2,7 +2,7 @@
 // ── CONTRACT ADDRESSES (Base Mainnet) ────────────────────────────────────────
 const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
-const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
+const STAKING_ADDRESS = '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d'
 const NFT_ADDRESS     = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2'
 const BASE_CHAIN_ID   = 8453
 
@@ -1911,7 +1911,9 @@ function HowToWinScreen() {
   const tips = [
     { t:"Vote Early, Vote Big", b:"Lock in a large vote early. Other players see the total — they will have to outspend you to take the top spot." },
     { t:"Watch the Leaderboard", b:"Check live standings constantly. If your profile is climbing fast, top up your vote to protect your position." },
-    { t:"Staking — Coming Soon", b:"Staking isn't live yet. When it launches, higher tiers will boost your vote weight — for now every vote counts the same, no staking required. Watch for the announcement." },
+    STAKING_ENABLED
+      ? { t:"Stake to Boost Your Votes", b:"Staking $TTS earns APR and multiplies your vote weight: Bronze 6,000 (1.1×), Silver 12,000 (1.25×), Gold 30,000 (1.5×), Diamond 120,000 (2×), VIP 600,000 (3×). The boost activates 7 days after you stake, and your principal is withdrawable anytime." }
+      : { t:"Staking — Coming Soon", b:"Staking isn't live yet. When it launches, higher tiers will boost your vote weight — for now every vote counts the same, no staking required. Watch for the announcement." },
     { t:"Focus Your TTS", b:"Only the winning profile pays out. TTS you put on losing profiles is burned. Pick one and go all in." },
   ]
   return (
@@ -1986,7 +1988,9 @@ function RulesScreen() {
     { t:'Voting', b:'Minimum 5 $TTS per vote with no upper limit. You may add more votes at any time during the week but may never remove votes once placed. You may vote on multiple profiles.' },
     { t:'Photo Submissions', b:'Up to 3 submissions per wallet per week. All photos must be SFW — clothed, no nudity, no explicit content. Costs 5 $TTS per submission. Accepted: JPEG, PNG. Photos become property of Blockchain Entertainment LLC upon submission.' },
     { t:'Prize Distribution', b:'Top Voter: 35% of winning pool.\nWinning Profile: 35% of pool.\nBlockchain Entertainment LLC: 20%.\nPolaris Project (501c3): 10%.\nLosing votes are burned permanently.' },
-    { t:'Staking', b:'Staking is coming soon — it is not active yet, so today every vote counts the same regardless of holdings. At launch, staking $TTS will earn APR rewards and a vote-weight boost by tier, with principal withdrawable anytime.' },
+    STAKING_ENABLED
+      ? { t:'Staking', b:'Staking $TTS earns APR rewards and boosts your vote weight by tier: Bronze 6,000 TTS (8% APR, 1.1×), Silver 12,000 (12%, 1.25×), Gold 30,000 (18%, 1.5×), Diamond 120,000 (32%, 2×), VIP 600,000 (45%, 3×). The vote multiplier activates 7 days after staking; any increase to your stake restarts that 7-day clock. Principal is withdrawable at any time with no lock-up, and accrued rewards stay claimable.' }
+      : { t:'Staking', b:'Staking is coming soon — it is not active yet, so today every vote counts the same regardless of holdings. At launch, staking $TTS will earn APR rewards and a vote-weight boost by tier, with principal withdrawable anytime.' },
     { t:'Fairness & Privacy', b:'Voting is provably fair via Chainlink VRF on Base blockchain. Only your chosen username appears publicly. Blockchain Entertainment LLC reserves the right to disqualify any submission for policy violations without prior notice.' },
   ]
   return (

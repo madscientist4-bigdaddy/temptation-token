@@ -1988,7 +1988,7 @@ const WALLETS_CONFIG = [
   { label: "Marketing / Bonus", name: "Marketing & Bonus Wallet", addr: MARKETING_WALLET, role: "Signup bonus + vote-match TTS payouts" },
   { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
   { label: "Voting Contract", name: "TTSVotingV3d — Escrow", addr: '0x783b8cd80b586b723188c93ef94ee1beede617b4', role: "Holds votes during active round" },
-  { label: "Staking Contract", name: "TTSStaking", addr: '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc', role: "Staked TTS lockup + APR distribution" },
+  { label: "Staking Contract", name: "TTSStaking", addr: '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d', role: "Staked TTS + APR rewards (no lock-up; principal withdrawable anytime)" },
   { label: "NFT Contract", name: "TTSRoundNFT", addr: '0x0768e862D3AB14d85213BfeF8f1D012E77721da2', role: "Round winner NFT trophies (minting Round 2+)" },
   { label: "Keeper / Automation", name: "TTSKeeper3", addr: '0x363ce4960e3b459f5892587a37ae1ff2ed04442c', role: "Chainlink automation (V3d): calendar-pinned start, snapshot, settle, rollover" },
   { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
@@ -2279,7 +2279,7 @@ function PayoutsScreen({ showToast }) {
   );
 }
 
-const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc';
+const STAKING_ADDRESS = '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d';
 const STAKING_TIERS = [
   { name: 'Bronze',  minUSD: 50,   apr: '8%',  boost: '1.1x' },
   { name: 'Silver',  minUSD: 100,  apr: '12%', boost: '1.25x' },
@@ -4706,12 +4706,12 @@ const OPS_MANUAL = [
   {
     title: 'Staking Reference', emoji: '💎',
     steps: [
-      'Canonical tiers (locked April 29 2026): Bronze $50+ 8% APR 1.1x | Silver $100+ 12% 1.25x | Gold $250+ 18% 1.5x | Diamond $1000+ 32% 2x | VIP $5000+ 45% 3x',
-      'TTS equivalent = USD threshold ÷ current Uniswap price — shown live in app',
-      'Tier multipliers are hardcoded in staking contract — changing tiers requires redeployment',
-      'Staking contract: 0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc (BaseScan)',
-      'APR is paid from protocol revenue; obligations scale with total staked — monitor in KPI dashboard',
-      'To update tiers: redeploy staking contract → update STAKING_ADDRESS in App.jsx + TTAdminDashboard.jsx → update CLAUDE.md',
+      'Live on-chain thresholds (TTS, not USD): Bronze 6,000 8% APR 1.1x | Silver 12,000 12% 1.25x | Gold 30,000 18% 1.5x | Diamond 120,000 32% 2x | VIP 600,000 45% 3x',
+      'Thresholds encode the original $50/$100/$250/$1,000/$5,000 design at $0.008333/TTS. They are fixed TTS amounts on-chain — they do NOT track price automatically',
+      'Thresholds and APRs are ADJUSTABLE without redeployment: setTierThresholds / setAprBps, callable by MANAGER_ROLE (Bank). Guarded by strict-ascending order + a max 4x change per edit',
+      'NO lock-up: unstake() returns principal at any time; emergencyWithdraw() works even while paused. The only clock is the 7-day vote-multiplier eligibility, which restarts on any stake increase',
+      'Staking contract: 0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d (BaseScan)',
+      'Reward pool: 10B TTS held by the staking contract itself (migrated 2026-08-07). claim() pays strictly from rewardSurplus = balance - totalStaked, so principal can never be paid out as rewards',
     ]
   },
   {

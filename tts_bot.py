@@ -81,6 +81,13 @@ VIP_TIERS = {
 REF_REFERRER_BONUS = 100  # inactive
 REF_NEW_USER_BONUS = 10   # inactive
 SIGNUP_BONUS       = 500   # active — paid by /api/signup-bonus on wallet connect
+
+# Staking go-live gate. The contract is deployed and funded on Base mainnet, but the
+# bot keeps saying "coming soon" until STAKING_LIVE=true is set in the Railway env.
+# Mirrors the frontend's VITE_STAKING_ENABLED so copy can never get ahead of launch —
+# flipping this is an env change + restart, never a code edit.
+STAKING_LIVE = os.environ.get("STAKING_LIVE", "false").strip().lower() == "true"
+
 DB_PATH = os.environ.get("DB_PATH", "/tmp/tts.db")
 
 def init_db():
@@ -195,7 +202,8 @@ def on_start(cid, uid, name, uname, args):
         "🗳 Vote $TTS on profiles\n"
         "🏆 Top voter wins 35% of weekly pot\n"
         "🔥 Losing votes burned\n"
-        "💎 Staking coming soon\n\n"
+        + ("💎 Stake $TTS — up to 45% APR + 3× vote weight\n\n" if STAKING_LIVE
+           else "💎 Staking coming soon\n\n") +
         f"*Your signup bonus:* {SIGNUP_BONUS} $TTS 🎁",
         main_kb())
     try:
@@ -219,8 +227,13 @@ def on_callback(cid, mid, cbid, data, uid, name):
         edit(cid, mid,
             "💰 *Ways to Earn $TTS*\n\n"
             "*Vote & Win:* Put the most TTS on the winning profile → earn 35% of the prize pool (top voter prize)\n\n"
-            "*Stake Your TTS:* Coming soon — staking isn't active yet "
-            "(tiers, APR, and vote multipliers will be announced at launch)\n\n"
+            + ("*Stake Your TTS:* Earn APR and multiply your vote weight — Bronze 6,000 TTS "
+               "(8% APR, 1.1×), Silver 12,000 (12%, 1.25×), Gold 30,000 (18%, 1.5×), "
+               "Diamond 120,000 (32%, 2×), VIP 600,000 (45%, 3×). Boost activates 7 days "
+               "after staking; principal withdrawable anytime\n\n"
+               if STAKING_LIVE else
+               "*Stake Your TTS:* Coming soon — staking isn't active yet "
+               "(tiers, APR, and vote multipliers will be announced at launch)\n\n") +
             "*Refer Friends:* Coming soon — referral rewards aren't active yet",
             {"inline_keyboard":[[{"text":"🎮 Play Now","web_app":{"url":APP}}],
                                  [{"text":"⬅️ Back","callback_data":"back"}]]})
@@ -298,7 +311,9 @@ def on_payment(cid, uid, payload):
 
 DAILY_POSTS = [
     "🏆 *Weekly voting is LIVE!* Top voter wins 35% of the prize pool.\n\nVote now 👉 t.me/TTSGameBot",
-    "💰 $TTS staking is coming soon — tiers & rewards announced at launch.\n\nStay tuned 👉 t.me/TTSGameBot",
+    ("💰 *$TTS staking is LIVE* — earn up to 45% APR and up to 3× vote weight. Principal withdrawable anytime.\n\nStake now 👉 t.me/TTSGameBot"
+     if STAKING_LIVE else
+     "💰 $TTS staking is coming soon — tiers & rewards announced at launch.\n\nStay tuned 👉 t.me/TTSGameBot"),
     "🔗 Refer a friend and grow the game — referral rewards coming soon.\n\nGet your link 👉 t.me/TTSGameBot",
     "🔥 $TTS is deflationary — every losing vote gets BURNED forever.\n\nBuy $TTS 👉 t.me/TTSGameBot",
     "⭐ VIP Vault is open — exclusive Telegram community access & early content previews.\n\nJoin 👉 t.me/TTSGameBot",

@@ -92,7 +92,7 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 | Club referral codes | ✅ LIVE | user enters club code on submit → auto-linked on-chain at admin approval. Club registration is admin-only |
 | NFT auto-mint | 🟢 WIRED (unexercised) | V3d mints 3 NFTs on settlement (winner / top voter / house). Minter now = V3d (fixed 2026-06-28). `totalSupply()=0` — never minted yet (needs a round settling with ≥1 vote) |
 | Telegram bot | ✅ LIVE + honest | running on Railway; staking/referral/VIP copy says "coming soon" — no undeliverable promises |
-| **Staking** | 🔴 NOT-BUILT | No frontend stake/unstake/claim path — only a "Coming Soon" placeholder + cosmetic tier table. Deployed proxy `0xaA12B889…` is mis-initialized (`ttsToken=address(0)`); `getStakingTier()` reverts → voting falls back to **1x for everyone**. `contracts/TTSStakingV2.sol` is the compiled-but-undeployed fix |
+| **Staking** | 🟢 ON-CHAIN LIVE / UI gated | Contracts deployed+verified on Base; **10B reward pool migrated 2026-08-07** into proxy `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` (old `0xaA12B889…` drained to 0, impl now RescueUUPS). V3d wired to it; mainnet E2E stake/unstake proven tax-free. Thresholds (TTS): 6k/12k/30k/120k/600k · APR 8/12/18/32/45% · **no lock-up** · 7-day multiplier clock. Frontend/bot still show "Coming Soon" — go-live is env-only (`VITE_STAKING_ENABLED` + `STAKING_LIVE`). See `staking/PHASE2_RUNBOOK.md` |
 | **User referral payouts** | ✅ LIVE (E2E-verified in prod 2026-07-01) | Web `?ref=` capture → `/api/bonus?action=refer-capture` (unique referee). Qualifying-vote payout via `?action=referral`, paid ONLY from `REFERRAL_WALLET_PRIVATE_KEY` (never Bank). `referral_enabled=true`. Anti-sybil all verified rejecting in prod: self-referral, double-capture, referrer-hijack, kill-switch, funding-source (Alchemy `getAssetTransfers`, bounded at TTS deploy block), fail-closed; ≥500 TTS threshold gates payout. Auto-funder (Marketing→referral wallet, never Bank) armed & correctly idle. Bot referral still coming-soon (no telegram→wallet bridge). |
 
 ---
@@ -107,7 +107,11 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 | **TTSVotingV3d (CANONICAL)** | `0x783b8cd80b586b723188c93ef94ee1beede617b4` | ✅ live, owns rounds |
 | **TTSKeeper3 (CANONICAL)** | `0x363ce4960e3b459f5892587a37ae1ff2ed04442c` | ✅ owns V3d, automated |
 | **TTSRoundNFT** | `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` | minter = V3d (set 2026-06-28) |
-| TTSStaking (proxy) | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` | ⚠️ deployed but broken (1x for all) |
+| **TTSStaking (proxy, CANONICAL)** | `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` | ✅ live, holds the 10B reward pool |
+| TTSStaking impl | `0x147f4a1238f600eee143a90aba91f6b66f8fb53b` | Sourcify exact_match |
+| Staking Timelock (UPGRADER) | `0xa4fbf397485763e39102dcfaefcbf9794df55875` | 2-day delay; Safe = proposer/executor |
+| RescueUUPS | `0x7Ac62C126fd59b05F53800E3ceb5228d0724ee4d` | old-proxy extraction helper (used 2026-08-07) |
+| TTSStaking OLD proxy | `0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc` | ☠️ DEAD — drained to 0, impl = RescueUUPS. Do NOT reference |
 | Gnosis Safe (2/2) | `0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86` | DEFAULT_ADMIN + UPGRADER |
 | Uniswap V2 Pool | `0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68` | LP locked → 2027-05-05 |
 | TTSLinkReserve | `0xE8006d8F36827c97fd8f2932d4D2198B833A432F` | — |

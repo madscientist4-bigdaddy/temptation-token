@@ -202,29 +202,19 @@ async function fetchLiveContext() {
     }
   } catch {}
 
-  // Staking lock behavior — probe common selectors; fall back to codebase-derived description
-  // if the UUPS proxy's unverified implementation doesn't respond
-  try {
-    const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
-    const LOCK_SELECTORS = ['0x3fd8b02f', '0x4e71e0c8', '0x3c7cf0e1', '0x48f30e8c']
-    let lockSeconds = 0
-    for (const sel of LOCK_SELECTORS) {
-      const raw = await rpc({ method: 'eth_call', params: [{ to: STAKING_ADDRESS, data: sel }, 'latest'] })
-      if (raw && raw.length === 66) {
-        const val = parseInt(raw, 16)
-        if (val > 0) { lockSeconds = val; break }
-      }
-    }
-    if (lockSeconds > 0) {
-      const days = Math.round(lockSeconds / 86400)
-      ctx.stakingLockBehavior = `Time-locked: ${days} days once staked. Staking is available anytime — not tied to round windows.`
-    } else {
-      // Codebase evidence: lockPd initialized to '3 months'; FAQ says "cannot be accessed early"
-      ctx.stakingLockBehavior = 'Time-locked approximately 3 months once staked. Staking is available anytime — not tied to round open/close windows.'
-    }
-  } catch {
-    ctx.stakingLockBehavior = 'Time-locked once staked (duration stored on-chain). Staking is available anytime — not tied to round windows.'
-  }
+  // Staking lock behavior — CANONICAL, from the live contract's source, not a selector probe.
+  // TTSStaking 0x7848cceE… has NO lock: unstake() withdraws principal at any time, and
+  // emergencyWithdraw() returns principal even while paused. The old 0xaA12B889… proxy that
+  // this used to probe is DEAD (drained + upgraded to RescueUUPS on 2026-08-07) and the
+  // "time-locked ~3 months" fallback it produced was factually WRONG — never reintroduce it.
+  // Saying a stake is locked when it is not is a material misstatement about a financial
+  // product, so this string is hardcoded to the truth rather than inferred.
+  ctx.stakingLockBehavior =
+    'NO lock-up: staked principal is withdrawable at any time via unstake (and via ' +
+    'emergencyWithdraw even if staking is paused). The only time element is the vote-weight ' +
+    'multiplier, which activates 7 days after staking and restarts that 7-day clock whenever ' +
+    'the stake is increased — APR rewards accrue from the moment of staking. Staking is ' +
+    'available anytime and is not tied to round open/close windows.'
 
   return ctx
 }

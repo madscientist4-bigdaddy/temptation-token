@@ -178,3 +178,74 @@ from one hot EOA key to a 2/2 multisig either way.
 ## PHASE 4 — HOLD
 Do NOT post to X/Telegram. Report "ready to announce" with the drafted copy and wait for
 the explicit word "announce".
+
+---
+
+## PHASE 2 — EXECUTED 2026-08-07 · ALL VERIFIED ON MAINNET
+
+**Gate opened.** Dr. Mike (`0x95607DcF…`) executed the Safe tx at 2026-08-07T19:03:25Z —
+exec tx `0x1fe27af9462569d9a3ba8408cb09f0f522af3025621e0c688c91672c60a04d08`, Safe nonce
+9 → 10, `isTaxExempt(0x7848cc…)` = **true**.
+
+Every tx below was simulated, sent, receipt-checked for revert, and read back.
+
+| Step | Tx | Result |
+|---|---|---|
+| 2a upgrade old proxy → RescueUUPS | `0x058bf79340d26588f39eb4483b6cc65f95f30b434f54d160f0e6e442568df99c` | impl slot → `0x7ac62c12…`, `Upgraded` event ✓ |
+| 2c rescue 1,000 TTS → Bank (TEST) | `0x230752c94800c917dfbe47adfed725313f8797a1fad2e9edb0d45992387a58f6` | Bank +1,000.0000, old −1,000.0000 — **tax-free, exact** ✓ |
+| 3 fund staking 1,000 TTS | `0x21018e1d64534f1e3ae33451be77590c1c1e6bf98f29f22a07cfc66824f113a0` | staking bal = 1,000.00 ✓ |
+| 4 wire `V3d.setStakingContract` | `0x6436c87d09afda7dc045dcba05a321887a71de65b89190348adfba40e1860339` | V3d reads `0x7848cc…`; `tierVoteCap(non-staker)` still 500 TTS ✓ |
+| 5 E2E stake 6,000 | `0xbe26932ace538df9bc2bfe49e2365b44e8118cbac0036631fde848f2ceafdbe5` | Bank −6,000.00 tax-free; `totalStaked` 6,000; tier = `not eligible` (7d clock) ✓ |
+| 5 E2E unstake 6,000 | `0x9981d5f8986449ad370013ba6741ef7c5240c06ec8af3ffa0ee1b9a6117de88d` | Bank +6,000.00 principal; `totalStaked` → 0; Bank net across E2E = **0.000000** ✓ |
+| 6 migrate REMAINDER | `0x291aad6ce3c3cceb3c0daa80d05296c75f5685fc734258949c48b97be88afdcf` | old proxy **0.00**; staking **10,000,000,000.00**; `rewardSurplus` 10B ✓ |
+
+**The 10B is now whole in the staking proxy `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d`.
+Old proxy `0xaA12B889…` is drained to zero and its impl is RescueUUPS. Zero tax lost across
+the entire migration.**
+
+### Two incidents, both RPC — neither a contract defect
+1. After step 2a the impl-slot readback printed the *old* value, then the equality check
+   against the *new* value passed in the same breath. Cause: Alchemy load-balanced the two
+   reads to nodes at different heights. Settled by pinning reads to the receipt block and
+   confirming the `Upgraded(0x7ac62c12…)` log — the upgrade was real.
+2. The first `unstake` **failed gas estimation** with `panic 0x11` (arithmetic
+   underflow). The only subtraction that can underflow is `block.timestamp - s.lastAccrual`
+   in `_settle` — reachable only if a node simulates with a header timestamp older than the
+   `lastAccrual` written by the stake, i.e. the same stale-node race. Ruled out as a contract
+   bug by forking mainnet at the exact post-stake state: both the pending unstake *and* a
+   fresh immediate stake→unstake succeeded. Retried on mainnet with an explicit
+   `--gas-limit`; it went through and returned the full 6,000. **No user-facing defect** —
+   but wallets that auto-estimate may occasionally show a spurious failure, so prefer a
+   fixed gas limit for scripted staking txs.
+
+### Live post-migration state (verified)
+`totalStaked` 0 · `rewardSurplus` 10,000,000,000.00 TTS · `paused` false ·
+`getMultiplier(non-staker)` = 1e18 (1×) · `getStakeDetails(non-staker)` = zeros, tier −1 ·
+on-chain APRs `800/1200/1800/3200/4500` bps = 8/12/18/32/45% — match design exactly.
+Residual dust: Bank has ~0.00377 TTS accrued-but-unclaimed from the E2E stake (harmless).
+
+## PHASE 3 — code READY, go-live is env-only (NOT yet flipped)
+All copy is now gated so the code is safe to ship while staking still reads "Coming Soon":
+- Frontend/chatbot gate on `STAKING_ENABLED` (`VITE_STAKING_ENABLED` + `VITE_STAKING_ADDRESS`).
+- Bot gates on a new `STAKING_LIVE` env var (**default false**) — added because
+  `tts_bot.py` copy and `DAILY_POSTS` were ungated hardcoded strings, so pushing them would
+  have auto-deployed Railway and effectively announced the launch ahead of the hold.
+
+Corrections shipped in the same pass (these were wrong regardless of go-live):
+- `api/content-generator.js` probed the **dead** old proxy and fell back to publishing
+  *"Time-locked approximately 3 months once staked"* — flatly false for this contract
+  (no lock-up at all). Replaced with the hardcoded truth. This string feeds automated
+  X/Telegram posts, so it was a material misstatement about a financial product.
+- `App.jsx`, `TTAdminDashboard.jsx`, `asktts-prompt.js` all pointed at the dead old proxy —
+  repointed to `0x7848cc…` (the admin staking monitor was reading a drained contract).
+- Admin "Staking Reference" claimed tiers were hardcoded and needed a redeploy to change;
+  they are in fact `setTierThresholds`/`setAprBps` adjustable by MANAGER_ROLE (Bank).
+
+**To go live (both are reversible env flips, no code change):**
+- Vercel: `VITE_STAKING_ENABLED=true`, `VITE_STAKING_ADDRESS=0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d`
+  (`VITE_STAKING_TTS`/`CHAIN_ID`/`RPC`/`EXPLORER` already default to mainnet correctly — note
+  the local `.env` still holds Sepolia leftovers; do NOT copy those to prod). Then `npx vercel --prod`.
+- Railway: `STAKING_LIVE=true` → restart bot.
+
+## PHASE 4 — STILL HELD
+No X/Telegram announcement. Awaiting the explicit word "announce".
