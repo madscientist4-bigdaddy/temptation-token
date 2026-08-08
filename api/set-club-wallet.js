@@ -42,6 +42,20 @@ function sb(path, opts = {}) {
   })
 }
 
+
+// Every abuse check below MUST fail closed. PostgREST returns a JSON *error object* (not
+// an exception) for a missing table, a bad filter or an RLS denial — so `await r.json()`
+// resolves to `{code, message}` and an `Array.isArray()` guard quietly falls through,
+// skipping the check entirely. That is how a dedupe/rate-limit becomes decorative. This
+// helper turns any non-2xx or non-array result into a throw, so the caller's catch runs.
+async function sbRows(path) {
+  const r = await sb(path)
+  if (!r.ok) throw new Error(`supabase ${r.status}`)
+  const d = await r.json()
+  if (!Array.isArray(d)) throw new Error('supabase returned a non-array result')
+  return d
+}
+
 const isAddr = (a) => typeof a === 'string' && /^0x[0-9a-fA-F]{40}$/.test(a)
 const ZERO = '0x0000000000000000000000000000000000000000'
 
@@ -58,11 +72,13 @@ function slugify(name) {
 async function uniqueCode(base) {
   for (let i = 0; i < 25; i++) {
     const cand = i === 0 ? base : `${base}${i + 1}`
+    // No .catch(() => []) here: swallowing a lookup failure would hand out a code that
+    // is already taken, and club codes are the thing that routes a club's 10%.
     const [a, b] = await Promise.all([
-      sb(`/club_partners?club_code=eq.${cand}&select=club_code`).then(r => r.json()).catch(() => []),
-      sb(`/pending_clubs?club_code=eq.${cand}&select=club_code`).then(r => r.json()).catch(() => []),
+      sbRows(`/club_partners?club_code=eq.${cand}&select=club_code`),
+      sbRows(`/pending_clubs?club_code=eq.${cand}&select=club_code`),
     ])
-    if ((!Array.isArray(a) || !a.length) && (!Array.isArray(b) || !b.length)) return cand
+    if (!a.length && !b.length) return cand
   }
   return null
 }
@@ -89,15 +105,16 @@ async function handleApply(req, res) {
 
   // Dedupe: one live application per wallet, and never shadow an already-approved club.
   try {
-    const existing = await sb(`/pending_clubs?wallet_address=eq.${walletLc}&status=in.(pending,approved)&select=club_code,status`).then(r => r.json())
-    if (Array.isArray(existing) && existing.length) {
+    const existing = await sbRows(`/pending_clubs?wallet_address=eq.${walletLc}&status=in.(pending,approved)&select=club_code,status`)
+    if (existing.length) {
       return res.status(200).json({ ok: true, duplicate: true, clubCode: existing[0].club_code, status: existing[0].status })
     }
-    const already = await sb(`/club_partners?wallet_address=eq.${walletLc}&active=is.true&select=club_code`).then(r => r.json())
-    if (Array.isArray(already) && already.length) {
+    const already = await sbRows(`/club_partners?wallet_address=eq.${walletLc}&active=is.true&select=club_code`)
+    if (already.length) {
       return res.status(200).json({ ok: true, duplicate: true, clubCode: already[0].club_code, status: 'approved' })
     }
-  } catch {
+  } catch (e) {
+    console.error('club apply: dedupe check failed —', e.message)
     return res.status(503).json({ ok: false, error: 'Applications are temporarily unavailable. Please try again shortly.' })
   }
 
@@ -105,17 +122,24 @@ async function handleApply(req, res) {
   // do not accept, rather than leave the public queue open to flooding.
   try {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
-    const recent = await sb(`/pending_clubs?created_at=gte.${since}&applicant_ip=eq.${encodeURIComponent(clientIp(req))}&select=id`).then(r => r.json())
-    if (Array.isArray(recent) && recent.length >= 3) {
+    const recent = await sbRows(`/pending_clubs?created_at=gte.${since}&applicant_ip=eq.${encodeURIComponent(clientIp(req))}&select=id`)
+    if (recent.length >= 3) {
       return res.status(429).json({ ok: false, error: 'Too many applications from this connection today. Try again tomorrow.' })
     }
-  } catch {
+  } catch (e) {
+    console.error('club apply: rate-limit check failed —', e.message)
     return res.status(503).json({ ok: false, error: 'Applications are temporarily unavailable. Please try again shortly.' })
   }
 
   const base = slugify(clubName)
   if (!base) return res.status(400).json({ ok: false, error: 'Club name must contain letters or numbers.' })
-  const code = await uniqueCode(base)
+  let code
+  try {
+    code = await uniqueCode(base)
+  } catch (e) {
+    console.error('club apply: code allocation failed —', e.message)
+    return res.status(503).json({ ok: false, error: 'Applications are temporarily unavailable. Please try again shortly.' })
+  }
   if (!code) return res.status(409).json({ ok: false, error: 'Could not generate a unique code for that name — try a more specific name.' })
 
   const r = await sb('/pending_clubs', {
@@ -127,8 +151,10 @@ async function handleApply(req, res) {
     }),
   })
   if (!r.ok) {
-    const detail = await r.text().catch(() => '')
-    return res.status(500).json({ ok: false, error: 'Could not save your application.', detail: detail.slice(0, 200) })
+    // Log the real reason; never return it. A public endpoint echoing PostgREST errors
+    // discloses table names and schema state to anyone who can POST.
+    console.error('club apply: insert failed —', (await r.text().catch(() => '')).slice(0, 300))
+    return res.status(503).json({ ok: false, error: 'Applications are temporarily unavailable. Please try again shortly.' })
   }
   return res.status(200).json({ ok: true, clubCode: code, status: 'pending' })
 }
