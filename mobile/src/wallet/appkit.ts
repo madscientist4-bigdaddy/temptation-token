@@ -1,3 +1,10 @@
+// @ts-nocheck — DEV-BUILD ONLY. The modules below (@reown/appkit-wagmi-react-native,
+// @walletconnect/react-native-compat, react-native-get-random-values, wagmi) are native
+// and are NOT installed for the Expo Go path, so tsc cannot resolve them here. They are
+// installed only for an EAS dev/preview/production build (where WALLET_ENABLED=true), at
+// which point this file is reached exclusively via the dynamic import in wallet/loader.ts.
+// The pragma keeps the Expo Go typecheck green without deleting the wired wallet code.
+//
 // WalletConnect (Reown AppKit) — React Native init. Mirrors src/config/wallet.js on
 // web (same public projectId, Base-only, dark theme), but uses the RN SDK which
 // deep-links to installed wallet apps instead of a browser modal.

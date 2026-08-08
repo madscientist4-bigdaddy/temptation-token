@@ -2,18 +2,22 @@
   "cli": { "version": ">= 5.9.0" },
   "build": {
     "development": {
+      "//": "Dev client with the REAL wallet path enabled. EXPO_PUBLIC_WALLET_ENABLED=true flips WALLET_ENABLED (src/config/features.ts) so WalletConnect/voting load. Requires the wallet deps installed (see mobile/README wallet section).",
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
     },
     "preview": {
-      "//": "Internal testing: TestFlight (iOS) + Play internal track (Android).",
+      "//": "Internal testing: TestFlight (iOS) + Play internal track (Android). Wallet enabled.",
       "distribution": "internal",
       "ios": { "simulator": false },
-      "channel": "preview"
+      "channel": "preview",
+      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
     }
   },
   "submit": {

@@ -5,7 +5,11 @@
     "esModuleInterop": true,
     "moduleResolution": "bundler",
     "target": "ESNext",
-    "lib": ["ESNext", "DOM"],
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "skipLibCheck": true
-  }
+  },
+  "extends": "expo/tsconfig.base"
 }

@@ -1,89 +1,121 @@
-// Expo Go-SAFE entry. Shows the live round + a ticking countdown + the current
-// profiles, straight from the PRODUCTION API — no native modules, so it runs in Expo Go
-// on a physical phone today. WalletConnect / voting is gated behind a dev build (Expo Go
-// cannot load the Reown AppKit native modules); see src/wallet/appkit.ts + PHASE1_PLAN.md.
+// Temptation Token — mobile app shell. Recreates the web game's look: a sticky wallet
+// bar (brand + balance + Connect), the green audit trust banner, a horizontal nav, and
+// the Play / Leaderboard screens. Runs in Expo Go TODAY (browse profiles, live round
+// countdown, leaderboard, profile detail, live community stats). Wallet connect + on-
+// chain voting are stubbed here and light up only in an EAS dev build via WALLET_ENABLED
+// (see src/config/features.ts, src/wallet/loader.ts, eas.json).
 import React, { useEffect, useState } from 'react'
-import { SafeAreaView, ScrollView, View, Text, Image, ActivityIndicator, RefreshControl, StatusBar, Linking, Pressable, StyleSheet } from 'react-native'
-import { api } from './src/api/client'
+import {
+  SafeAreaView, View, Text, Pressable, StatusBar, StyleSheet, Linking, ScrollView,
+} from 'react-native'
+import { PlayScreen } from './src/screens/PlayScreen'
+import { LeaderboardScreen } from './src/screens/LeaderboardScreen'
+import { WalletSheet } from './src/components/WalletSheet'
+import { loadWallet } from './src/wallet/loader'
+import { colors, serif, sans, MAX_WIDTH } from './src/theme'
 
-// Round 6 ends 2026-08-10 04:59:00 UTC (Sunday 11:59 PM EST anchor).
-const ROUND_END = 1786337940 * 1000
-
-function useCountdown(end: number) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
-  const s = Math.max(0, Math.floor((end - now) / 1000))
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
-  const p = (n: number) => (n < 10 ? '0' : '') + n
-  return s <= 0 ? 'settling…' : `${d}d ${p(h)}:${p(m)}:${p(sec)}`
-}
+type TabKey = 'play' | 'leaderboard'
+const TABS: { k: TabKey; l: string }[] = [
+  { k: 'play', l: 'Play' },
+  { k: 'leaderboard', l: 'Leaderboard' },
+]
 
 export default function App() {
-  const [profiles, setProfiles] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const cd = useCountdown(ROUND_END)
+  const [tab, setTab] = useState<TabKey>('play')
+  const [walletOpen, setWalletOpen] = useState(false)
 
-  const load = async () => {
-    setError(null)
-    try { const r = await api.listProfiles(); setProfiles(Array.isArray(r.profiles) ? r.profiles : []) }
-    catch (e: any) { setError('Could not reach the game server. Pull to retry.') }
-    setLoading(false)
-  }
-  useEffect(() => { load() }, [])
+  // In a dev build (WALLET_ENABLED) initialise Reown AppKit lazily. In Expo Go this is a
+  // no-op — loadWallet() returns null without ever importing the native modules.
+  useEffect(() => {
+    loadWallet().then((w) => w?.initWallet()).catch(() => {})
+  }, [])
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={s.scroll} refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor="#F2C14E" />}>
-        <Text style={s.brand}>TEMPTATION TOKEN</Text>
-        <Text style={s.sub}>Live on Base · Round 6</Text>
-        <View style={s.cdBox}>
-          <Text style={s.cdLabel}>ROUND ENDS IN</Text>
-          <Text style={s.cd}>{cd}</Text>
+    <SafeAreaView style={st.root}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.void} />
+
+      {/* Wallet bar */}
+      <View style={st.wbar}>
+        <View style={st.wbarInner}>
+          <View style={st.brandWrap}>
+            <Text style={st.brandMark}>TT</Text>
+            <Text style={st.brandName}>Temptation Token</Text>
+          </View>
+          <View style={st.bal}>
+            <Text style={st.balLabel}>Balance</Text>
+            <Text style={st.balAmt}>—<Text style={st.balUnit}> $TTS</Text></Text>
+          </View>
+          <Pressable style={st.connect} onPress={() => setWalletOpen(true)}>
+            <Text style={st.connectTxt}>Connect</Text>
+          </Pressable>
         </View>
+      </View>
 
-        <Text style={s.section}>Vote board</Text>
-        {loading ? <ActivityIndicator color="#F2C14E" style={{ marginTop: 24 }} />
-          : error ? <Text style={s.err}>{error}</Text>
-          : profiles.length === 0 ? <Text style={s.err}>No profiles yet.</Text>
-          : profiles.map((p, i) => (
-            <View key={p.profileId || i} style={s.card}>
-              {p.image_url ? <Image source={{ uri: p.image_url }} style={s.photo} /> : <View style={[s.photo, s.photoEmpty]} />}
-              <View style={{ flex: 1 }}>
-                <Text style={s.name}>{p.display_name || 'Anonymous'}</Text>
-                {p.link_title ? <Text style={s.link}>{p.link_title}</Text> : null}
-              </View>
-            </View>
+      {/* Audit / trust banner (mirrors web) */}
+      <Pressable
+        style={st.trust}
+        onPress={() => Linking.openURL('https://app.solidproof.io/projects/temptation-token')}
+      >
+        <Text style={st.trustTxt}>✓ Audited by SolidProof · Zero critical findings · View Report →</Text>
+      </Pressable>
+
+      {/* Nav */}
+      <View style={st.nav}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.navInner}>
+          {TABS.map((t) => (
+            <Pressable key={t.k} style={[st.navItem, tab === t.k && st.navItemActive]} onPress={() => setTab(t.k)}>
+              <Text style={[st.navTxt, tab === t.k && st.navTxtActive]}>{t.l}</Text>
+            </Pressable>
           ))}
+        </ScrollView>
+      </View>
 
-        <Pressable style={s.cta} onPress={() => Linking.openURL('https://app.temptationtoken.io')}>
-          <Text style={s.ctaTxt}>Connect wallet & vote →</Text>
-          <Text style={s.ctaSub}>Opens the web app (in-app wallet connect ships in the full build)</Text>
-        </Pressable>
-        <Text style={s.foot}>Expo Go preview · browse + live countdown are live · WalletConnect needs the dev/TestFlight build</Text>
-      </ScrollView>
+      {/* Screens */}
+      <View style={st.main}>
+        {tab === 'play' && <PlayScreen onConnect={() => setWalletOpen(true)} />}
+        {tab === 'leaderboard' && <LeaderboardScreen />}
+      </View>
+
+      <WalletSheet visible={walletOpen} onClose={() => setWalletOpen(false)} />
     </SafeAreaView>
   )
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0B0B0F' },
-  scroll: { padding: 20, paddingBottom: 48 },
-  brand: { color: '#F4F2F7', fontSize: 22, fontWeight: '800', letterSpacing: 2, textAlign: 'center', marginTop: 8 },
-  sub: { color: '#8A8797', fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 18 },
-  cdBox: { backgroundColor: '#15151D', borderRadius: 16, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: '#2a2a36' },
-  cdLabel: { color: '#8A8797', fontSize: 11, letterSpacing: 2, marginBottom: 6 },
-  cd: { color: '#F2C14E', fontSize: 30, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  section: { color: '#F4F2F7', fontSize: 16, fontWeight: '700', marginTop: 26, marginBottom: 12 },
-  card: { flexDirection: 'row', gap: 14, backgroundColor: '#15151D', borderRadius: 14, padding: 12, marginBottom: 10, alignItems: 'center', borderWidth: 1, borderColor: '#22222c' },
-  photo: { width: 58, height: 58, borderRadius: 10, backgroundColor: '#222' },
-  photoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  name: { color: '#F4F2F7', fontSize: 15, fontWeight: '600' },
-  link: { color: '#8A8797', fontSize: 12, marginTop: 2 },
-  err: { color: '#FF2D6E', textAlign: 'center', marginTop: 20 },
-  cta: { backgroundColor: '#FF2D6E', borderRadius: 13, padding: 16, marginTop: 22, alignItems: 'center' },
-  ctaTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  ctaSub: { color: 'rgba(255,255,255,0.85)', fontSize: 11, marginTop: 3 },
-  foot: { color: '#55545f', fontSize: 11, textAlign: 'center', marginTop: 18 },
+const st = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.void },
+  wbar: {
+    backgroundColor: colors.deep, borderBottomWidth: 1, borderBottomColor: colors.border,
+    paddingHorizontal: 18, paddingVertical: 12,
+  },
+  wbarInner: {
+    maxWidth: MAX_WIDTH, width: '100%', alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+  },
+  brandWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  brandMark: {
+    fontFamily: serif, fontStyle: 'italic', fontSize: 22, color: colors.gold,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden',
+  },
+  brandName: { fontFamily: serif, fontStyle: 'italic', fontSize: 15, color: colors.text, flexShrink: 1 },
+  bal: { alignItems: 'center' },
+  balLabel: { fontFamily: sans, fontSize: 10, letterSpacing: 1, color: colors.muted, textTransform: 'uppercase' },
+  balAmt: { fontFamily: sans, fontSize: 20, fontWeight: '800', color: colors.goldLight, lineHeight: 24 },
+  balUnit: { fontSize: 11, color: colors.goldDim, fontWeight: '700' },
+  connect: {
+    backgroundColor: colors.crimsonGlow, borderWidth: 1, borderColor: colors.crimsonGlow,
+    borderRadius: 5, paddingHorizontal: 16, paddingVertical: 12,
+  },
+  connectTxt: { color: colors.text, fontFamily: sans, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+  trust: {
+    backgroundColor: 'rgba(46,204,113,0.08)', borderBottomWidth: 1, borderBottomColor: 'rgba(46,204,113,0.15)',
+    paddingVertical: 6, paddingHorizontal: 16,
+  },
+  trustTxt: { color: colors.green, fontSize: 10.5, textAlign: 'center', letterSpacing: 0.6, fontWeight: '600', fontFamily: sans },
+  nav: { backgroundColor: colors.deep, borderBottomWidth: 1, borderBottomColor: colors.border },
+  navInner: { maxWidth: MAX_WIDTH, alignSelf: 'center', paddingHorizontal: 6 },
+  navItem: { paddingHorizontal: 14, paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  navItemActive: { borderBottomColor: colors.gold },
+  navTxt: { fontFamily: sans, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', fontWeight: '700', color: 'rgba(240,232,216,0.75)' },
+  navTxtActive: { color: colors.gold },
+  main: { flex: 1, maxWidth: MAX_WIDTH, width: '100%', alignSelf: 'center' },
 })
