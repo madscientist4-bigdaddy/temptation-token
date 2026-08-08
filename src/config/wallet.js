@@ -4,7 +4,6 @@ import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { QueryClient } from '@tanstack/react-query'
 import { coinbaseWallet } from 'wagmi/connectors'
-import { GASLESS_ENABLED } from './gasless.js'
 
 // Public WalletConnect/Reown client id — env-driven (rotatable without a code change).
 // Falls back to the known public id so a missing env var never breaks the build.
@@ -24,16 +23,20 @@ const networks = [base]
 // an ERC-4337 smart account. Paired with the paymaster this is what lets a brand-new user
 // sign up, submit and vote holding ZERO ETH.
 //
-// Added only when GASLESS_ENABLED so production connect options are unchanged while the
-// flag is off. `smartWalletOnly` keeps us off the legacy CBW extension path, which is an
-// EOA and cannot be sponsored.
-const gaslessConnectors = GASLESS_ENABLED
-  ? [coinbaseWallet({
-      appName: 'Temptation Token',
-      appLogoUrl: metadata.icons[0],
-      preference: 'smartWalletOnly',
-    })]
-  : []
+// Always present, not gated on GASLESS_ENABLED. Two independent reasons:
+//   1. Gasless voting needs a smart account to sponsor (that part IS flag-gated, in
+//      src/lib/gasless.js — the connector alone sponsors nothing).
+//   2. Self-serve club onboarding (/clubs) needs inline wallet creation so a club owner
+//      can get a payout address from a barstool with a passkey. Club owners never
+//      transact, so that path needs no paymaster and no flag.
+// `smartWalletOnly` keeps us off the legacy CBW extension path, which is an EOA.
+const gaslessConnectors = [
+  coinbaseWallet({
+    appName: 'Temptation Token',
+    appLogoUrl: metadata.icons[0],
+    preference: 'smartWalletOnly',
+  }),
+]
 
 export const wagmiAdapter = new WagmiAdapter({
   networks,

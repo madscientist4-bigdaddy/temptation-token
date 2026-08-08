@@ -696,6 +696,93 @@ async function firePost(post) {
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+
+// ── Listings watcher — the CoinGecko green light ──────────────────────────────
+//
+// CoinGecko weights liquidity and trade frequency heavily, and a rejected application
+// puts you in a cooldown. So rather than guess, this watches the Uniswap V2 pool and
+// pings Telegram once there have been 14 CONSECUTIVE days of nonzero volume — the point
+// at which the "is it actually traded?" objection stops applying.
+//
+// Method: sample the pool's cumulative price accumulators + reserves daily. Uniswap V2
+// bumps price0CumulativeLast/price1CumulativeLast on every swap-bearing block, and
+// blockTimestampLast only moves when the reserves change. If blockTimestampLast has
+// advanced since yesterday's sample, the pool traded. That is a swap-detector that costs
+// two eth_calls and needs no indexer or paid API.
+//
+// State lives in admin_config under a single key (JSON), so this needs no new table.
+const POOL = '0x77Fe188379BEaAd3BCFb26c965c812CEa721ce68'
+const LISTINGS_KEY = 'listings_watch'
+const REQUIRED_STREAK_DAYS = 14
+
+async function readPoolState() {
+  // getReserves() -> (uint112 r0, uint112 r1, uint32 blockTimestampLast)
+  const data = await rpcCall('eth_call', [{ to: POOL, data: '0x0902f1ac' }, 'latest'])
+  if (!data || data.length < 2 + 64 * 3) return null
+  const h = data.slice(2)
+  const r0 = BigInt('0x' + h.slice(0, 64))
+  const r1 = BigInt('0x' + h.slice(64, 128))
+  const ts = Number(BigInt('0x' + h.slice(128, 192)))
+  return { r0: r0.toString(), r1: r1.toString(), blockTimestampLast: ts }
+}
+
+async function runListingsWatch() {
+  const token = process.env.BROADCAST_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN
+  const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+
+  const pool = await readPoolState().catch(() => null)
+  if (!pool) return { ok: false, reason: 'pool read failed' }
+
+  let state = { streak: 0, lastTs: 0, lastSampledDay: null, notifiedAt: null }
+  // admin_config is RLS-locked to the service role — sbGet uses the anon key and would
+  // silently return nothing, which would reset the streak to 0 every single day.
+  try {
+    const rows = await (await sbService(`/admin_config?key=eq.${LISTINGS_KEY}&select=value`)).json()
+    if (Array.isArray(rows) && rows[0]?.value) state = { ...state, ...JSON.parse(rows[0].value) }
+  } catch {}
+
+  const today = new Date().toISOString().slice(0, 10)
+  if (state.lastSampledDay === today) {
+    return { ok: true, skipped: 'already sampled today', streak: state.streak }
+  }
+
+  const traded = state.lastTs > 0 && pool.blockTimestampLast > state.lastTs
+  const first = state.lastTs === 0
+
+  // First run only establishes a baseline — we cannot know whether it traded yesterday.
+  const streak = first ? 0 : (traded ? state.streak + 1 : 0)
+
+  const next = {
+    streak,
+    lastTs: pool.blockTimestampLast,
+    lastSampledDay: today,
+    notifiedAt: state.notifiedAt || null,
+  }
+
+  // Fire once, then latch — nobody wants this every day forever.
+  if (streak >= REQUIRED_STREAK_DAYS && !state.notifiedAt) {
+    const msg = [
+      '\u2705 <b>CoinGecko green light</b>',
+      '',
+      `The TTS/WETH pool has traded on <b>${streak} consecutive days</b>.`,
+      'That was the blocker on the CoinGecko application — thin, stale liquidity was the most likely rejection reason, and a rejection means a cooldown.',
+      '',
+      'Ready to submit: <code>outputs/listings/coingecko_application.md</code> has every field filled.',
+      'Run <code>node outputs/listings/circulating.mjs</code> first for a same-day supply figure.',
+    ].join('\n')
+    await sendTelegram(adminChatId, msg, token).catch(() => {})
+    next.notifiedAt = new Date().toISOString()
+  }
+
+  await sbService('/admin_config', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
+    body: JSON.stringify({ key: LISTINGS_KEY, value: JSON.stringify(next) }),
+  }).catch(() => {})
+
+  return { ok: true, traded, streak, required: REQUIRED_STREAK_DAYS, notified: Boolean(next.notifiedAt) }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
 
@@ -715,6 +802,12 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) })
     }
+  }
+
+  // ── GET /api/scheduler?action=listings-watch — daily pool-volume streak check ─
+  if (req.query?.action === 'listings-watch') {
+    try { return res.status(200).json(await runListingsWatch()) }
+    catch (e) { return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) }) }
   }
 
   // ── GET /api/scheduler?action=vrf-status — read-only VRF health (no alert) ──
@@ -791,6 +884,15 @@ export default async function handler(req, res) {
   // without MARKETING_WALLET_PRIVATE_KEY. Funds ONLY from Marketing, never Bank.
   if (nowHour === 12) {
     try { results.autoFund = await runAutoFunder() } catch (e) { results.autoFund = { error: e.message } }
+  }
+
+  // ── JOB: listings watcher (daily, 00:00 UTC) ─────────────────────────────
+  // Samples the Uniswap pool once a day and counts consecutive traded days. Pings
+  // Telegram once at 14 — the point where CoinGecko's liquidity objection stops
+  // applying. Latches after firing so it never nags. Self-guards against double
+  // sampling if the cron runs twice in a UTC day.
+  if (nowHour === 0) {
+    try { results.listingsWatch = await runListingsWatch() } catch (e) { results.listingsWatch = { error: e.message } }
   }
 
   // ── JOB 1: Fire approved posts that are due ──────────────────────────────

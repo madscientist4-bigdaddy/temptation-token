@@ -89,6 +89,26 @@
       "destination": "/audit.html"
     },
     {
+      "source": "/api/clubs/apply",
+      "destination": "/api/set-club-wallet?action=apply"
+    },
+    {
+      "source": "/api/clubs/status",
+      "destination": "/api/set-club-wallet?action=status"
+    },
+    {
+      "source": "/api/clubs/pending",
+      "destination": "/api/set-club-wallet?action=pending"
+    },
+    {
+      "source": "/api/clubs/approve",
+      "destination": "/api/set-club-wallet?action=approve"
+    },
+    {
+      "source": "/api/clubs/deny",
+      "destination": "/api/set-club-wallet?action=deny"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
@@ -129,6 +149,43 @@
     {
       "path": "/api/content-generator",
       "schedule": "0 8 * * 1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/pwa/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, immutable"
+        }
+      ]
     }
   ]
 }

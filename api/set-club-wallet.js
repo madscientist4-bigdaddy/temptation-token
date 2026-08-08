@@ -1,8 +1,19 @@
-// POST /api/set-club-wallet
-// Body: { clubName, clubCode, walletAddress }
-// Registers or updates a club's payout wallet on the TTSVotingV3d contract.
-// Also upserts the club into the club_partners table in Supabase.
-// Pass walletAddress: "0x0000000000000000000000000000000000000000" to deregister.
+// Club registration + self-serve partner onboarding.
+//
+//   POST /api/set-club-wallet                      admin — register/deregister directly
+//   POST /api/set-club-wallet?action=apply         PUBLIC — a club applies (no auth, no gas)
+//   GET  /api/set-club-wallet?action=status&wallet=0x…   PUBLIC — poll own application
+//   GET  /api/set-club-wallet?action=pending       admin — the approval queue
+//   POST /api/set-club-wallet?action=approve       admin — approve: on-chain register + unlock kit
+//   POST /api/set-club-wallet?action=deny          admin — deny
+//
+// Everything lives in one file because Vercel Hobby caps us at 12 functions and we are
+// exactly at 12. Routed by ?action=, with /api/clubs/* rewritten to it in vercel.json.
+//
+// Design: a club owner never transacts and never pays gas. They give a name + city and a
+// payout address (existing wallet, or one created inline via passkey). The ONLY on-chain
+// write is setClubWallet, signed by Bank at approval time. Approval is the one human gate.
+//
 // Requires: DEPLOYER_PRIVATE_KEY in Vercel env.
 
 import { createWalletClient, createPublicClient, http, parseAbi } from 'viem'
@@ -17,7 +28,226 @@ const SUPABASE_KEY   = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_
 
 const ABI = parseAbi(['function setClubWallet(string calldata code, address wallet) external'])
 
+// ── Supabase helper ───────────────────────────────────────────────────────────
+function sb(path, opts = {}) {
+  return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(opts.headers || {}),
+    },
+  })
+}
+
+const isAddr = (a) => typeof a === 'string' && /^0x[0-9a-fA-F]{40}$/.test(a)
+const ZERO = '0x0000000000000000000000000000000000000000'
+
+// Club codes are DERIVED, never chosen by the applicant — a code is printed on flyers and
+// typed by performers, so it has to be short, lowercase and unambiguous.
+function slugify(name) {
+  return String(name || '')
+    .toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .slice(0, 20)
+}
+
+async function uniqueCode(base) {
+  for (let i = 0; i < 25; i++) {
+    const cand = i === 0 ? base : `${base}${i + 1}`
+    const [a, b] = await Promise.all([
+      sb(`/club_partners?club_code=eq.${cand}&select=club_code`).then(r => r.json()).catch(() => []),
+      sb(`/pending_clubs?club_code=eq.${cand}&select=club_code`).then(r => r.json()).catch(() => []),
+    ])
+    if ((!Array.isArray(a) || !a.length) && (!Array.isArray(b) || !b.length)) return cand
+  }
+  return null
+}
+
+function clientIp(req) {
+  const f = req.headers['x-forwarded-for']
+  return (Array.isArray(f) ? f[0] : (f || '')).split(',')[0].trim() || 'unknown'
+}
+
+// ── PUBLIC: a club applies ────────────────────────────────────────────────────
+async function handleApply(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
+  const b = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body) || {}
+
+  const clubName = String(b.clubName || '').trim()
+  const city     = String(b.city || '').trim()
+  const wallet   = String(b.walletAddress || '').trim()
+
+  if (clubName.length < 2 || clubName.length > 80) return res.status(400).json({ ok: false, error: 'Club name must be 2–80 characters.' })
+  if (city.length < 2 || city.length > 80)         return res.status(400).json({ ok: false, error: 'City must be 2–80 characters.' })
+  if (!isAddr(wallet) || wallet.toLowerCase() === ZERO) return res.status(400).json({ ok: false, error: 'A valid payout wallet is required.' })
+
+  const walletLc = wallet.toLowerCase()
+
+  // Dedupe: one live application per wallet, and never shadow an already-approved club.
+  try {
+    const existing = await sb(`/pending_clubs?wallet_address=eq.${walletLc}&status=in.(pending,approved)&select=club_code,status`).then(r => r.json())
+    if (Array.isArray(existing) && existing.length) {
+      return res.status(200).json({ ok: true, duplicate: true, clubCode: existing[0].club_code, status: existing[0].status })
+    }
+    const already = await sb(`/club_partners?wallet_address=eq.${walletLc}&active=is.true&select=club_code`).then(r => r.json())
+    if (Array.isArray(already) && already.length) {
+      return res.status(200).json({ ok: true, duplicate: true, clubCode: already[0].club_code, status: 'approved' })
+    }
+  } catch {
+    return res.status(503).json({ ok: false, error: 'Applications are temporarily unavailable. Please try again shortly.' })
+  }
+
+  // Abuse limit: cap applications per IP per day. Fail CLOSED — if we cannot count, we
+  // do not accept, rather than leave the public queue open to flooding.
+  try {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+    const recent = await sb(`/pending_clubs?created_at=gte.${since}&applicant_ip=eq.${encodeURIComponent(clientIp(req))}&select=id`).then(r => r.json())
+    if (Array.isArray(recent) && recent.length >= 3) {
+      return res.status(429).json({ ok: false, error: 'Too many applications from this connection today. Try again tomorrow.' })
+    }
+  } catch {
+    return res.status(503).json({ ok: false, error: 'Applications are temporarily unavailable. Please try again shortly.' })
+  }
+
+  const base = slugify(clubName)
+  if (!base) return res.status(400).json({ ok: false, error: 'Club name must contain letters or numbers.' })
+  const code = await uniqueCode(base)
+  if (!code) return res.status(409).json({ ok: false, error: 'Could not generate a unique code for that name — try a more specific name.' })
+
+  const r = await sb('/pending_clubs', {
+    method: 'POST',
+    body: JSON.stringify({
+      club_code: code, club_name: clubName, city,
+      wallet_address: walletLc, status: 'pending',
+      applicant_ip: clientIp(req), created_at: new Date().toISOString(),
+    }),
+  })
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '')
+    return res.status(500).json({ ok: false, error: 'Could not save your application.', detail: detail.slice(0, 200) })
+  }
+  return res.status(200).json({ ok: true, clubCode: code, status: 'pending' })
+}
+
+// ── PUBLIC: poll your own application ─────────────────────────────────────────
+// Keyed by wallet, which the applicant demonstrably controls. Returns only their own row.
+async function handleStatus(req, res) {
+  const wallet = String(req.query?.wallet || '').trim().toLowerCase()
+  if (!isAddr(wallet)) return res.status(400).json({ ok: false, error: 'wallet required' })
+  try {
+    const rows = await sb(`/pending_clubs?wallet_address=eq.${wallet}&select=club_code,club_name,city,status,created_at&order=created_at.desc&limit=1`).then(r => r.json())
+    if (!Array.isArray(rows) || !rows.length) return res.status(200).json({ ok: true, found: false })
+    const row = rows[0]
+    return res.status(200).json({ ok: true, found: true, clubCode: row.club_code, clubName: row.club_name, city: row.city, status: row.status })
+  } catch {
+    return res.status(503).json({ ok: false, error: 'status unavailable' })
+  }
+}
+
+// ── ADMIN: pending queue ──────────────────────────────────────────────────────
+async function handlePending(req, res) {
+  if (!requireAdmin(req, res, req.body || {})) return
+  try {
+    const rows = await sb('/pending_clubs?status=eq.pending&select=*&order=created_at.asc').then(r => r.json())
+    return res.status(200).json({ ok: true, pending: Array.isArray(rows) ? rows : [] })
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message })
+  }
+}
+
+// ── ADMIN: deny ───────────────────────────────────────────────────────────────
+async function handleDeny(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
+  if (!requireAdmin(req, res, req.body || {})) return
+  const b = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body) || {}
+  const code = String(b.clubCode || '').trim().toLowerCase()
+  if (!code) return res.status(400).json({ ok: false, error: 'clubCode required' })
+  await sb(`/pending_clubs?club_code=eq.${code}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'denied', decided_at: new Date().toISOString() }),
+  })
+  return res.status(200).json({ ok: true, clubCode: code, status: 'denied' })
+}
+
+
+
+// ── ADMIN: approve → the one human gate ───────────────────────────────────────
+// Fires the on-chain registration from Bank, flips the club live, and unlocks the kit.
+// Ordering matters: the chain write happens FIRST and is receipt-checked. We only mark
+// the application approved once the club is genuinely registered, so a failed tx can
+// never leave a club "approved" in the UI with no on-chain payout route.
+async function handleApprove(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST only' })
+  if (!requireAdmin(req, res, req.body || {})) return
+  const b = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body) || {}
+  const code = String(b.clubCode || '').trim().toLowerCase()
+  if (!code) return res.status(400).json({ ok: false, error: 'clubCode required' })
+
+  let row
+  try {
+    const rows = await sb(`/pending_clubs?club_code=eq.${code}&select=*`).then(r => r.json())
+    if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ ok: false, error: 'application not found' })
+    row = rows[0]
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message })
+  }
+  if (row.status === 'approved') {
+    return res.status(200).json({ ok: true, alreadyApproved: true, clubCode: code })
+  }
+  if (!isAddr(row.wallet_address) || row.wallet_address.toLowerCase() === ZERO) {
+    return res.status(400).json({ ok: false, error: 'application has no valid payout wallet' })
+  }
+
+  const txHash = await registerOnChain(code, row.wallet_address)
+  if (txHash.error) return res.status(500).json({ ok: false, error: txHash.error })
+
+  await sb('/club_partners', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
+    body: JSON.stringify({
+      club_code: code, club_name: row.club_name, wallet_address: row.wallet_address,
+      active: true, updated_at: new Date().toISOString(),
+    }),
+  }).catch(() => {})
+
+  await sb(`/pending_clubs?club_code=eq.${code}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'approved', decided_at: new Date().toISOString(), tx_hash: txHash.hash }),
+  }).catch(() => {})
+
+  return res.status(200).json({ ok: true, clubCode: code, walletAddress: row.wallet_address, txHash: txHash.hash })
+}
+
+// Shared on-chain registration. Simulated implicitly by viem, sent from Bank, and the
+// receipt status is checked explicitly — viem does NOT throw on an on-chain revert.
+async function registerOnChain(code, walletAddress) {
+  const pk = process.env.DEPLOYER_PRIVATE_KEY
+  if (!pk) return { error: 'DEPLOYER_PRIVATE_KEY not set' }
+  try {
+    const account = privateKeyToAccount(pk.startsWith('0x') ? pk : `0x${pk}`)
+    const walletClient = createWalletClient({ account, chain: base, transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org') })
+    const publicClient = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org') })
+    const hash = await walletClient.writeContract({ address: VOTING_ADDRESS, abi: ABI, functionName: 'setClubWallet', args: [code, walletAddress] })
+    const receipt = await publicClient.waitForTransactionReceipt({ hash })
+    if (receipt.status !== 'success') return { error: 'setClubWallet reverted on-chain', hash }
+    return { hash }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
 export default async function handler(req, res) {
+  const action = (req.query && req.query.action) || ''
+  if (action === 'apply')   return handleApply(req, res)
+  if (action === 'status')  return handleStatus(req, res)
+  if (action === 'pending') return handlePending(req, res)
+  if (action === 'approve') return handleApprove(req, res)
+  if (action === 'deny')    return handleDeny(req, res)
+
   if (req.method !== 'POST') return res.status(405).end()
   // Admin-only: this endpoint signs a Bank-wallet (DEPLOYER_PRIVATE_KEY) tx that
   // sets a club's on-chain payout wallet. Without this gate anyone could hijack a

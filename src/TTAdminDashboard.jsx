@@ -2428,6 +2428,9 @@ function ReferralScreen({ showToast }) {
   const [clubsLoading, setClubsLoading] = React.useState(true)
   const [clubEarnings, setClubEarnings] = React.useState({}) // walletLower -> { tts, count } from on-chain ClubPayoutSent
   const [newClub, setNewClub] = React.useState({ clubName:'', clubCode:'', walletAddress:'' })
+  const [pendingClubs, setPendingClubs] = React.useState([])
+  const [pendingLoading, setPendingLoading] = React.useState(true)
+  const [decidingClub, setDecidingClub] = React.useState(null) // in-flight guard: holds the code
   const [addingClub, setAddingClub] = React.useState(false)
   const [removingClub, setRemovingClub] = React.useState(null) // I6: in-flight guard (holds the code being removed)
 
@@ -2534,6 +2537,40 @@ function ReferralScreen({ showToast }) {
       }
     } catch(e) { showToast('Request failed','error') }
     setAddingClub(false)
+  }
+
+  // ── Self-serve partner queue ────────────────────────────────────────────────
+  // Approval is the one human gate in club onboarding: it fires the on-chain
+  // setClubWallet from Bank and unlocks the club's kit. Deliberately one tap.
+  const loadPendingClubs = React.useCallback(() => {
+    setPendingLoading(true)
+    fetch('/api/clubs/pending', { headers: { 'Authorization': `Bearer ${adminToken()}` } })
+      .then(r => r.json())
+      .then(d => { setPendingClubs(Array.isArray(d.pending) ? d.pending : []); setPendingLoading(false) })
+      .catch(() => setPendingLoading(false))
+  }, [])
+
+  React.useEffect(() => { loadPendingClubs() }, [loadPendingClubs])
+
+  const decideClub = async (code, decision) => {
+    if (decidingClub) return
+    if (decision === 'deny' && !window.confirm(`Deny "${code}"? They'll be told the application is closed.`)) return
+    setDecidingClub(code)
+    try {
+      const r = await fetch(`/api/clubs/${decision}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` },
+        body: JSON.stringify({ clubCode: code }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        showToast(decision === 'approve'
+          ? `${code} approved · registered on-chain${d.txHash ? ` · tx ${d.txHash.slice(0,12)}…` : ''}`
+          : `${code} denied`, 'success')
+        loadPendingClubs(); loadClubs()
+      } else showToast(`Failed: ${d.error}`, 'error')
+    } catch { showToast('Request failed', 'error') }
+    finally { setDecidingClub(null) }
   }
 
   // Print-ready one-pager for a club: QR (?club=<code>), their code, and a plain-English
@@ -2662,6 +2699,45 @@ function ReferralScreen({ showToast }) {
         <div style={{fontSize:".82rem",fontWeight:700,color:"var(--text)",marginBottom:4,textTransform:"uppercase",letterSpacing:".08em"}}>Club Partners</div>
         <div style={{fontSize:".72rem",color:"var(--muted)",marginBottom:16,lineHeight:1.6}}>
           Registered clubs receive <strong style={{color:"var(--gold)"}}>10% of each round pool</strong> when the winning profile was submitted with their referral code. House share reduces from 20% → 10%. Set via on-chain <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>setClubWallet(code, wallet)</code>. "Earned" totals are indexed live from on-chain <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>ClubPayoutSent</code> events.
+        </div>
+
+        {/* Self-serve partner applications — the approval queue */}
+        <div className="stat-card" style={{marginBottom:16, borderColor: pendingClubs.length ? "var(--gold)" : undefined}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div style={{fontSize:".75rem",fontWeight:700,color:"var(--gold)",textTransform:"uppercase",letterSpacing:".08em"}}>
+              Partner Applications {pendingClubs.length > 0 && <span style={{background:"var(--gold)",color:"#0c0c14",borderRadius:999,padding:"1px 8px",marginLeft:8,fontSize:".7rem"}}>{pendingClubs.length}</span>}
+            </div>
+            <button onClick={loadPendingClubs} style={{background:"transparent",border:"1px solid var(--border-gold)",borderRadius:4,color:"var(--gold-dim)",padding:"3px 10px",fontSize:".66rem",cursor:"pointer"}}>Refresh</button>
+          </div>
+          <div style={{fontSize:".7rem",color:"var(--muted)",marginBottom:12,lineHeight:1.6}}>
+            Clubs that applied at <code style={{fontSize:".68rem",color:"var(--gold-dim)"}}>/clubs</code>. Approving registers them on-chain from the Bank wallet and unlocks their kit instantly — their application page updates by itself.
+          </div>
+          {pendingLoading
+            ? <div style={{color:"var(--muted)",fontSize:".8rem"}}>Loading applications…</div>
+            : pendingClubs.length === 0
+              ? <div style={{color:"var(--muted)",fontSize:".8rem"}}>No applications waiting.</div>
+              : <table className="data-table" style={{width:"100%"}}>
+                  <thead><tr><th>Club</th><th>City</th><th>Code</th><th>Payout Wallet</th><th>Applied</th><th>Decision</th></tr></thead>
+                  <tbody>{pendingClubs.map(c => (
+                    <tr key={c.club_code}>
+                      <td style={{fontWeight:700}}>{c.club_name}</td>
+                      <td style={{fontSize:".78rem",color:"var(--muted)"}}>{c.city}</td>
+                      <td><span style={{fontFamily:"monospace",fontSize:".82rem",color:"var(--gold)"}}>{c.club_code}</span></td>
+                      <td><span style={{fontFamily:"monospace",fontSize:".68rem",color:"var(--muted)"}}>{c.wallet_address?.slice(0,10)}…{c.wallet_address?.slice(-6)}</span></td>
+                      <td style={{fontSize:".68rem",color:"var(--muted)"}}>{c.created_at ? new Date(c.created_at).toLocaleDateString() : "—"}</td>
+                      <td style={{whiteSpace:"nowrap"}}>
+                        <button onClick={()=>decideClub(c.club_code,'approve')} disabled={!!decidingClub}
+                          style={{background:"rgba(46,204,113,.12)",border:"1px solid rgba(46,204,113,.4)",borderRadius:4,color:"#2ecc71",padding:"5px 12px",fontSize:".7rem",fontWeight:700,cursor:decidingClub?"not-allowed":"pointer",opacity:decidingClub?0.5:1,marginRight:6}}>
+                          {decidingClub === c.club_code ? 'Working…' : 'Approve'}
+                        </button>
+                        <button onClick={()=>decideClub(c.club_code,'deny')} disabled={!!decidingClub}
+                          style={{background:"rgba(232,64,90,.1)",border:"1px solid rgba(232,64,90,.3)",borderRadius:4,color:"var(--rose)",padding:"5px 12px",fontSize:".7rem",cursor:decidingClub?"not-allowed":"pointer",opacity:decidingClub?0.5:1}}>
+                          Deny
+                        </button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>}
         </div>
 
         {/* Add Club Form */}
