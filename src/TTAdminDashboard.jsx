@@ -3169,9 +3169,19 @@ function SettingsScreen() {
 const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'; // TTSVotingV3d
 const CHAINLINK_REGISTRY = '0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743';
 // V3d cutover (2026-06-24): Keeper3 calendar-pinned upkeep is the single live upkeep.
-// Old V3b/V3c-era upkeeps to be cancelled at automation.chain.link to recover LINK.
+//
+// Verified 2026-08-07: this upkeep is ACTIVE and healthy — 43.97 LINK against a 2.42 LINK
+// minimum, forwarder set, not paused. It is NOT a source of recoverable LINK, and the
+// dashboard used to tell you to "withdraw from deprecated upkeep" when Bank fuel ran low.
+// That advice was wrong twice over: the live upkeep must keep its balance, and the old
+// V3b/V3c-era upkeeps were already drained. If Bank LINK is below the floor the only real
+// fix is to BUY LINK and send it to the Bank wallet.
+//
+// CRE (Chainlink Runtime Environment): PARKED. Not adopted, not scheduled, and nothing in
+// this dashboard depends on it. Automation + VRF as configured here are the live path.
 const UPKEEPS = [
-  { name: 'TTS Game Keeper V3d', known: 10, id: '113446314522587151772280129999432062856069985411437977877707978564657748455208' },
+  // `known` is only the fallback shown if the on-chain read fails; refreshed 2026-08-07.
+  { name: 'TTS Game Keeper V3d', known: 44, id: '113446314522587151772280129999432062856069985411437977877707978564657748455208' },
 ];
 // VRF v2.5 coordinator + subscription (funds settlement fulfillment — distinct from
 // the automation upkeep above). A round strands here if the DON never fulfills.
@@ -3389,7 +3399,7 @@ function SystemScreen() {
           ) : (<>
             <tr><td style={{ color:'var(--muted)' }}>Status</td><td>{autofund.enabled === false ? <span style={{ color:'#f39c12' }}>⏸️ Disabled (kill switch)</span> : <span style={{ color:'#2ecc71' }}>✅ Armed</span>}</td></tr>
             <tr><td style={{ color:'var(--muted)' }}>Rule</td><td style={{ fontSize:'.72rem' }}>Top up when sub &lt; 25 LINK → to 30. Reserve ~{autofund.reserveLink ?? 15} LINK. Caps: 30/top-up, 60/7&nbsp;days. Bank floor 5 LINK.</td></tr>
-            <tr><td style={{ color:'var(--muted)' }}>Bank LINK (fuel)</td><td><strong style={{ color: (autofund.bankLink ?? 0) < 5 ? '#e84040' : '#2ecc71' }}>{autofund.bankLink != null ? autofund.bankLink.toFixed(3) : '—'} LINK</strong>{(autofund.bankLink ?? 0) < 5 && <span style={{ fontSize:'.66rem', color:'#e84040', marginLeft:6 }}>⛔ below floor — no fuel (withdraw from deprecated upkeep)</span>}</td></tr>
+            <tr><td style={{ color:'var(--muted)' }}>Bank LINK (fuel)</td><td><strong style={{ color: (autofund.bankLink ?? 0) < 5 ? '#e84040' : '#2ecc71' }}>{autofund.bankLink != null ? autofund.bankLink.toFixed(3) : '—'} LINK</strong>{(autofund.bankLink ?? 0) < 5 && <span style={{ fontSize:'.66rem', color:'#e84040', marginLeft:6 }}>⛔ below floor — no fuel. Fix: buy LINK and send it to the Bank wallet.</span>}</td></tr>
             <tr><td style={{ color:'var(--muted)' }}>7-day topped up</td><td>{(autofund.sevenDayTopupTotal ?? 0).toFixed(2)} / {autofund.sevenDayCap ?? 60} LINK</td></tr>
             <tr><td style={{ color:'var(--muted)' }}>Last decision</td><td style={{ fontSize:'.72rem' }}>{autofund.lastDecision || '—'}</td></tr>
             {autofund.lastTopupAt && <tr><td style={{ color:'var(--muted)' }}>Last top-up</td><td style={{ fontSize:'.72rem' }}>+{autofund.lastTopupAmount} LINK · {new Date(autofund.lastTopupAt).toLocaleString()}</td></tr>}
@@ -4482,16 +4492,16 @@ function CommandScreen({ setActive }) {
 // ─── DAILY PRIORITIES ─────────────────────────────────────────────────────────
 const PRIORITY_GROUPS = [
   {
+    // Empty renders as null (see the visibleTasks length guard below), so this group
+    // simply disappears until something genuinely needs Jim.
+    //
+    // Removed 2026-08-07: "Deploy NFT-enabled voting contract". Stale since the V3d
+    // cutover — V3d 0x783b8cd8… is live and owns rounds, and TTSRoundNFT's minter was
+    // set to V3d on 2026-06-28, so the NFT-enabled contract has been deployed and wired
+    // for months. It sat here flagged HIGH PRIORITY, which trains you to ignore the one
+    // banner that is supposed to mean something.
     key: 'action', title: 'Action Required', emoji: '🚨', reset: 'never',
-    tasks: [
-      {
-        id: 'a1',
-        label: '🚀 Deploy NFT-enabled voting contract — run forge create in terminal, paste Deployed to: address into Claude Code',
-        cat: 'Deploy',
-        priority: 'high',
-        showFrom: '2026-05-04',
-      },
-    ]
+    tasks: []
   },
   {
     key: 'daily', title: "Today's Tasks", emoji: '☀️', reset: 'daily',
