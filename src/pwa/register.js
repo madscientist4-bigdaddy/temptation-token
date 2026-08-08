@@ -76,16 +76,30 @@ export function registerSW(onUpdateReady) {
       })
       .catch((e) => console.warn('[pwa] service worker registration failed', e))
 
-    // Reload exactly once, when the new worker takes control.
+    // Reload when a NEW worker takes control — but only when the user asked for it.
+    //
+    // `clients.claim()` in the worker's activate step also fires controllerchange, on the
+    // very first visit, when there was no previous controller at all. Reloading there
+    // would bounce every first-time visitor for no reason and could wipe a half-filled
+    // vote or submit form. So the reload is gated on `userRequestedUpdate`, set only by
+    // activate() below, and fires at most once.
     let reloading = false
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return
+      if (reloading || !userRequestedUpdate) return
       reloading = true
       window.location.reload()
     })
   }
 }
 
+// Set when the page explicitly asks a waiting worker to take over (the "Refresh" button
+// on the update notice). Module-scoped so the controllerchange listener can read it.
+let userRequestedUpdate = false
+
 function activate(reg) {
+  userRequestedUpdate = true
   reg.waiting?.postMessage('SKIP_WAITING')
+  // If the worker is already gone from `waiting` (raced past us), reload directly so the
+  // Refresh button is never a no-op.
+  if (!reg.waiting) window.location.reload()
 }

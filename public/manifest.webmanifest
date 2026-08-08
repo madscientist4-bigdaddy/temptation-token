@@ -1,0 +1,48 @@
+{
+  "name": "Temptation Token — Vote. Win. Earn $TTS.",
+  "short_name": "Temptation",
+  "description": "The vote-to-earn game on Base. Vote $TTS on weekly profiles — the top voter and the winning profile split the pool.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#05050a",
+  "theme_color": "#05050a",
+  "categories": ["games", "finance", "entertainment"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icon-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/pwa/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Play this round",
+      "short_name": "Play",
+      "description": "Vote on this week's profiles",
+      "url": "/?tab=play&source=pwa",
+      "icons": [{ "src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Leaderboard",
+      "short_name": "Standings",
+      "description": "Live standings for the current round",
+      "url": "/?tab=leaderboard&source=pwa",
+      "icons": [{ "src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Submit a photo",
+      "short_name": "Submit",
+      "description": "Enter this week's round",
+      "url": "/?tab=submit&source=pwa",
+      "icons": [{ "src": "/pwa/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

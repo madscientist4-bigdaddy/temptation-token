@@ -66,6 +66,13 @@ export default function InstallPrompt() {
     }
   }, [])
 
+  // Body class drives the FAB-hiding rule in CSS below, and is always cleaned up on
+  // unmount so the chatbot can never be left permanently hidden.
+  useEffect(() => {
+    document.body.classList.toggle('ttip-modal', iosSheet)
+    return () => document.body.classList.remove('ttip-modal')
+  }, [iosSheet])
+
   const dismiss = () => {
     safeStore.set(DISMISS_KEY, String(Date.now()))
     setMode(null)
@@ -114,10 +121,22 @@ export default function InstallPrompt() {
             <p className="ttip-lead">
               iOS installs apps from the Safari share menu — it takes two taps.
             </p>
+            {/* The step text is wrapped in a single <span>: the <li> is a flex row, and
+                flex treats every bare text node and <strong> as its OWN item — which
+                shreds the sentence into separately-wrapping fragments. */}
             <ol className="ttip-steps">
-              <li><span className="ttip-n">1</span> Tap the <strong>Share</strong> icon in Safari&apos;s bottom bar (the square with an arrow pointing up).</li>
-              <li><span className="ttip-n">2</span> Scroll and choose <strong>Add to Home Screen</strong>.</li>
-              <li><span className="ttip-n">3</span> Tap <strong>Add</strong>. Temptation Token now opens full-screen like a native app.</li>
+              <li>
+                <span className="ttip-n">1</span>
+                <span className="ttip-t">Tap the <strong>Share</strong> icon in Safari&apos;s bottom bar — the square with an arrow pointing up.</span>
+              </li>
+              <li>
+                <span className="ttip-n">2</span>
+                <span className="ttip-t">Scroll down and choose <strong>Add to Home Screen</strong>.</span>
+              </li>
+              <li>
+                <span className="ttip-n">3</span>
+                <span className="ttip-t">Tap <strong>Add</strong>. Temptation Token now opens full-screen, like a native app.</span>
+              </li>
             </ol>
             <button className="ttip-done" onClick={() => setIosSheet(false)}>Got it</button>
             <button className="ttip-never" onClick={dismiss}>Don&apos;t show this again</button>
@@ -178,10 +197,8 @@ const CSS = `
 }
 .ttip-lead { font-size: .72rem; color: var(--muted, rgba(240,232,216,.5)); text-align: center; margin-bottom: 18px; }
 .ttip-steps { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-.ttip-steps li {
-  display: flex; gap: 11px; align-items: flex-start;
-  font-size: .74rem; line-height: 1.55; color: var(--text, #f0e8d8);
-}
+.ttip-steps li { display: flex; gap: 11px; align-items: flex-start; }
+.ttip-t { flex: 1; font-size: .74rem; line-height: 1.55; color: var(--text, #f0e8d8); }
 .ttip-steps strong { color: var(--gold-light, #f0d060); font-weight: 700; }
 .ttip-n {
   flex-shrink: 0; width: 21px; height: 21px; border-radius: 50%;
@@ -198,4 +215,8 @@ const CSS = `
   width: 100%; background: none; border: none; color: var(--muted, rgba(240,232,216,.5));
   font-family: inherit; font-size: .68rem; padding: 14px; min-height: 44px; cursor: pointer;
 }
+/* The support chatbot FAB is pinned bottom-right at z-index 99999 and would sit on top
+   of this sheet's dismiss link. Hide it for as long as the sheet is up — support is one
+   tap away again the moment the sheet closes. */
+body.ttip-modal .tts-fab { display: none !important; }
 `
