@@ -81,6 +81,14 @@
       "destination": "/api/rpc?action=paymaster"
     },
     {
+      "source": "/audit",
+      "destination": "/audit.html"
+    },
+    {
+      "source": "/audit/",
+      "destination": "/audit.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
