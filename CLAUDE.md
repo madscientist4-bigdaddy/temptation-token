@@ -53,11 +53,30 @@ python tts_bot.py    # Telegram bot worker (separate process, runs on Railway)
 
 ## Deploy
 ```bash
-npm run build && node scripts/check-prize-split.mjs   # local gate
-npx vercel --prod                                     # app → Vercel
+npm run build && node scripts/check-prize-split.mjs   # canonical-value gate
+npm run deploy                                        # GUARDED deploy → Vercel
 git push                                              # bot → Railway auto-deploys
 ```
 Always `git add` + commit + push after a change (unless mid-task).
+
+**Use `npm run deploy`, not bare `npx vercel --prod`.** It runs
+`scripts/predeploy-guard.mjs` first and REFUSES to ship if:
+1. anything is untracked/modified under `src/ api/ lib/` or in `package.json`,
+   `package-lock.json`, `vercel.json`, `.vercelignore` — an uncommitted file the build
+   imports is the classic Vercel-only "Module not found";
+2. `vercel build --prod` fails locally (honours real project settings);
+3. `.vercelignore` has an unanchored pattern, or would strip any tracked file under
+   `src/ api/ lib/`.
+
+Check 3 is separate from check 2 on purpose: `.vercelignore` controls what is **uploaded**,
+not the local filesystem, so a stripping pattern still gives `vercel build` exit 0 and
+only fails remotely. A bare `lib/` once ate `src/lib/` this way (gitignore semantics — a
+pattern with no internal slash matches at any depth). **Every `.vercelignore` pattern must
+be root-anchored with a leading `/`.** Root `lib/` must never be excluded wholesale — it
+holds `adminAuth.js`, `marketing/*`, `nft/art.js` that `api/*.js` import.
+
+Requires `uv` on PATH (`brew install uv`) — Vercel installs Python deps with it, and the
+guard cannot verify the real build without it.
 
 ---
 
@@ -90,7 +109,7 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 | Frontend (prod) | ✅ LIVE | `app.temptationtoken.io`, 12 functions |
 | Admin dashboard | ✅ LIVE | server-side auth, gated data proxy, anon key purged |
 | Club referral codes | ✅ LIVE | user enters club code on submit → auto-linked on-chain at admin approval. Club registration is admin-only |
-| NFT auto-mint | 🟢 WIRED (unexercised) | V3d mints 3 NFTs on settlement (winner / top voter / house). Minter now = V3d (fixed 2026-06-28). `totalSupply()=0` — never minted yet (needs a round settling with ≥1 vote) |
+| NFT auto-mint | 🟢 WIRED (unexercised) | V3d mints 3 NFTs on settlement (winner / top voter / house). `V3d.nftContract()` = **Trophy NFT `0x02DDd0e6…`** (verified on-chain 2026-08-08), NOT the old TTSRoundNFT. Trophy `totalSupply()=0` — mints from Round 6 on. `src/App.jsx` still points at the old NFT address |
 | Telegram bot | ✅ LIVE + honest | running on Railway; staking/referral/VIP copy says "coming soon" — no undeliverable promises |
 | **Staking** | 🟢 ON-CHAIN LIVE / UI gated | Contracts deployed+verified on Base; **10B reward pool migrated 2026-08-07** into proxy `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` (old `0xaA12B889…` drained to 0, impl now RescueUUPS). V3d wired to it; mainnet E2E stake/unstake proven tax-free. Thresholds (TTS): 6k/12k/30k/120k/600k · APR 8/12/18/32/45% · **no lock-up** · 7-day multiplier clock. Frontend/bot still show "Coming Soon" — go-live is env-only (`VITE_STAKING_ENABLED` + `STAKING_LIVE`). See `staking/PHASE2_RUNBOOK.md` |
 | **User referral payouts** | ✅ LIVE (E2E-verified in prod 2026-07-01) | Web `?ref=` capture → `/api/bonus?action=refer-capture` (unique referee). Qualifying-vote payout via `?action=referral`, paid ONLY from `REFERRAL_WALLET_PRIVATE_KEY` (never Bank). `referral_enabled=true`. Anti-sybil all verified rejecting in prod: self-referral, double-capture, referrer-hijack, kill-switch, funding-source (Alchemy `getAssetTransfers`, bounded at TTS deploy block), fail-closed; ≥500 TTS threshold gates payout. Auto-funder (Marketing→referral wallet, never Bank) armed & correctly idle. Bot referral still coming-soon (no telegram→wallet bridge). |
@@ -106,7 +125,8 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 | **TTS Token (UUPS proxy)** | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` | live (v2 impl `0xb995b63c`, M-1 fix) |
 | **TTSVotingV3d (CANONICAL)** | `0x783b8cd80b586b723188c93ef94ee1beede617b4` | ✅ live, owns rounds |
 | **TTSKeeper3 (CANONICAL)** | `0x363ce4960e3b459f5892587a37ae1ff2ed04442c` | ✅ owns V3d, automated |
-| **TTSRoundNFT** | `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` | minter = V3d (set 2026-06-28) |
+| **Trophy NFT (CANONICAL)** | `0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5` | ✅ `V3d.nftContract()` points here (verified on-chain 2026-08-08). `totalSupply()=0` — V3d mints here from Round 6 on. Used by `api/profiles.js` + `api/scheduler.js` (`TROPHY_NFT`) |
+| TTSRoundNFT (OLD) | `0x0768e862D3AB14d85213BfeF8f1D012E77721da2` | ⚠️ superseded — no longer V3d's `nftContract`. `totalSupply()=6` (legacy mints). Still hardcoded in `src/App.jsx` — stale, needs updating |
 | **TTSStaking (proxy, CANONICAL)** | `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` | ✅ live, holds the 10B reward pool |
 | TTSStaking impl | `0x147f4a1238f600eee143a90aba91f6b66f8fb53b` | Sourcify exact_match |
 | Staking Timelock (UPGRADER) | `0xa4fbf397485763e39102dcfaefcbf9794df55875` | 2-day delay; Safe = proposer/executor |
@@ -296,8 +316,8 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
 - **Staking**: build frontend stake path + deploy `TTSStakingV2` (`upgradeToAndCall`
   initializeV2 from Bank) — see `outputs/staking_v2_diff.md`. Until then, voting tier
   boost is 1x for all.
-- **NFT**: minter now V3d; will mint once a round settles with ≥1 vote (`totalSupply`
-  still 0).
+- **NFT**: V3d mints to Trophy `0x02DDd0e6…` (`totalSupply` still 0; mints from Round 6 on).
+  `src/App.jsx` still hardcodes the retired TTSRoundNFT `0x0768e862…` — update it.
 - **Trust/scanners**: SolidProof portal access + KYC ($600); GoPlus appeal
   (`service@gopluslabs.io`); Blockaid #1263614; CoinGecko/DexScreener resubmission.
   Detail + templates in history / `outputs/`.
