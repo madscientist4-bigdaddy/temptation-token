@@ -1,0 +1,6 @@
+# Generated artifacts — regenerate with the scripts, don't commit creator-specific output.
+packs/
+out/
+standings.json
+attribution.json
+agencies.json

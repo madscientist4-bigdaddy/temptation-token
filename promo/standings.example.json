@@ -1,0 +1,20 @@
+{
+  "round": 6,
+  "updated": "2026-08-09T18:00:00Z",
+  "standings": [
+    { "rank": 1, "name": "Demo Creator",  "handle": "@democreator",  "votes": 1240 },
+    { "rank": 2, "name": "Sample Two",    "handle": "@sampletwo",    "votes": 1195 },
+    { "rank": 3, "name": "Sample Three",  "handle": "@samplethree",  "votes": 1180 },
+    { "rank": 4, "name": "Sample Four",   "handle": "@samplefour",   "votes": 860  },
+    { "rank": 5, "name": "Sample Five",   "handle": "@samplefive",   "votes": 640  },
+    { "rank": 6, "name": "Sample Six",    "handle": "@samplesix",    "votes": 410  },
+    { "rank": 7, "name": "Sample Seven",  "handle": "@sampleseven",  "votes": 300  },
+    { "rank": 8, "name": "Sample Eight",  "handle": "@sampleeight",  "votes": 215  },
+    { "rank": 9, "name": "Sample Nine",   "handle": "@samplenine",   "votes": 140  },
+    { "rank": 10, "name": "Sample Ten",   "handle": "@sampleten",    "votes": 95   }
+  ],
+  "new_creators": [
+    { "name": "Sample Nine", "handle": "@samplenine" },
+    { "name": "Sample Ten",  "handle": "@sampleten"  }
+  ]
+}
