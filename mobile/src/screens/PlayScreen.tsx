@@ -65,33 +65,37 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* The header sits ABOVE the carousel, not in ListHeaderComponent.
+          On a horizontal FlatList the header is laid out along the horizontal axis —
+          i.e. beside the cards, at its natural unconstrained width — which pushed the
+          title/countdown off the right edge and shoved every profile card off-screen.
+          A plain sibling in the vertical parent lays out correctly. */}
+      <View>
+        <SectionHead
+          eyebrow="Live on Base Blockchain"
+          title="Vote & Win"
+          subtitle="Swipe through profiles · Place $TTS to win 35% of the pool"
+        />
+        <View style={st.timer}>
+          <View style={{ flexShrink: 1 }}>
+            <Text style={st.tl}>Round Ends{roundId != null ? ` · Round ${roundId}` : ''}</Text>
+            <Text style={st.tv}>{settling ? 'Settling…' : cd}</Text>
+          </View>
+          <View style={st.liveRow}>
+            <View style={st.dot} />
+            <Text style={st.liveTxt}>Live</Text>
+          </View>
+        </View>
+        {pool > 0 ? (
+          <Text style={st.pool}>Pool this round · {pool.toLocaleString()} $TTS</Text>
+        ) : null}
+        {offline ? <Text style={st.offline}>Offline preview — showing sample profiles</Text> : null}
+      </View>
+
       <FlatList
         data={loading ? [] : profiles}
         keyExtractor={(p) => p.profileId}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={colors.gold} />}
-        ListHeaderComponent={
-          <View>
-            <SectionHead
-              eyebrow="Live on Base Blockchain"
-              title="Vote & Win"
-              subtitle="Swipe through profiles · Place $TTS to win 35% of the pool"
-            />
-            <View style={st.timer}>
-              <View>
-                <Text style={st.tl}>Round Ends{roundId != null ? ` · Round ${roundId}` : ''}</Text>
-                <Text style={st.tv}>{settling ? 'Settling…' : cd}</Text>
-              </View>
-              <View style={st.liveRow}>
-                <View style={st.dot} />
-                <Text style={st.liveTxt}>Live</Text>
-              </View>
-            </View>
-            {pool > 0 ? (
-              <Text style={st.pool}>Pool this round · {pool.toLocaleString()} $TTS</Text>
-            ) : null}
-            {offline ? <Text style={st.offline}>Offline preview — showing sample profiles</Text> : null}
-          </View>
-        }
         renderItem={({ item, index }) => (
           <View style={{ width: cardW, paddingHorizontal: 0 }}>
             <VoteCard

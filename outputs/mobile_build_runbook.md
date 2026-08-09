@@ -78,7 +78,31 @@ No Play Console is required for side-loading. The $25 Play Console is only neede
 
 ---
 
-## iOS simulator — no Apple account required
+## iOS simulator — BUILT ✅ (no Apple account required)
+
+Artifact produced 2026-08-09, installed and launched on an iPhone 16e simulator:
+
+```
+outputs/TemptationToken-sim.app.tar.gz      14 MB (52 MB unpacked)
+bundle id io.temptationtoken.app · version 0.1.0 · Release · iphonesimulator
+```
+
+Gitignored (`outputs/*.app.tar.gz`) — a 14 MB binary does not belong in git history.
+Rebuild with the commands below.
+
+```bash
+tar -xzf outputs/TemptationToken-sim.app.tar.gz
+xcrun simctl boot "iPhone 16e"          # any booted simulator works
+xcrun simctl install booted TemptationToken.app
+xcrun simctl launch booted io.temptationtoken.app
+```
+
+Verified running: all five tabs, live Round 6 countdown, 18 live profiles in the
+carousel, and the Staking tab reading the 10,000,000,000 $TTS reward pool straight off
+`0x7848cc…` through the hand-rolled decoder — with the Coming Soon gate correctly held
+shut (`STAKING_LIVE` false).
+
+## Building it yourself
 
 A simulator build is never code-signed, so it needs no Apple Developer account. Two routes:
 

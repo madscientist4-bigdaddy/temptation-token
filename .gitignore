@@ -45,3 +45,8 @@ lib/openzeppelin-contracts-upgradeable/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Built mobile artifacts — large binaries, regenerate with the mobile build runbook
+outputs/*.app.tar.gz
+outputs/*.apk
+outputs/*.ipa
