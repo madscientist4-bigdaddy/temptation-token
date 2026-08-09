@@ -17,15 +17,25 @@ export function clubLink(code) {
   return `${APP_ORIGIN}/?club=${encodeURIComponent(String(code).trim().toLowerCase())}`
 }
 
-/** QR as an SVG string, embedded inline so the page needs no network at print time. */
+/**
+ * QR as an SVG string, embedded inline so the page needs no network at print time.
+ *
+ * The fixed width/height attributes are STRIPPED and the viewBox kept, so the SVG scales
+ * to whatever box it is dropped into. qrcode emits width="520" height="520", which on the
+ * phone-sized kit page overflowed its 460px card and forced horizontal scrolling — the
+ * page is opened on a phone more often than anywhere else. The print one-pager sets its
+ * own size in CSS (.qrbox svg { width: 2.5in }), so it is unaffected.
+ */
 export async function clubQrSvg(code) {
-  return QRCode.toString(clubLink(code), {
+  const svg = await QRCode.toString(clubLink(code), {
     type: 'svg',
     errorCorrectionLevel: 'M', // survives a photocopy; 'H' makes the modules too dense to scan across a dim room
     margin: 1,
     width: 520,
     color: { dark: '#0c0c14', light: '#ffffff' },
   })
+  return svg.replace(/<svg([^>]*)>/, (m, attrs) =>
+    `<svg${attrs.replace(/\s(width|height)="[^"]*"/g, '')} width="100%" height="100%" style="display:block">`)
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (

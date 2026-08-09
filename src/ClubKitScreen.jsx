@@ -87,7 +87,8 @@ export default function ClubKitScreen({ code }) {
       <p style={S.sub}>Print the one-pager for the dressing room, or share the link directly with your performers.</p>
 
       <div style={{ ...S.card, textAlign: 'center' }}>
-        <div style={{ background: '#fff', borderRadius: 10, padding: 14, display: 'inline-block', marginBottom: 12 }}
+        <div style={{ background: '#fff', borderRadius: 10, padding: 14, marginBottom: 12,
+                      width: '100%', maxWidth: 260, marginLeft: 'auto', marginRight: 'auto', boxSizing: 'border-box' }}
              dangerouslySetInnerHTML={{ __html: qr }} />
         <div style={S.code}>{code}</div>
         <div style={{ ...S.mono, marginTop: 6 }}>{link}</div>
