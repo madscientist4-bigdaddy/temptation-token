@@ -1,28 +1,34 @@
-# Vercel only builds the Vite web app (src/) and the serverless functions (api/).
-# Everything below is either a separate project or vendored Solidity dependencies.
-# Uploading them blew past Vercel's 15,000-file deploy limit (mobile/node_modules alone
-# is ~20,500 files).
+# Vercel builds ONLY the Vite web app (src/) and the serverless functions (api/).
 #
-# CAREFUL: root lib/ is NOT excluded — it holds lib/adminAuth.js, lib/marketing/* and
-# lib/nft/art.js, all imported by api/*.js. Only the vendored Foundry deps inside it are
-# excluded. Excluding lib/ wholesale breaks the build.
+# EVERY pattern here is ROOT-ANCHORED with a leading slash. This matters: .vercelignore
+# uses .gitignore semantics, where a pattern with no internal slash matches at ANY depth.
+# A bare "lib/" would therefore also strip src/lib/ — which holds clubKit.js, gasless.js,
+# txError.js and asktts-prompt.js — and the build would die on "Module not found" that
+# reproduces nowhere locally. Anchoring makes that class of mistake impossible.
+#
+# Do NOT exclude root lib/ wholesale either: it holds adminAuth.js, marketing/* and
+# nft/art.js, all imported by api/*.js. Only its vendored Solidity deps are excluded.
+#
+# Why any of this exists: Vercel caps a deploy at 15,000 files and the repo is well past
+# that (mobile/node_modules alone is ~20,500).
 
 # React Native app — built with EAS, never on Vercel
-mobile/
+/mobile/
 
-# Foundry projects
-staking/
-trophy/
-out/
-out-flat/
-cache/
-broadcast/
-artifacts/
+# Foundry projects and their build output
+/staking/
+/trophy/
+/out/
+/out-flat/
+/cache/
+/broadcast/
+/artifacts/
 
-# Vendored Solidity deps living under the otherwise-needed lib/
-lib/forge-std/
-lib/openzeppelin-contracts-upgradeable/
+# Vendored Solidity deps living under the otherwise-required root lib/
+/lib/forge-std/
+/lib/openzeppelin-contracts-upgradeable/
 
-# Local tooling
-.foundry/
-wp-plugins/
+# Local tooling / prebuilt output
+/.foundry/
+/wp-plugins/
+/.vercel/output/

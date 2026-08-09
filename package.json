@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "node scripts/predeploy-guard.mjs",
+    "deploy": "node scripts/predeploy-guard.mjs && npx vercel --prod"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
