@@ -43,9 +43,13 @@ async function j<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 // ── Types for the submit / KYC / referral flows ─────────────────────────────
+// Verified against prod 2026-08-09: a wallet with no record returns
+// {"status":"not_started"}, which is why that member is in the union — omitting it made
+// the type quietly wrong even though the runtime checks (=== 'approved' / 'pending')
+// still behaved.
 export type KycStatus = {
   verified?: boolean
-  status?: 'approved' | 'pending' | 'needs_review' | 'declined' | null
+  status?: 'approved' | 'pending' | 'needs_review' | 'declined' | 'not_started' | null
   ageAcknowledged?: boolean
 }
 
