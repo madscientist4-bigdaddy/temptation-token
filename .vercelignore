@@ -1,0 +1,28 @@
+# Vercel only builds the Vite web app (src/) and the serverless functions (api/).
+# Everything below is either a separate project or vendored Solidity dependencies.
+# Uploading them blew past Vercel's 15,000-file deploy limit (mobile/node_modules alone
+# is ~20,500 files).
+#
+# CAREFUL: root lib/ is NOT excluded — it holds lib/adminAuth.js, lib/marketing/* and
+# lib/nft/art.js, all imported by api/*.js. Only the vendored Foundry deps inside it are
+# excluded. Excluding lib/ wholesale breaks the build.
+
+# React Native app — built with EAS, never on Vercel
+mobile/
+
+# Foundry projects
+staking/
+trophy/
+out/
+out-flat/
+cache/
+broadcast/
+artifacts/
+
+# Vendored Solidity deps living under the otherwise-needed lib/
+lib/forge-std/
+lib/openzeppelin-contracts-upgradeable/
+
+# Local tooling
+.foundry/
+wp-plugins/

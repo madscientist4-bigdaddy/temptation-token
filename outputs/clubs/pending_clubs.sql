@@ -28,3 +28,15 @@ revoke all on public.pending_clubs from anon, authenticated;
 
 -- Lets the admin dashboard read the queue through /api/admin-data.
 -- (api/admin.js ALLOWED set already updated to include 'pending_clubs'.)
+
+-- ── STATUS 2026-08-09 ────────────────────────────────────────────────────────
+-- This table does NOT exist yet, so /api/clubs/apply currently returns 503
+-- "Applications are temporarily unavailable" — by design, it fails closed rather than
+-- accepting applications it cannot dedupe or rate-limit.
+--
+-- Everything else in the flow is live and verified against mainnet:
+--   • /clubs renders and connects a wallet
+--   • approval -> on-chain setClubWallet -> kit unlock -> deregister -> kit re-locks
+--     (verified end to end with throwaway club "zzze2elounge", now cleaned up)
+--
+-- Run this one statement and the apply path opens. Nothing else is needed.
