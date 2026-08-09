@@ -42,9 +42,62 @@ async function j<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
+// ── Types for the submit / KYC / referral flows ─────────────────────────────
+export type KycStatus = {
+  verified?: boolean
+  status?: 'approved' | 'pending' | 'needs_review' | 'declined' | null
+  ageAcknowledged?: boolean
+}
+
+export type UploadInit = {
+  alreadyVerified?: boolean
+  bucketBase?: string
+  id?: { path: string; url: string }
+  selfie?: { path: string; url: string }
+  error?: string
+}
+
+export type SubmitPayload = {
+  walletAddress: string
+  displayName: string
+  linkTitle?: string
+  linkUrl?: string
+  imageUrl: string // data: URI
+  referralCode?: string
+  roundId?: number
+  nftConsent: boolean
+  idDocPath?: string
+  selfiePath?: string
+}
+
+const post = <T,>(path: string, body: unknown) =>
+  j<T>(path, { method: 'POST', body: JSON.stringify(body) })
+
 export const api = {
   // Play/Leaderboard — all approved profiles (round-agnostic, safe fields).
   listProfiles: () => j<{ profiles: Profile[] }>('/api/public-profiles'),
   // Community + round stats (members, voters this round, current round id).
   communityStats: () => j<CommunityStats>('/api/community-stats'),
+
+  // ── Identity ──────────────────────────────────────────────────────────────
+  kycStatus: (wallet: string) => j<KycStatus>(`/api/kyc-status?wallet=${wallet}`),
+  /** Ask for MANUAL admin review — the live launch KYC path (Persona stays sandbox). */
+  kycRequest: (walletAddress: string) =>
+    post<{ ok: boolean; status?: string; alreadyVerified?: boolean }>('/api/kyc?action=request', { walletAddress }),
+  /** Mint short-lived signed PUT urls for the government ID + selfie. */
+  idUploadInit: (walletAddress: string) =>
+    post<UploadInit>('/api/kyc?action=id-upload-init', { walletAddress }),
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  submitQuota: (wallet: string) => j<{ usedThisWeek: number; remaining: number }>(`/api/profiles?action=submit&wallet=${wallet}`),
+  submitProfile: (payload: SubmitPayload) => post<{ ok: boolean }>('/api/submit-profile', payload),
+
+  // ── Referral ──────────────────────────────────────────────────────────────
+  referCapture: (referrerWallet: string, refereeWallet: string) =>
+    post<{ ok: boolean }>('/api/bonus?action=refer-capture', { referrerWallet, refereeWallet, source: 'mobile' }),
+  signupBonus: (walletAddress: string) =>
+    post<{ success: boolean; amount?: number; txHash?: string; alreadyClaimed?: boolean; reason?: string }>(
+      '/api/signup-bonus',
+      { walletAddress }
+    ),
 }

@@ -2,22 +2,42 @@
   "cli": { "version": ">= 5.9.0" },
   "build": {
     "development": {
-      "//": "Dev client with the REAL wallet path enabled. EXPO_PUBLIC_WALLET_ENABLED=true flips WALLET_ENABLED (src/config/features.ts) so WalletConnect/voting load. Requires the wallet deps installed (see mobile/README wallet section).",
       "developmentClient": true,
       "distribution": "internal",
       "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
     },
-    "preview": {
-      "//": "Internal testing: TestFlight (iOS) + Play internal track (Android). Wallet enabled.",
+    "apk": {
       "distribution": "internal",
-      "ios": { "simulator": false },
+      "channel": "apk",
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "false" }
+    },
+    "apk-wallet": {
+      "distribution": "internal",
+      "channel": "apk-wallet",
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
+    },
+    "ios-simulator": {
+      "distribution": "internal",
+      "channel": "ios-simulator",
+      "ios": { "simulator": true },
+      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "false" }
+    },
+    "preview": {
+      "distribution": "internal",
       "channel": "preview",
+      "ios": { "simulator": false },
       "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
     },
     "production": {
       "channel": "production",
       "autoIncrement": true,
-      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_WALLET_ENABLED": "true",
+        "EXPO_PUBLIC_STAKING_LIVE": "false"
+      }
     }
   },
   "submit": {

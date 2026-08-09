@@ -10,19 +10,48 @@ import {
 } from 'react-native'
 import { PlayScreen } from './src/screens/PlayScreen'
 import { LeaderboardScreen } from './src/screens/LeaderboardScreen'
+import { SubmitScreen } from './src/screens/SubmitScreen'
+import { StakingScreen } from './src/screens/StakingScreen'
+import { ReferralScreen } from './src/screens/ReferralScreen'
 import { WalletSheet } from './src/components/WalletSheet'
+import { WalletProvider, useWallet } from './src/lib/wallet'
 import { loadWallet } from './src/wallet/loader'
+import { readTtsBalance, formatTTS } from './src/lib/chain'
 import { colors, serif, sans, MAX_WIDTH } from './src/theme'
 
-type TabKey = 'play' | 'leaderboard'
+type TabKey = 'play' | 'leaderboard' | 'submit' | 'stake' | 'refer'
 const TABS: { k: TabKey; l: string }[] = [
   { k: 'play', l: 'Play' },
   { k: 'leaderboard', l: 'Leaderboard' },
+  { k: 'submit', l: 'Submit' },
+  { k: 'stake', l: 'Stake' },
+  { k: 'refer', l: 'Refer' },
 ]
 
+// WalletProvider has to sit above everything that reads the address, so App is a thin
+// wrapper around the real shell.
 export default function App() {
+  return (
+    <WalletProvider>
+      <Shell />
+    </WalletProvider>
+  )
+}
+
+function Shell() {
   const [tab, setTab] = useState<TabKey>('play')
   const [walletOpen, setWalletOpen] = useState(false)
+  const { address } = useWallet()
+  const [balance, setBalance] = useState<bigint | null>(null)
+
+  // The wallet bar shows a real balance as soon as an address is known — this is a plain
+  // eth_call, so it works in Expo Go with no wallet SDK involved.
+  useEffect(() => {
+    let live = true
+    if (!address) { setBalance(null); return }
+    readTtsBalance(address).then((b) => { if (live) setBalance(b) }).catch(() => {})
+    return () => { live = false }
+  }, [address, tab])
 
   // In a dev build (WALLET_ENABLED) initialise Reown AppKit lazily. In Expo Go this is a
   // no-op — loadWallet() returns null without ever importing the native modules.
@@ -43,10 +72,13 @@ export default function App() {
           </View>
           <View style={st.bal}>
             <Text style={st.balLabel}>Balance</Text>
-            <Text style={st.balAmt}>—<Text style={st.balUnit}> $TTS</Text></Text>
+            <Text style={st.balAmt}>
+              {balance != null ? formatTTS(balance, 0) : '—'}
+              <Text style={st.balUnit}> $TTS</Text>
+            </Text>
           </View>
           <Pressable style={st.connect} onPress={() => setWalletOpen(true)}>
-            <Text style={st.connectTxt}>Connect</Text>
+            <Text style={st.connectTxt}>{address ? `${address.slice(0, 5)}…${address.slice(-3)}` : 'Connect'}</Text>
           </Pressable>
         </View>
       </View>
@@ -74,6 +106,9 @@ export default function App() {
       <View style={st.main}>
         {tab === 'play' && <PlayScreen onConnect={() => setWalletOpen(true)} />}
         {tab === 'leaderboard' && <LeaderboardScreen />}
+        {tab === 'submit' && <SubmitScreen onConnect={() => setWalletOpen(true)} />}
+        {tab === 'stake' && <StakingScreen onConnect={() => setWalletOpen(true)} />}
+        {tab === 'refer' && <ReferralScreen onConnect={() => setWalletOpen(true)} />}
       </View>
 
       <WalletSheet visible={walletOpen} onClose={() => setWalletOpen(false)} />

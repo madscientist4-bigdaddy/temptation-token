@@ -14,5 +14,16 @@
 // bundler never resolves the native modules. See src/wallet/loader.ts.
 export const WALLET_ENABLED = process.env.EXPO_PUBLIC_WALLET_ENABLED === 'true'
 
+// STAKING_LIVE mirrors the web app's VITE_STAKING_ENABLED gate. The staking contracts are
+// deployed, verified and funded on Base mainnet, but the public launch is a business
+// decision (the X/Telegram announcement is deliberately held) and the web app still shows
+// "Coming Soon". Mobile must not announce it first, so this defaults to FALSE and the
+// staking tab shows the same honest coming-soon state — while still reading the real
+// on-chain numbers, which are public either way.
+//
+// Flip via EXPO_PUBLIC_STAKING_LIVE=true in an EAS build profile at launch, in the same
+// change as the web env flip.
+export const STAKING_LIVE = process.env.EXPO_PUBLIC_STAKING_LIVE === 'true'
+
 // Convenience label for the stub UI so copy stays consistent.
 export const FULL_APP_URL = 'https://app.temptationtoken.io'
