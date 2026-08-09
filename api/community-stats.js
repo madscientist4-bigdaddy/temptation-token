@@ -20,6 +20,34 @@ async function sbGet(table, query = '') {
 const HEARTBEAT_KEY = 'bot_last_heartbeat'
 const HEARTBEAT_STALE_SEC = 600
 
+// TTSVotingV3d — the authority on which round is open.
+const VOTING_V3D = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
+const CURRENT_ROUND_ID_SELECTOR = '0x9cbe5efd' // currentRoundId()
+const RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org'
+
+/** On-chain currentRoundId, or null if the RPC is unreachable/reverts. */
+async function currentRoundIdOnChain() {
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 6000)
+    const r = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'eth_call',
+        params: [{ to: VOTING_V3D, data: CURRENT_ROUND_ID_SELECTOR }, 'latest'],
+      }),
+    }).finally(() => clearTimeout(timer))
+    const j = await r.json()
+    if (j.error || typeof j.result !== 'string' || j.result === '0x') return null
+    const n = Number(BigInt(j.result))
+    return Number.isSafeInteger(n) && n > 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
 export default async function handler(req, res) {
   // ── Bot heartbeat (from /api/bot-health rewrite) ────────────────────────
   if (req.query?.action === 'heartbeat') {
@@ -109,11 +137,19 @@ export default async function handler(req, res) {
     result.x_error = 'X credentials not configured'
   }
 
-  // Engagement: votes + unique voters for current round
+  // Engagement: votes + unique voters for the current round.
+  //
+  // The round id comes from the CHAIN, not the Supabase `rounds` table. V3d is the only
+  // authority on which round is open; the `rounds` table is a stale mirror that was last
+  // written at round 1, so reading it reported "Round 1" while the chain was on round 6
+  // — and then counted votes for round 1, which is why votes_this_round read 0 all week.
+  // Falls back to the table only if the RPC is unreachable.
   try {
-    const rounds = await sbGet('rounds', 'order=id.desc&limit=1&select=id')
-    if (Array.isArray(rounds) && rounds.length > 0) {
-      const roundId = rounds[0].id
+    const roundId = (await currentRoundIdOnChain()) ?? (await (async () => {
+      const rounds = await sbGet('rounds', 'order=id.desc&limit=1&select=id')
+      return Array.isArray(rounds) && rounds.length > 0 ? rounds[0].id : null
+    })())
+    if (roundId != null) {
       const votes = await sbGet('votes', `round_id=eq.${roundId}&select=voter_wallet`)
       if (Array.isArray(votes)) {
         const uniqueVoters = new Set(votes.map(v => v.voter_wallet).filter(Boolean)).size
