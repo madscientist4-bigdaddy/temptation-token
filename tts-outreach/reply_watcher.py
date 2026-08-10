@@ -1,13 +1,37 @@
 """MODULE E — inbound reply watcher.
 
 Polls IMAP, matches senders to target domains, halts that target's sequence,
-raises a macOS notification, and drafts a suggested reply.
+drafts a suggested reply, and raises the alarm two ways: a macOS banner in the
+moment, and an unhandled row in `replies` that becomes the red badge on the
+dashboard's Outreach tab whenever it is next opened. The banner is easy to miss;
+the badge is what makes a reply impossible to lose.
 
 Opt-out is handled first and unconditionally: anything that looks like a
 removal request suppresses the target permanently and queues a one-line
 confirmation. That path is never overridden by a later intent match.
 """
+
+
 from __future__ import annotations
+
+# ── DISABLED: not the sender of record ────────────────────────────────────────
+# 2026-08-10: `outreach/` is the SOLE sender of record. This tree retains a fully working
+# SMTP path (Proton Bridge), so leaving it runnable means two systems could email the same
+# agencies from the same address — duplicate outreach to a partner is the kind of mistake
+# that ends a partnership, and neither tree would know the other had sent.
+#
+# Not deleted, because this tree still holds the Makefile, launchd jobs, harvester and
+# reply-watcher that `outreach/` does not yet have. Refuses to run instead.
+#
+# To deliberately re-enable (only if this tree becomes canonical again):
+#     TTS_OUTREACH_ALLOW_SEND=i-understand-this-is-not-the-sender-of-record
+import os as _os, sys as _sys
+if _os.environ.get("TTS_OUTREACH_ALLOW_SEND") != "i-understand-this-is-not-the-sender-of-record":
+    _sys.stderr.write(
+        "\n\033[31m  REFUSING TO RUN — tts-outreach/ is not the sender of record.\n"
+        "  outreach/ is. Use that, or see the override note at the top of this file.\033[0m\n\n")
+    raise SystemExit(3)
+# ──────────────────────────────────────────────────────────────────────────────
 
 import argparse
 import email
@@ -177,22 +201,63 @@ def match_agency(from_addr: str):
     return None
 
 
-def write_draft(row, intent: str, subject: str, from_addr: str, snippet: str) -> str:
-    who = from_addr.split("@")[0].split(".")[0].title() or row["name"]
+# Shared inboxes, not people. Addressing a reply "Hi Info," is worse than not
+# using a name at all — it advertises that a script wrote it.
+GENERIC_MAILBOXES = {
+    "info", "office", "contact", "hello", "hi", "admin", "support", "sales",
+    "team", "mail", "email", "enquiries", "inquiries", "general", "booking",
+    "bookings", "management", "partnerships", "business", "press", "pr", "help",
+}
+
+RE_PREFIX = re.compile(r"^(?:\s*re\s*:\s*)+", re.I)
+
+
+def reply_subject(subject: str) -> str:
+    """`Re:` exactly once, however many the thread already carried."""
+    base = RE_PREFIX.sub("", (subject or "").strip()) or "your message"
+    return f"Re: {base}"
+
+
+def greeting_name(from_addr: str, row) -> str:
+    local = from_addr.split("@")[0].split("+")[0]
+    first = local.split(".")[0].strip()
+    if not first or first.lower() in GENERIC_MAILBOXES or first.isdigit():
+        return "there"
+    return first.title()
+
+
+def build_draft(row, intent: str, subject: str, from_addr: str, snippet: str) -> tuple[str, str]:
+    """Return (draft_subject, draft_body) for the suggested reply.
+
+    Split apart because the dashboard shows the body in an editable box and needs
+    the subject separately, while the .txt draft wants them joined back together.
+    """
+    who = greeting_name(from_addr, row)
+    subject = RE_PREFIX.sub("", (subject or "").strip()) or "your message"
     tmpl = DRAFTS.get(intent)
-    path = config.DRAFTS / f"{row['name'].replace(' ', '_')}.txt"
     if tmpl:
         content = tmpl.format(who=who, subject=subject, calendly=config.CALENDLY)
     else:
         content = (f"Subject: Re: {subject}\n\nHi {who},\n\n"
                    f"[intent unclear — read their message and answer directly]\n\n"
                    f"Their message:\n{snippet}\n\nJim\n")
+    lines = content.splitlines()
+    if lines and lines[0].lower().startswith("subject:"):
+        return reply_subject(lines[0].split(":", 1)[1]), "\n".join(lines[1:]).lstrip("\n")
+    return reply_subject(subject), content
+
+
+def write_draft(row, intent: str, from_addr: str, snippet: str,
+                draft_subject: str, draft_body: str) -> str:
+    """Mirror the draft to drafts/*.txt. The dashboard reads the DB copy; this
+    file stays so the system is still usable from a terminal with nothing running."""
+    path = config.DRAFTS / f"{row['name'].replace(' ', '_')}.txt"
     header = (f"# {row['name']} · intent={intent} · from={from_addr}\n"
               f"# received {datetime.now():%Y-%m-%d %H:%M}\n"
               f"# ---- their message ----\n"
               + "".join(f"# {ln}\n" for ln in snippet.splitlines()[:15])
               + "# ---- suggested reply ----\n\n")
-    path.write_text(header + content, encoding="utf-8")
+    path.write_text(f"{header}Subject: {draft_subject}\n\n{draft_body}", encoding="utf-8")
     return str(path)
 
 
@@ -234,28 +299,36 @@ def poll(folder: str = "INBOX", limit: int = 50) -> int:
 
             snippet = "\n".join(text.strip().splitlines()[:20])[:1200]
             intent = classify(subject + "\n" + text)
+            draft_subject, draft_body = build_draft(row, intent, subject, from_addr, snippet)
 
-            with db.conn() as c:
-                c.execute("""INSERT OR IGNORE INTO replies(agency_id,from_addr,subject,snippet,intent,ts,uid)
-                             VALUES(?,?,?,?,?,?,?)""",
-                          (row["id"], from_addr, subject, snippet, intent,
-                           datetime.now().isoformat(timespec="seconds"), uid.decode()))
+            # The row IS the unread counter: the dashboard badge counts replies
+            # with handled=0. Writing the row and raising the badge are therefore
+            # one atomic act that cannot half-happen. `new` is False when this UID
+            # was already recorded, which keeps a re-poll from re-notifying.
+            new = db.record_reply(
+                row["id"], from_addr, subject, snippet, intent, uid.decode(),
+                body=text.strip()[:20000], draft=draft_body, draft_subject=draft_subject)
 
             if intent == "OPT_OUT":
                 db.set_status(row["id"], "SUPPRESSED")
                 db.halt_sequence(row["id"], "opt-out received")
-                notify("Outreach: opt-out", f"{row['name']} asked to be removed")
+                if new:
+                    notify("Outreach: opt-out", f"{row['name']} asked to be removed")
                 print(f"  SUPPRESSED  {row['name']} ({from_addr}) — opt-out")
             else:
                 db.set_status(row["id"], "REPLIED")
                 db.halt_sequence(row["id"], f"reply received ({intent})")
-                notify(f"Reply: {row['name']}", f"{intent.title()} — {subject[:60]}")
+                if new:
+                    # Banner now, red badge whenever the dashboard is next opened.
+                    notify("New reply", f"{row['name']} — open dashboard")
                 print(f"  REPLIED     {row['name']} ({from_addr}) — {intent}")
 
-            path = write_draft(row, intent, subject, from_addr, snippet)
+            path = write_draft(row, intent, from_addr, snippet, draft_subject, draft_body)
             print(f"              draft -> {path}")
-            handled += 1
-    print(f"\n  {handled} reply/replies processed.")
+            if new:
+                handled += 1
+    print(f"\n  {handled} new reply/replies processed. "
+          f"{db.unread_count()} awaiting you in the dashboard (Operations -> Outreach).")
     return 0
 
 

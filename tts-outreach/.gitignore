@@ -1,0 +1,10 @@
+.env
+.venv/
+state.db
+outbox/
+drafts/
+logs/
+TODAY.md
+dm_copilot.html
+data/contacts_found.csv
+data/fedex_list.csv

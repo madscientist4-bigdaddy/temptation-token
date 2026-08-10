@@ -9,7 +9,28 @@ Refuses to send when ANY of these is true:
 
 Every attempt is logged to SQLite whether it sends or not.
 """
+
+
 from __future__ import annotations
+
+# ── DISABLED: not the sender of record ────────────────────────────────────────
+# 2026-08-10: `outreach/` is the SOLE sender of record. This tree retains a fully working
+# SMTP path (Proton Bridge), so leaving it runnable means two systems could email the same
+# agencies from the same address — duplicate outreach to a partner is the kind of mistake
+# that ends a partnership, and neither tree would know the other had sent.
+#
+# Not deleted, because this tree still holds the Makefile, launchd jobs, harvester and
+# reply-watcher that `outreach/` does not yet have. Refuses to run instead.
+#
+# To deliberately re-enable (only if this tree becomes canonical again):
+#     TTS_OUTREACH_ALLOW_SEND=i-understand-this-is-not-the-sender-of-record
+import os as _os, sys as _sys
+if _os.environ.get("TTS_OUTREACH_ALLOW_SEND") != "i-understand-this-is-not-the-sender-of-record":
+    _sys.stderr.write(
+        "\n\033[31m  REFUSING TO RUN — tts-outreach/ is not the sender of record.\n"
+        "  outreach/ is. Use that, or see the override note at the top of this file.\033[0m\n\n")
+    raise SystemExit(3)
+# ──────────────────────────────────────────────────────────────────────────────
 
 import argparse
 import smtplib

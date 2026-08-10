@@ -1,0 +1,10 @@
+Subject: 45-second walkthrough (video)
+
+Hi {{name}} team,
+
+Rather than more text — here's the whole thing in 45 seconds: {{LOOM}}
+
+If it's a fit, grab any slot that works: {{CALENDLY}}
+
+Jim Goetz
+Founder — Temptation Token · Blockchain Entertainment LLC

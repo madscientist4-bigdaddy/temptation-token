@@ -1,13 +1,32 @@
 """`make status` — what the system believes right now."""
 from __future__ import annotations
 
+import json
 import subprocess
+import urllib.error
+import urllib.request
 from datetime import datetime
 
 import bridge
 import config
 import db
 import sender
+
+
+def api_status() -> tuple[bool, str]:
+    """Is the dashboard's API up? Checked over HTTP rather than by port scan so a
+    stale listener with a broken app cannot report itself healthy."""
+    host = config.env("OUTREACH_API_HOST", "127.0.0.1")
+    port = config.env("OUTREACH_API_PORT", "8787")
+    url = f"http://{host}:{port}/outreach/status"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as r:
+            data = json.loads(r.read().decode())
+        return True, f"UP    {url}  ({data.get('unread', 0)} unread)"
+    except urllib.error.URLError as e:
+        return False, f"DOWN  {url}  ({getattr(e, 'reason', e)}) — run `make api` or `make install`"
+    except Exception as e:
+        return False, f"DOWN  {url}  ({type(e).__name__}: {e})"
 
 
 def main() -> int:
@@ -45,6 +64,18 @@ def main() -> int:
     if pend:
         print("  pending       " + "  ".join(f"{r['kind']}={r['n']}" for r in pend))
     print(f"  replies seen  {repl}")
+
+    unread = db.unread_count()
+    api_ok, api_line = api_status()
+    print(f"  unread        {unread}" + ("   <- waiting on you" if unread else ""))
+    print(f"  dashboard api {api_line}")
+    if api_ok:
+        print("                dashboard tab: Operations -> Outreach")
+
+    board_tally: dict[str, int] = {}
+    for b in db.board():
+        board_tally[b["state"]] = board_tally.get(b["state"], 0) + 1
+    print("  board         " + "  ".join(f"{k}={v}" for k, v in sorted(board_tally.items())))
 
     missing = [r["name"] for r in rows if r["status"] in ("NEEDS_DOMAIN", "NEEDS_REVIEW")]
     if missing:

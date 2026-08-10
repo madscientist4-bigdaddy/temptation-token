@@ -1,0 +1,19 @@
+# Hard blocklist. The sender REFUSES any recipient whose domain OR name
+# fuzzy-matches an entry here. One entry per line; blank lines and #-comments
+# ignored. Bare words (no TLD) match against the agency NAME as well as the
+# domain, so "ashagency" catches "Ash Agency" / ash-agency.com / ashagency.io.
+#
+# Matching is: exact -> normalized substring -> difflib ratio >= 0.86.
+# See blocklist.py. Changes take effect immediately; nothing is cached.
+
+moxymgt.com
+unrulyagency.com
+dysrpt.com
+behaveagency.com
+ashagency
+contentx
+vergeagency
+elitecreators
+bossbaddies
+creatorsinc
+sirenagency

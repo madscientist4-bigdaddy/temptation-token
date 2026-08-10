@@ -1,0 +1,9 @@
+requests>=2.32
+beautifulsoup4>=4.12
+lxml>=5.2
+dnspython>=2.6
+# dashboard API (MODULE F) — serves the Outreach tab on 127.0.0.1:8787
+fastapi>=0.115
+uvicorn[standard]>=0.30
+# optional — MODULE B only:
+# playwright>=1.44
