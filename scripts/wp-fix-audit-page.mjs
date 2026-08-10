@@ -39,8 +39,30 @@ const EDITS = [
   },
 ]
 
-const MUST_APPEAR = ['0x783b8cd80b586b723188c93ef94ee1beede617b4', '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d']
-const MUST_VANISH = ['0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6', '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc']
+// The page lists no NFT contract at all, so the canonical Trophy NFT has to be
+// added rather than swapped. Anchored on the (already-substituted) staking
+// address so it lands as the last row of the same table.
+const TD = 'style="padding:8px"'
+const TD_MONO = 'style="padding:8px;font-family:monospace;font-size:.8rem"'
+const INSERTS = [
+  {
+    what: 'add Trophy NFT row (page currently lists no NFT contract)',
+    after: `<td ${TD_MONO}>0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d</td>\n</tr>`,
+    html: `\n<tr>\n<td ${TD}>Trophy NFT</td>\n<td ${TD_MONO}>0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5</td>\n</tr>`,
+    skipIf: '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5',
+  },
+]
+
+const MUST_APPEAR = [
+  '0x783b8cd80b586b723188c93ef94ee1beede617b4',
+  '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d',
+  '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5',
+]
+const MUST_VANISH = [
+  '0x6d6fF6A0bd0A71D999ac1d593a941108a2BE4bC6',
+  '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc',
+  '0x0768e862D3AB14d85213BfeF8f1D012E77721da2', // retired TTSRoundNFT, must never appear
+]
 // The token proxy is correct already and must survive untouched.
 const MUST_PERSIST = ['0x5570eA97d53A53170e973894A9Fa7feb5785d3b9']
 
@@ -59,6 +81,21 @@ function transform (html) {
       out = out.split(s.from).join(s.to)
       applied.push(`${edit.what} :: ${s.from} → ${s.to} (${hits}x)`)
     }
+  }
+  for (const ins of INSERTS) {
+    if (ins.skipIf && out.includes(ins.skipIf)) {
+      applied.push(`${ins.what} :: already present, skipped`)
+      continue
+    }
+    const hits = out.split(ins.after).length - 1
+    if (hits !== 1) {
+      throw new Error(
+        `Refusing to insert: anchor for "${ins.what}" matched ${hits} time(s), expected 1. ` +
+        `Re-inspect the live markup before applying.`,
+      )
+    }
+    out = out.replace(ins.after, ins.after + ins.html)
+    applied.push(`${ins.what} :: inserted after the staking row`)
   }
   return { out, applied }
 }
