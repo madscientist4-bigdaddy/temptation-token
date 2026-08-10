@@ -1,0 +1,31 @@
+# ── THIS REPO IS PUBLIC. Nothing below may ever be committed. ────────────────
+# It holds third parties' business contact details, a Gmail app password, and
+# private commercial correspondence. Publishing any of it would be a privacy
+# problem for people who never agreed to appear in a public repo.
+
+# Credentials
+.env
+.env.*
+!.env.example
+
+# Harvested / derived contact data about third parties
+data/outreach.db
+data/contacts_found.csv
+data/fedex_list.csv
+data/agencies.csv
+
+# Correspondence and generated work product
+drafts/
+outbox/
+packs/
+cards/
+logs/
+TODAY.md
+dm_copilot.html
+posts_*.md
+posts_*.html
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

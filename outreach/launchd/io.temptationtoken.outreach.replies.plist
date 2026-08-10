@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>io.temptationtoken.outreach.replies</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bin/python3</string><string>/Users/functionisedproductions/Projects/temptation-token/outreach/reply_watcher.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/functionisedproductions/Projects/temptation-token/outreach</string>
+  <key>StandardOutPath</key><string>/Users/functionisedproductions/Projects/temptation-token/outreach/logs/replies.log</string>
+  <key>StandardErrorPath</key><string>/Users/functionisedproductions/Projects/temptation-token/outreach/logs/replies.err</string>
+  <key>RunAtLoad</key><false/>
+  <key>StartInterval</key><integer>1800</integer>
+</dict></plist>

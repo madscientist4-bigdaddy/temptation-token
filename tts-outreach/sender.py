@@ -13,26 +13,8 @@ Every attempt is logged to SQLite whether it sends or not.
 
 from __future__ import annotations
 
-# ── DISABLED: not the sender of record ────────────────────────────────────────
-# 2026-08-10: `outreach/` is the SOLE sender of record. This tree retains a fully working
-# SMTP path (Proton Bridge), so leaving it runnable means two systems could email the same
-# agencies from the same address — duplicate outreach to a partner is the kind of mistake
-# that ends a partnership, and neither tree would know the other had sent.
-#
-# Not deleted, because this tree still holds the Makefile, launchd jobs, harvester and
-# reply-watcher that `outreach/` does not yet have. Refuses to run instead.
-#
-# To deliberately re-enable (only if this tree becomes canonical again):
-#     TTS_OUTREACH_ALLOW_SEND=i-understand-this-is-not-the-sender-of-record
-import os as _os, sys as _sys
-if _os.environ.get("TTS_OUTREACH_ALLOW_SEND") != "i-understand-this-is-not-the-sender-of-record":
-    _sys.stderr.write(
-        "\n\033[31m  REFUSING TO RUN — tts-outreach/ is not the sender of record.\n"
-        "  outreach/ is. Use that, or see the override note at the top of this file.\033[0m\n\n")
-    raise SystemExit(3)
-# ──────────────────────────────────────────────────────────────────────────────
-
 import argparse
+import os
 import smtplib
 import ssl
 import time
@@ -47,6 +29,35 @@ import bridge
 import claims_guard
 import config
 import db
+
+# ── DISABLED: not the sender of record ────────────────────────────────────────
+# 2026-08-10: `outreach/` is the SOLE sender of record. This tree retains a fully working
+# SMTP path (Proton Bridge), so leaving it runnable means two systems could email the same
+# agencies from the same address — duplicate outreach to a partner is the kind of mistake
+# that ends a partnership, and neither tree would know the other had sent.
+#
+# Not deleted, because this tree still holds the Makefile, launchd jobs, harvester and
+# reply-watcher that `outreach/` does not yet have.
+#
+# Enforced at the SMTP boundary rather than on import, for two reasons: an import-time
+# SystemExit also kills read-only consumers (status.py imports this module purely for
+# in_window() and daily_cap(), and dies with it), and a guard sitting on the actual
+# socket cannot be sidestepped by a future caller that imports deliver() directly.
+#
+# To deliberately re-enable (only if this tree becomes canonical again):
+#     TTS_OUTREACH_ALLOW_SEND=i-understand-this-is-not-the-sender-of-record
+SEND_OVERRIDE = "i-understand-this-is-not-the-sender-of-record"
+NOT_SENDER_OF_RECORD = (
+    "REFUSING TO SEND — tts-outreach/ is not the sender of record; outreach/ is. "
+    "See the override note in sender.py."
+)
+
+
+def refuse_if_not_sender_of_record() -> None:
+    """Raise unless this tree has been deliberately re-armed. Called on every path
+    that could put a message on the wire."""
+    if os.environ.get("TTS_OUTREACH_ALLOW_SEND") != SEND_OVERRIDE:
+        raise PermissionError(NOT_SENDER_OF_RECORD)
 
 
 def render(template_name: str, row) -> tuple[str, str]:
@@ -112,6 +123,8 @@ def build_message(row, subject: str, body: str) -> EmailMessage:
 
 
 def deliver(msg: EmailMessage) -> str:
+    # The one place this module opens a socket, so the one place the guard has to hold.
+    refuse_if_not_sender_of_record()
     # Proton Bridge on 127.0.0.1:1025, STARTTLS with a self-signed cert — the default
     # context would reject it. bridge.loopback_tls_context() only relaxes verification
     # for loopback, so this cannot follow a config change out to a real host.
@@ -150,6 +163,15 @@ def main() -> int:
     mode = "LIVE" if live else "DRY-RUN"
 
     print(f"\n{'='*78}\n  SENDER — {mode}   ({datetime.now(config.ET):%Y-%m-%d %H:%M %Z})\n{'='*78}")
+
+    # Fail here rather than per-message, so the refusal is one clear line instead of
+    # a dozen identical errors halfway through the task list.
+    if live:
+        try:
+            refuse_if_not_sender_of_record()
+        except PermissionError as e:
+            print(f"\n{bridge.RED}  {e}{bridge.OFF}\n")
+            return 5
 
     problems = preflight(live)
     for p in problems:

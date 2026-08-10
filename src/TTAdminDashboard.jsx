@@ -908,6 +908,55 @@ const injectStyles = () => {
     .manual-copy-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: .6rem; font-family: var(--font-body); transition: all .15s; }
     .manual-copy-btn.copied { background: var(--green-dim); border-color: rgba(46,204,113,.3); color: var(--green); }
     .manual-tpl-text { font-size: .68rem; color: var(--text); font-family: var(--font-body); line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0; }
+
+    /* ── OUTREACH ── */
+    .otr-conn { display: flex; align-items: center; gap: 8px; font-size: .6rem; color: var(--muted); }
+    .otr-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .otr-dot.down { background: var(--rose); }
+    .otr-notice { border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: .68rem; line-height: 1.6; }
+    .otr-notice.warn { background: var(--amber-dim); border: 1px solid rgba(243,156,18,.3); color: var(--text); }
+    .otr-notice.err  { background: var(--red-dim); border: 1px solid rgba(232,64,90,.3); color: var(--text); }
+    .otr-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 26px 0 12px; flex-wrap: wrap; }
+    .otr-section-title { font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text); }
+    .otr-section-sub { font-size: .6rem; color: var(--muted); }
+    .otr-state { display: inline-block; font-size: .55rem; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+    .otr-state.new         { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); }
+    .otr-state.queued      { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .otr-state.contacted   { background: rgba(52,152,219,.15); color: #2477a8; border: 1px solid rgba(52,152,219,.25); }
+    .otr-state.replied     { background: var(--amber-dim); color: #8a5a06; border: 1px solid rgba(243,156,18,.3); }
+    .otr-state.call-booked { background: var(--green-dim); color: var(--green); border: 1px solid rgba(46,204,113,.3); }
+    .otr-state.pilot       { background: rgba(139,26,42,.12); color: var(--crimson); border: 1px solid rgba(139,26,42,.28); }
+    .otr-state.nurture     { background: rgba(52,152,219,.08); color: var(--muted); border: 1px solid rgba(52,152,219,.18); }
+    .otr-state.no-reply    { background: var(--surface3); color: var(--muted); border: 1px solid var(--border); }
+    .otr-state.paused      { background: var(--surface3); color: var(--muted); border: 1px solid var(--border); }
+    .otr-state.suppressed  { background: var(--red-dim); color: var(--rose); border: 1px solid rgba(232,64,90,.25); }
+    .otr-tally { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .otr-mini-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: .58rem; font-family: var(--font-body); transition: all .15s; white-space: nowrap; }
+    .otr-mini-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-light); }
+    .otr-mini-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .otr-reply-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+    .otr-reply-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .otr-reply-who { font-size: .85rem; font-weight: 700; color: var(--text); }
+    .otr-reply-meta { font-size: .6rem; color: var(--muted); margin-top: 3px; word-break: break-all; }
+    .otr-reply-cols { display: grid; grid-template-columns: 1fr 1fr; }
+    .otr-col { padding: 16px 18px; min-width: 0; }
+    .otr-col + .otr-col { border-left: 1px solid var(--border); }
+    .otr-col-label { font-size: .55rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .otr-their-msg { font-size: .72rem; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; max-height: 340px; overflow-y: auto; margin: 0; font-family: var(--font-body); }
+    .otr-subject-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: .68rem; color: var(--text); font-family: var(--font-body); outline: none; margin-bottom: 8px; }
+    .otr-draft-box { width: 100%; min-height: 260px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: .72rem; line-height: 1.65; color: var(--text); font-family: var(--font-body); resize: vertical; outline: none; }
+    .otr-draft-box:focus, .otr-subject-input:focus { border-color: var(--gold); }
+    .otr-send-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .otr-send-btn { background: var(--crimson); border: none; color: #fff; padding: 9px 22px; border-radius: 8px; cursor: pointer; font-size: .7rem; font-weight: 700; letter-spacing: .06em; font-family: var(--font-body); transition: all .15s; }
+    .otr-send-btn:hover:not(:disabled) { background: var(--crimson-glow); }
+    .otr-send-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .otr-send-hint { font-size: .58rem; color: var(--muted); }
+
+    @media (max-width: 900px) {
+      .otr-reply-cols { grid-template-columns: 1fr; }
+      .otr-col + .otr-col { border-left: none; border-top: 1px solid var(--border); }
+    }
   `;
   document.head.appendChild(s);
 };
@@ -5173,6 +5222,365 @@ function FinancialKPIScreen({ showToast }) {
   );
 }
 
+// ─── OUTREACH ─────────────────────────────────────────────────────────────────
+// Backed by tts-outreach/api.py, a loopback-only FastAPI over the outreach
+// SQLite. It is a local process, so this tab is the one part of the dashboard
+// that is expected to be unreachable sometimes — every fetch here treats "API
+// down" as a normal state with an explanation, never as an error to swallow.
+const OUTREACH_API = 'http://127.0.0.1:8787';
+const OUTREACH_POLL_MS = 60000;
+
+async function outreachGet(path) {
+  const r = await fetch(`${OUTREACH_API}${path}`, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+async function outreachPost(path, body) {
+  const r = await fetch(`${OUTREACH_API}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `${r.status} ${r.statusText}`);
+  return data;
+}
+
+// Unread count for the sidebar badge. Lives at the root so the badge is correct
+// on whatever tab is open, not only while Outreach itself is mounted.
+function useOutreachUnread() {
+  const [unread, setUnread] = useState(0);
+  const [bump, setBump] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const tick = () => outreachGet('/outreach/unread')
+      .then(d => { if (alive) setUnread(d.unread || 0); })
+      .catch(() => { if (alive) setUnread(0); });   // API down -> no badge, not a crash
+    tick();
+    const t = setInterval(tick, OUTREACH_POLL_MS);
+    return () => { alive = false; clearInterval(t); };
+  }, [bump]);
+  return [unread, () => setBump(b => b + 1)];
+}
+
+const TRANSPORT_LABEL = {
+  proton: 'Proton Bridge',
+  gmail: 'Gmail',
+  none: 'no transport configured',
+};
+
+function OutreachReply({ reply, onDone, showToast, transport }) {
+  const [subject, setSubject] = useState(reply.draft_subject || '');
+  const [body, setBody] = useState(reply.draft || '');
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    if (!body.trim()) { showToast('Nothing to send — the reply is empty', 'error'); return; }
+    setSending(true);
+    try {
+      const res = await outreachPost('/outreach/reply', { agency: reply.agency, body, subject });
+      if (res.dry_run) {
+        // Deliberately does NOT clear the card: nothing was sent, so the reply
+        // is still unanswered and must stay in the queue.
+        showToast(`DRY-RUN — saved to ${res.saved_to}, nothing sent`, 'error');
+      } else {
+        showToast(`Sent to ${res.to}`, 'success');
+        onDone();
+      }
+    } catch (e) {
+      showToast(`Send failed: ${e.message}`, 'error');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function act(path, label) {
+    setSending(true);
+    try {
+      await outreachPost(path, { agency: reply.agency });
+      showToast(`${reply.agency} ${label}`, 'success');
+      onDone();
+    } catch (e) {
+      showToast(`Failed: ${e.message}`, 'error');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="otr-reply-card">
+      <div className="otr-reply-head">
+        <div>
+          <div className="otr-reply-who">
+            {reply.agency}
+            {reply.suppressed && <span className="otr-state suppressed" style={{ marginLeft: 8 }}>opted out</span>}
+          </div>
+          <div className="otr-reply-meta">
+            {reply.from_addr} · {new Date(reply.received).toLocaleString()} · intent {reply.intent}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="otr-mini-btn" disabled={sending} onClick={() => act('/outreach/suppress', 'suppressed')}>Suppress</button>
+        </div>
+      </div>
+
+      <div className="otr-reply-cols">
+        <div className="otr-col">
+          <div className="otr-col-label">Their message</div>
+          <pre className="otr-their-msg">{reply.message || '(empty message)'}</pre>
+        </div>
+        <div className="otr-col">
+          <div className="otr-col-label">Your reply — edit before sending</div>
+          <input
+            className="otr-subject-input"
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            placeholder="Subject"
+          />
+          <textarea
+            className="otr-draft-box"
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            spellCheck
+          />
+          <div className="otr-send-row">
+            <button className="otr-send-btn" onClick={send} disabled={sending}>
+              {sending ? 'Sending…' : 'Send reply'}
+            </button>
+            <span className="otr-send-hint">
+              {reply.suppressed
+                ? 'They opted out — sending the confirmation keeps them suppressed.'
+                : `Goes to ${reply.agency_email || reply.from_addr}`
+                  + (transport ? ` via ${TRANSPORT_LABEL[transport] || transport}.` : '.')}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OutreachScreen({ showToast, onUnreadChange }) {
+  const [board, setBoard] = useState(null);
+  const [replies, setReplies] = useState([]);
+  const [err, setErr] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshedAt, setRefreshedAt] = useState(null);
+  const [busy, setBusy] = useState('');
+
+  async function load() {
+    try {
+      const [b, r] = await Promise.all([
+        outreachGet('/outreach/board'),
+        outreachGet('/outreach/replies'),
+      ]);
+      setBoard(b);
+      setReplies(r.replies || []);
+      setErr(null);
+      setRefreshedAt(new Date());
+      onUnreadChange?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, OUTREACH_POLL_MS);
+    return () => clearInterval(t);
+  }, []);
+
+  async function rowAction(agency, path, label) {
+    setBusy(agency);
+    try {
+      await outreachPost(path, { agency });
+      showToast(`${agency} ${label}`, 'success');
+      await load();
+    } catch (e) {
+      showToast(`Failed: ${e.message}`, 'error');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function setStage(agency, stage) {
+    setBusy(agency);
+    try {
+      await outreachPost('/outreach/stage', { agency, stage });
+      await load();
+    } catch (e) {
+      showToast(`Failed: ${e.message}`, 'error');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  const apiDown = !!err && !board;
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-title">Outreach</div>
+        <div className="gold-rule" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div className="page-sub">Agency pipeline & inbound replies · local outreach engine</div>
+          <div className="otr-conn">
+            <span className={`otr-dot${apiDown ? ' down' : ''}`} />
+            {apiDown ? 'API offline' : `Refreshed ${refreshedAt ? refreshedAt.toLocaleTimeString() : '…'}`}
+            <button className="otr-mini-btn" onClick={load} style={{ marginLeft: 4 }}>Refresh</button>
+          </div>
+        </div>
+      </div>
+
+      {apiDown && (
+        <div className="otr-notice err">
+          <strong>The outreach API isn’t running.</strong> This tab reads a local
+          SQLite database through <code>{OUTREACH_API}</code>, which only exists on your Mac.
+          <div style={{ marginTop: 8, fontFamily: 'monospace', fontSize: '.66rem' }}>
+            cd tts-outreach &amp;&amp; make api&nbsp;&nbsp;·&nbsp;&nbsp;or once, permanently: make install
+          </div>
+          <div style={{ marginTop: 6, fontSize: '.62rem', color: 'var(--muted)' }}>{err}</div>
+        </div>
+      )}
+
+      {board?.dry_run && (
+        <div className="otr-notice warn">
+          <strong>DRY-RUN is on — no email has ever actually been sent.</strong> States like{' '}
+          <em>contacted</em> come from the state machine advancing on dry-run previews, not from
+          mail anyone received; the <strong>Sent</strong> column counts real deliveries only, which
+          is why it reads 0. Replies you send from here are written to <code>outbox/</code>{' '}
+          instead of leaving the machine. Set <code>DRY_RUN=false</code> in{' '}
+          <code>outreach/.env</code> to go live.
+        </div>
+      )}
+      {board?.transport === 'none' && (
+        <div className="otr-notice err">
+          <strong>No mail transport is configured.</strong> Sending will fail even with DRY_RUN off.
+          Set <code>GMAIL_APP_PW</code> (and a real <code>FROM_EMAIL</code>) or{' '}
+          <code>PROTON_SMTP_USER</code> + <code>PROTON_BRIDGE_PW</code> in{' '}
+          <code>outreach/.env</code>, then <code>make mail-check</code>.
+        </div>
+      )}
+      {board && !board.dry_run && board.transport === 'proton' && !board.bridge_up && (
+        <div className="otr-notice err">
+          <strong>Proton Bridge is closed.</strong> Sending a reply will fail until you open the
+          Proton Mail Bridge app.
+        </div>
+      )}
+
+      {/* ── REPLIES ── */}
+      <div className="otr-section-head">
+        <div className="otr-section-title">
+          Replies
+          {replies.length > 0 && (
+            <span className="nav-badge" style={{ marginLeft: 8, color: '#fff' }}>{replies.length}</span>
+          )}
+        </div>
+        <div className="otr-section-sub">
+          {replies.length === 0 ? 'Nothing waiting on you' : `${replies.length} awaiting your answer`}
+        </div>
+      </div>
+
+      {loading && !board ? (
+        <div className="empty-state"><div className="empty-icon">⏳</div>Loading…</div>
+      ) : replies.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">📭</div>
+          No unanswered replies. New ones raise a Mac banner and appear here with a draft ready to edit.
+        </div>
+      ) : (
+        replies.map(r => (
+          <OutreachReply key={r.id} reply={r} showToast={showToast} onDone={load}
+            transport={board?.transport} />
+        ))
+      )}
+
+      {/* ── BOARD ── */}
+      <div className="otr-section-head">
+        <div className="otr-section-title">Board</div>
+        <div className="otr-section-sub">
+          {board ? `${board.agencies.length} agencies · auto-refreshes every 60s` : ''}
+        </div>
+      </div>
+
+      {board && (
+        <>
+          <div className="otr-tally">
+            {board.states.filter(s => board.tally[s]).map(s => (
+              <span key={s} className={`otr-state ${s}`}>{s} {board.tally[s]}</span>
+            ))}
+          </div>
+          <div className="table-card">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Agency</th><th>Status</th><th>Last action</th><th>Sent</th>
+                  <th>Next step</th><th>Contact</th><th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {board.agencies.map(a => (
+                  <tr key={a.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{a.name}</div>
+                      <div style={{ fontSize: '.58rem', color: 'var(--muted)' }}>
+                        {a.domain}{a.tier ? ` · tier ${a.tier}` : ''}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`otr-state ${a.state}`}>{a.state}</span>
+                      {a.open_replies > 0 && (
+                        <span className="nav-badge" style={{ marginLeft: 6, color: '#fff' }}>{a.open_replies}</span>
+                      )}
+                    </td>
+                    <td style={{ color: a.last_action ? 'var(--text)' : 'var(--muted)' }}>
+                      {a.last_action || '—'}
+                    </td>
+                    <td>{a.sends}</td>
+                    <td style={{ color: 'var(--muted)' }}>{a.next_due || '—'}</td>
+                    <td style={{ fontSize: '.62rem', color: 'var(--muted)', wordBreak: 'break-all' }}>
+                      {a.email || '—'}
+                    </td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {/* Suppression is terminal by design (CAN-SPAM), so a suppressed row
+                          offers no way back — matching what the API will actually allow. */}
+                      <button className="otr-mini-btn"
+                        disabled={busy === a.name || a.state === 'suppressed' || a.state === 'call-booked'}
+                        onClick={() => setStage(a.name, 'call-booked')}>Call booked</button>{' '}
+                      <button className="otr-mini-btn"
+                        disabled={busy === a.name || a.state === 'suppressed' || a.state === 'pilot'}
+                        onClick={() => setStage(a.name, 'pilot')}>Pilot</button>{' '}
+                      {a.paused ? (
+                        <button className="otr-mini-btn" disabled={busy === a.name}
+                          onClick={() => setStage(a.name, 'resume')}>Resume</button>
+                      ) : (
+                        <button className="otr-mini-btn"
+                          disabled={busy === a.name || a.state === 'suppressed'}
+                          onClick={() => rowAction(a.name, '/outreach/pause', 'paused')}>Pause</button>
+                      )}{' '}
+                      <button className="otr-mini-btn"
+                        disabled={busy === a.name || a.state === 'suppressed'}
+                        onClick={() => rowAction(a.name, '/outreach/suppress', 'suppressed')}>Suppress</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 10 }}>
+            Sent counts real deliveries only — dry-run previews are excluded so the board can’t
+            imply outreach that never left the machine. {board.sent_today} sent today ·
+            transport {board.transport}{board.from_addr ? ` · from ${board.from_addr}` : ''}.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── SIDEBAR NAV CONFIG ───────────────────────────────────────────────────────
 const NAV = [
   { section: "Command", items: [
@@ -5183,6 +5591,7 @@ const NAV = [
   ]},
   { section: "Operations", items: [
     { key: "overview",       icon: "📊", label: "Overview" },
+    { key: "outreach",       icon: "📬", label: "Outreach" },
     { key: "review",         icon: "📸", label: "Photo Review" },
     { key: "verifications",  icon: "🪪", label: "KYC Status" },
     { key: "content",        icon: "📅", label: "Content Calendar" },
@@ -5242,6 +5651,7 @@ export default function AdminApp() {
   const clock = useLiveClock();
   const weekLabel = useCurrentWeek();
   const [toast, showToast] = useToast();
+  const [outreachUnread, refreshOutreachUnread] = useOutreachUnread();
 
   if (!loggedIn) return <div className="adm-app"><LoginScreen onLogin={handleLogin} /></div>;
 
@@ -5252,6 +5662,7 @@ export default function AdminApp() {
     kpi:        <KPIScreen />,
     manual:     <ManualScreen />,
     overview:   <OverviewScreen />,
+    outreach:   <OutreachScreen {...screenProps} onUnreadChange={refreshOutreachUnread} />,
     review:         <ReviewScreen {...screenProps} />,
     verifications:  <VerificationsScreen {...screenProps} />,
     content:        <ContentCalendarErrorBoundary><ContentCalendarScreen {...screenProps} /></ContentCalendarErrorBoundary>,
@@ -5268,7 +5679,7 @@ export default function AdminApp() {
 
   const titles = {
     command: "Command Center", priorities: "Daily Priorities", kpi: "KPI Dashboard", manual: "Operations Manual",
-    overview: "Overview", review: "Photo Review", verifications: "Age Verifications", content: "Content Calendar", social: "Social Media",
+    overview: "Overview", outreach: "Outreach", review: "Photo Review", verifications: "Age Verifications", content: "Content Calendar", social: "Social Media",
     users: "User Management", wallets: "Wallets", payouts: "Payouts",
     staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health",
     finance: "Financial KPI",
@@ -5290,17 +5701,24 @@ export default function AdminApp() {
             {NAV.map(section => (
               <div key={section.section}>
                 <div className="nav-section-label">{section.section}</div>
-                {section.items.map(item => (
-                  <button
-                    key={item.key}
-                    className={`nav-btn${active === item.key ? " active" : ""}`}
-                    onClick={() => { setActive(item.key); setSidebarOpen(false); }}
-                  >
-                    <span className="icon">{item.icon}</span>
-                    {item.label}
-                    {item.badge && <span className="nav-badge">{item.badge}</span>}
-                  </button>
-                ))}
+                {section.items.map(item => {
+                  // Outreach carries a live count of unanswered replies; the rest
+                  // use whatever static badge NAV declares.
+                  const badge = item.key === "outreach"
+                    ? (outreachUnread || null)
+                    : item.badge;
+                  return (
+                    <button
+                      key={item.key}
+                      className={`nav-btn${active === item.key ? " active" : ""}`}
+                      onClick={() => { setActive(item.key); setSidebarOpen(false); }}
+                    >
+                      <span className="icon">{item.icon}</span>
+                      {item.label}
+                      {badge && <span className="nav-badge">{badge}</span>}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>

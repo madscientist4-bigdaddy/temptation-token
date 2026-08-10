@@ -14,25 +14,6 @@ confirmation. That path is never overridden by a later intent match.
 
 from __future__ import annotations
 
-# ── DISABLED: not the sender of record ────────────────────────────────────────
-# 2026-08-10: `outreach/` is the SOLE sender of record. This tree retains a fully working
-# SMTP path (Proton Bridge), so leaving it runnable means two systems could email the same
-# agencies from the same address — duplicate outreach to a partner is the kind of mistake
-# that ends a partnership, and neither tree would know the other had sent.
-#
-# Not deleted, because this tree still holds the Makefile, launchd jobs, harvester and
-# reply-watcher that `outreach/` does not yet have. Refuses to run instead.
-#
-# To deliberately re-enable (only if this tree becomes canonical again):
-#     TTS_OUTREACH_ALLOW_SEND=i-understand-this-is-not-the-sender-of-record
-import os as _os, sys as _sys
-if _os.environ.get("TTS_OUTREACH_ALLOW_SEND") != "i-understand-this-is-not-the-sender-of-record":
-    _sys.stderr.write(
-        "\n\033[31m  REFUSING TO RUN — tts-outreach/ is not the sender of record.\n"
-        "  outreach/ is. Use that, or see the override note at the top of this file.\033[0m\n\n")
-    raise SystemExit(3)
-# ──────────────────────────────────────────────────────────────────────────────
-
 import argparse
 import email
 import imaplib
@@ -45,6 +26,19 @@ from email.header import decode_header, make_header
 import bridge
 import config
 import db
+import sender
+
+# ── DISABLED: not the sender of record ────────────────────────────────────────
+# 2026-08-10: `outreach/` is the SOLE sender of record; its watcher owns the reply
+# queue that feeds the dashboard. Running this one too would mean two watchers
+# marking the same agencies REPLIED in two different databases, and neither knowing
+# about the other.
+#
+# Enforced when a poll actually starts rather than on import, so the pure helpers
+# here (classify, reply_subject, the draft templates) stay importable and testable.
+# The refusal itself lives in sender.py so there is exactly one override switch:
+#     TTS_OUTREACH_ALLOW_SEND=i-understand-this-is-not-the-sender-of-record
+# ──────────────────────────────────────────────────────────────────────────────
 
 OPT_OUT = re.compile(
     r"\b(remove|unsubscribe|opt[\s-]?out|stop\s+(?:emailing|contacting)|take me off|"
@@ -262,6 +256,13 @@ def write_draft(row, intent: str, from_addr: str, snippet: str,
 
 
 def poll(folder: str = "INBOX", limit: int = 50) -> int:
+    try:
+        sender.refuse_if_not_sender_of_record()
+    except PermissionError as e:
+        print(f"\n{bridge.RED}  {e}{bridge.OFF}")
+        print(f"{bridge.RED}  Use outreach/ — `cd outreach && make replies`.{bridge.OFF}\n")
+        return 5
+
     cred = bridge.credentials_problem()
     if cred:
         print(f"Cannot poll: {cred}")

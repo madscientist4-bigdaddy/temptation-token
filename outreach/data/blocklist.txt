@@ -1,0 +1,15 @@
+# NEVER contact. Enforced at the sender by guardrails.can_contact(); substring match
+# across name, domain, email and every social handle. Entries may be a domain or a bare
+# brand — both forms are matched.
+# A missing/unreadable file is a hard error, not an empty list (fail closed).
+moxymgt.com
+unrulyagency.com
+dysrpt.com
+behaveagency.com
+ashagency
+contentx
+vergeagency
+elitecreators
+bossbaddies
+creatorsinc
+sirenagency

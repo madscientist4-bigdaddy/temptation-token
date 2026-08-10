@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <!-- The local API behind the admin dashboard's Outreach tab.
+
+       Unlike the other jobs this is a long-running server, not a periodic task:
+       RunAtLoad starts it at login and KeepAlive restarts it if it dies, so the
+       dashboard tab works whenever the Mac is on.
+
+       Reading the board and the reply queue is pure SQLite, so this job does not
+       need any mail transport to start. A transport is only required at the moment
+       a reply is actually sent, and the API returns a clear error then.
+
+       Listens on 127.0.0.1:8787 only. Check with: make status -->
+  <key>Label</key><string>io.temptationtoken.outreach.api</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bin/python3</string><string>/Users/functionisedproductions/Projects/temptation-token/outreach/api.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/functionisedproductions/Projects/temptation-token/outreach</string>
+  <key>StandardOutPath</key><string>/Users/functionisedproductions/Projects/temptation-token/outreach/logs/api.log</string>
+  <key>StandardErrorPath</key><string>/Users/functionisedproductions/Projects/temptation-token/outreach/logs/api.err</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <!-- Without this, a crash loop would respawn as fast as launchd can fork. -->
+  <key>ThrottleInterval</key><integer>10</integer>
+</dict></plist>

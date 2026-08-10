@@ -1,0 +1,17 @@
+{
+  "round": 7,
+  "closes": "Sunday 11:59 PM ET",
+  "note": "Placeholder used when TTS_API_URL is unset. Replace with live data or set the env var.",
+  "standings": [
+    {"name": "Demo Creator", "votes": 4820},
+    {"name": "Sample Two",   "votes": 4115},
+    {"name": "Sample Three", "votes": 3390},
+    {"name": "Sample Four",  "votes": 2775},
+    {"name": "Sample Five",  "votes": 2140},
+    {"name": "Sample Six",   "votes": 1655},
+    {"name": "Sample Seven", "votes": 1290},
+    {"name": "Sample Eight", "votes": 980},
+    {"name": "Sample Nine",  "votes": 720},
+    {"name": "Sample Ten",   "votes": 505}
+  ]
+}

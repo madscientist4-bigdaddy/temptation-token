@@ -2,7 +2,7 @@ PY      := .venv/bin/python
 PLISTS  := $(wildcard launchd/*.plist)
 AGENTS  := $(HOME)/Library/LaunchAgents
 
-.PHONY: help setup harvest send brief copilot replies claims sunbiz api status install uninstall clean
+.PHONY: help setup harvest send brief copilot replies claims sunbiz status install uninstall clean
 
 help:
 	@echo "  make setup      first-run wizard (writes .env, seeds SQLite)"
@@ -12,7 +12,6 @@ help:
 	@echo "  make replies    poll IMAP once for replies"
 	@echo "  make claims     check outbound copy against the deployed contract"
 	@echo "  make sunbiz     FL/CA registry lookup -> data/fedex_list.csv"
-	@echo "  make api        serve the dashboard API on 127.0.0.1:8787 (foreground)"
 	@echo "  make status     what the system thinks right now"
 	@echo "  make install    load the five launchd jobs"
 	@echo "  make uninstall  unload them"
@@ -25,7 +24,6 @@ copilot:    ; $(PY) daily_brief.py --for tomorrow && open dm_copilot.html
 replies:    ; $(PY) reply_watcher.py
 claims:     ; $(PY) claims_guard.py
 sunbiz:     ; $(PY) sunbiz.py --urls-only
-api:        ; $(PY) api.py
 
 status:
 	@$(PY) status.py

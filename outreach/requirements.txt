@@ -1,0 +1,7 @@
+# Core outreach engine (harvest, sender, watcher) uses only the stdlib plus:
+requests>=2.32
+beautifulsoup4>=4.12
+
+# Dashboard API — serves the admin dashboard's Outreach tab on 127.0.0.1:8787
+fastapi>=0.115
+uvicorn[standard]>=0.30
