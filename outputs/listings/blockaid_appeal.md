@@ -35,7 +35,7 @@ deterministic, matches the documentation exactly, and is reproducible from the c
 source. The winner is selected by **Chainlink VRF**, so the operator cannot choose it.
 
 **2. An independent audit is published, with a permanent public URL.**
-- Audit page: **https://temptationtoken.io/audit**
+- Audit page: **https://app.temptationtoken.io/audit**
 - Auditor's own portal (Solidproof): **https://app.solidproof.io/projects/temptation-token**
 
 All critical and high findings are resolved. The one accepted finding (AF-001,
@@ -97,7 +97,7 @@ jgoetz@functionised.com
 3. Paste the body above. Attach nothing — every claim is a link they can verify themselves,
    which is what reviewers prefer.
 4. **Before sending**, click these three yourself and confirm they load:
-   - https://temptationtoken.io/audit
+   - https://app.temptationtoken.io/audit
    - https://app.solidproof.io/projects/temptation-token
    - https://basescan.org/tx/0x12010ff383e78f3775613a591e88a7c0d44f314c171c476599cf0926cb16d8d0
 5. Expect **5–15 business days**. If nothing after 15, reply once in-thread with
