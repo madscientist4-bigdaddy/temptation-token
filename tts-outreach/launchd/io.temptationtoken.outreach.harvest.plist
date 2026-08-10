@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <!-- REQUIRES Proton Mail Bridge to be RUNNING. This job talks to 127.0.0.1:1025
+       (SMTP) / :1143 (IMAP); with Bridge closed it exits cleanly and does nothing.
+       Turn on Bridge -> Settings -> "Start on login" or every reboot silently
+       disables this job. Check with: make status -->
+  <key>Label</key><string>io.temptationtoken.outreach.harvest</string>
+  <key>ProgramArguments</key><array>
+    <string>/Users/functionisedproductions/Desktop/temptation-token/tts-outreach/.venv/bin/python</string><string>/Users/functionisedproductions/Desktop/temptation-token/tts-outreach/harvest.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/functionisedproductions/Desktop/temptation-token/tts-outreach</string>
+  <key>StandardOutPath</key><string>/Users/functionisedproductions/Desktop/temptation-token/tts-outreach/logs/harvest.log</string>
+  <key>StandardErrorPath</key><string>/Users/functionisedproductions/Desktop/temptation-token/tts-outreach/logs/harvest.err</string>
+  <key>RunAtLoad</key><false/>
+  <key>StartCalendarInterval</key><dict>
+    <key>Weekday</key><integer>1</integer><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer>
+  </dict>
+</dict></plist>
