@@ -5582,6 +5582,273 @@ function OutreachScreen({ showToast, onUnreadChange }) {
 }
 
 // ─── SIDEBAR NAV CONFIG ───────────────────────────────────────────────────────
+// ─── SOCIAL AI COMPOSER ───────────────────────────────────────────────────────
+// Upload brand media → Claude drafts captions → compliance engine gates them →
+// preview → POST NOW or SCHEDULE. Creator/submitter media is refused server-side
+// (SOCIAL_CREATOR_MEDIA=false) until the consent copy covers marketing use.
+
+function composerCall(action, payload = {}) {
+  return fetch(`/api/social-post?action=composer-${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` },
+    body: JSON.stringify(payload),
+  }).then(async r => {
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(d.error || `HTTP ${r.status}`), { detail: d });
+    return d;
+  });
+}
+
+function ComplianceBadges({ verdict }) {
+  if (!verdict) return null;
+  const chip = (bg, bd, col) => ({ background: bg, border: `1px solid ${bd}`, color: col, borderRadius: 6, padding: '2px 8px', fontSize: '.6rem', fontWeight: 700, marginRight: 6, marginBottom: 4, display: 'inline-block' });
+  return (
+    <div style={{ marginTop: 8 }}>
+      {verdict.ok
+        ? <span style={chip('rgba(46,204,113,.12)', 'rgba(46,204,113,.35)', '#2ecc71')}>✓ passes compliance</span>
+        : <span style={chip('rgba(231,76,60,.12)', 'rgba(231,76,60,.4)', '#e74c3c')}>✕ blocked</span>}
+      <span style={chip('rgba(255,255,255,.06)', 'rgba(255,255,255,.15)', 'var(--muted)')}>
+        {verdict.length}{verdict.limit ? `/${verdict.limit}` : ''} chars
+      </span>
+      {verdict.blocking?.map(b => (
+        <div key={b.id} style={{ fontSize: '.62rem', color: '#e74c3c', marginTop: 4 }}>✕ <b>{b.label}</b> — {b.why}</div>
+      ))}
+      {verdict.warnings?.map(w => (
+        <div key={w.id} style={{ fontSize: '.62rem', color: '#f39c12', marginTop: 4 }}>⚠ <b>{w.label}</b> — {w.why}</div>
+      ))}
+    </div>
+  );
+}
+
+function SocialComposerScreen({ showToast }) {
+  const [caps, setCaps] = useState(null);
+  const [assets, setAssets] = useState([]);
+  const [log, setLog] = useState([]);
+  const [asset, setAsset] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [brief, setBrief] = useState('');
+  const [platforms, setPlatforms] = useState(['x_tts', 'telegram']);
+  const [promo, setPromo] = useState(false);
+  const [options, setOptions] = useState([]);
+  const [chosen, setChosen] = useState(0);
+  const [edited, setEdited] = useState('');
+  const [busy, setBusy] = useState('');
+  const [when, setWhen] = useState('');
+
+  const refresh = () => composerCall('assets').then(d => { setAssets(d.assets || []); setLog(d.log || []); }).catch(() => {});
+  useEffect(() => { composerCall('capabilities').then(setCaps).catch(() => setCaps({ error: true })); refresh(); }, []);
+
+  const primary = platforms.includes('x_tts') ? 'x_tts' : 'telegram';
+  const verdict = options[chosen]?.compliance;
+
+  // Re-evaluated server-side at post time; this is only a live preview hint.
+  const liveLen = edited.length;
+  const overLimit = primary === 'x_tts' && liveLen > 280;
+
+  async function handleUpload(file, source) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { upload_url, asset: row } = await composerCall('upload-url', {
+        filename: file.name, mime: file.type, bytes: file.size, source, label: file.name,
+      });
+      // Browser PUTs straight to Supabase — bypasses Vercel's 4.5MB body cap.
+      const put = await fetch(upload_url, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!put.ok) throw new Error(`Upload failed: HTTP ${put.status}`);
+      setAsset(row);
+      showToast(`Uploaded ${file.name}`, 'success');
+      refresh();
+    } catch (e) { showToast(e.message, 'error'); }
+    setUploading(false);
+  }
+
+  async function generate() {
+    if (!brief.trim()) return showToast('Describe the post first', 'error');
+    setBusy('generate');
+    try {
+      const d = await composerCall('generate', { brief, platform: primary, count: 3, requiresDisclosure: promo });
+      setOptions(d.captions || []);
+      setChosen(0);
+      setEdited(d.captions?.[0]?.text || '');
+      showToast(`${d.captions?.length || 0} options drafted`, 'success');
+    } catch (e) { showToast(e.message, 'error'); }
+    setBusy('');
+  }
+
+  async function postNow() {
+    if (!edited.trim()) return showToast('Nothing to post', 'error');
+    if (!confirm(`Post to ${platforms.join(' + ')} right now?`)) return;
+    setBusy('post');
+    try {
+      const d = await composerCall('post', {
+        assetId: asset?.id || null, caption: edited, platforms, requiresDisclosure: promo,
+      });
+      showToast(d.ok ? 'Posted' : 'Posted with errors — check the log', d.ok ? 'success' : 'error');
+      refresh();
+    } catch (e) {
+      showToast(e.detail?.compliance ? `Blocked: ${e.detail.compliance.blocking.map(b => b.label).join(', ')}` : e.message, 'error');
+    }
+    setBusy('');
+  }
+
+  async function schedule() {
+    if (!when) return showToast('Pick a date & time', 'error');
+    setBusy('schedule');
+    try {
+      await composerCall('schedule', {
+        assetId: asset?.id || null, caption: edited, platforms,
+        scheduledAt: new Date(when).toISOString(), requiresDisclosure: promo,
+      });
+      showToast('Scheduled into the content calendar', 'success');
+      refresh();
+    } catch (e) {
+      showToast(e.detail?.compliance ? `Blocked: ${e.detail.compliance.blocking.map(b => b.label).join(', ')}` : e.message, 'error');
+    }
+    setBusy('');
+  }
+
+  const card = { background: 'var(--card)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: 18, marginBottom: 16 };
+  const btn = (on) => ({ background: on ? 'rgba(212,175,55,.18)' : 'rgba(255,255,255,.05)', border: `1px solid ${on ? 'rgba(212,175,55,.5)' : 'rgba(255,255,255,.12)'}`, color: on ? 'var(--gold)' : 'var(--muted)', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 700, marginRight: 8 });
+
+  return (
+    <div>
+      <div className="page-title">Social Composer</div>
+
+      {/* CAPABILITY / GATE BANNER */}
+      <div style={{ ...card, borderColor: caps?.video_chunked_upload ? 'rgba(255,255,255,.08)' : 'rgba(243,156,18,.3)' }}>
+        <div style={{ fontWeight: 700, marginBottom: 8, fontSize: '.8rem' }}>Capabilities</div>
+        <div style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.7 }}>
+          <div>Photos → X: {caps?.photo_upload ? '✅ supported' : '❌ X credentials missing'}</div>
+          <div>Video → X (chunked upload): {caps == null ? '…checking' : caps.video_chunked_upload ? '✅ supported by this API tier' : `❌ not available on this tier${caps.video_probe?.status ? ` (HTTP ${caps.video_probe.status})` : ''} — photos only`}</div>
+          <div>Telegram broadcaster: {caps?.telegram ? '✅ connected' : '❌ BROADCAST_BOT_TOKEN missing'}</div>
+          <div style={{ marginTop: 6, color: caps?.creator_media_enabled ? '#f39c12' : '#2ecc71' }}>
+            Creator/submitter media: {caps?.creator_media_enabled ? '⚠ ENABLED' : '🔒 blocked (SOCIAL_CREATOR_MEDIA=false)'} — only admin brand/announcement media can post.
+          </div>
+        </div>
+      </div>
+
+      {/* 1 — MEDIA */}
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 10, fontSize: '.8rem' }}>1 · Brand media <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional — text-only posts are fine)</span></div>
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime"
+          disabled={uploading}
+          onChange={e => handleUpload(e.target.files?.[0], 'admin_brand')}
+          style={{ fontSize: '.7rem', color: 'var(--muted)' }} />
+        {uploading && <span style={{ marginLeft: 10, fontSize: '.7rem', color: 'var(--gold)' }}>uploading…</span>}
+        {asset && (
+          <div style={{ marginTop: 10, fontSize: '.7rem', color: '#2ecc71' }}>
+            Attached: <code>{asset.label || asset.storage_path}</code> · {asset.kind} · {asset.source}
+            <button onClick={() => setAsset(null)} style={{ ...btn(false), marginLeft: 10, padding: '2px 8px' }}>remove</button>
+          </div>
+        )}
+        <div style={{ marginTop: 8, fontSize: '.62rem', color: 'var(--muted)' }}>
+          Uploads land in a private bucket. Files go straight from your browser to storage — nothing passes through the API, so large video is fine.
+        </div>
+
+        {assets.length > 0 && (
+          <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 10 }}>
+            <div style={{ fontSize: '.62rem', color: 'var(--muted)', marginBottom: 6 }}>Recent uploads — click to re-attach</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {assets.slice(0, 12).map(a => {
+                const blocked = a.source !== 'admin_brand' && !caps?.creator_media_enabled;
+                return (
+                  <button key={a.id} onClick={() => !blocked && setAsset(a)} disabled={blocked}
+                    title={blocked ? 'Creator media — blocked until consent copy covers marketing use' : a.storage_path}
+                    style={{
+                      background: asset?.id === a.id ? 'rgba(212,175,55,.18)' : 'rgba(255,255,255,.05)',
+                      border: `1px solid ${asset?.id === a.id ? 'rgba(212,175,55,.5)' : 'rgba(255,255,255,.12)'}`,
+                      color: blocked ? '#e74c3c' : 'var(--muted)',
+                      padding: '4px 10px', borderRadius: 6, fontSize: '.6rem',
+                      cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? .55 : 1,
+                    }}>
+                    {blocked ? '🔒 ' : a.kind === 'video' ? '🎬 ' : '🖼 '}{(a.label || a.storage_path).slice(-24)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2 — BRIEF */}
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 10, fontSize: '.8rem' }}>2 · What is this post about?</div>
+        <textarea value={brief} onChange={e => setBrief(e.target.value)} rows={3}
+          placeholder="e.g. Round 7 opens Monday — 16 profiles, biggest pool yet, remind people voting closes Sunday 11:59 ET"
+          style={{ width: '100%', background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.12)', color: 'var(--text)', borderRadius: 6, padding: 10, fontSize: '.75rem', fontFamily: 'inherit' }} />
+        <div style={{ marginTop: 10 }}>
+          <button style={btn(platforms.includes('x_tts'))} onClick={() => setPlatforms(p => p.includes('x_tts') ? p.filter(x => x !== 'x_tts') : [...p, 'x_tts'])}>𝕏 @temptationtoken</button>
+          <button style={btn(platforms.includes('telegram'))} onClick={() => setPlatforms(p => p.includes('telegram') ? p.filter(x => x !== 'telegram') : [...p, 'telegram'])}>Telegram</button>
+          <button style={btn(promo)} onClick={() => setPromo(v => !v)} title="Forces the #ad disclosure rule on">Promotional (#ad)</button>
+        </div>
+        <button onClick={generate} disabled={busy === 'generate'}
+          style={{ ...btn(true), marginTop: 12, padding: '8px 18px' }}>
+          {busy === 'generate' ? 'Drafting…' : '✨ Draft captions'}
+        </button>
+      </div>
+
+      {/* 3 — OPTIONS */}
+      {options.length > 0 && (
+        <div style={card}>
+          <div style={{ fontWeight: 700, marginBottom: 10, fontSize: '.8rem' }}>3 · Pick an option</div>
+          {options.map((o, i) => (
+            <div key={i} onClick={() => { setChosen(i); setEdited(o.text); }}
+              style={{ border: `1px solid ${chosen === i ? 'rgba(212,175,55,.5)' : 'rgba(255,255,255,.1)'}`, background: chosen === i ? 'rgba(212,175,55,.06)' : 'transparent', borderRadius: 8, padding: 12, marginBottom: 10, cursor: 'pointer' }}>
+              <div style={{ fontSize: '.6rem', color: 'var(--gold)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>{o.angle || `Option ${i + 1}`}</div>
+              <div style={{ fontSize: '.75rem', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{o.text}</div>
+              <ComplianceBadges verdict={o.compliance} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 4 — PREVIEW + SEND */}
+      {options.length > 0 && (
+        <div style={card}>
+          <div style={{ fontWeight: 700, marginBottom: 10, fontSize: '.8rem' }}>4 · Preview & send</div>
+          <textarea value={edited} onChange={e => setEdited(e.target.value)} rows={6}
+            style={{ width: '100%', background: 'rgba(0,0,0,.3)', border: `1px solid ${overLimit ? 'rgba(231,76,60,.5)' : 'rgba(255,255,255,.12)'}`, color: 'var(--text)', borderRadius: 6, padding: 10, fontSize: '.78rem', fontFamily: 'inherit', lineHeight: 1.5 }} />
+          <div style={{ fontSize: '.62rem', color: overLimit ? '#e74c3c' : 'var(--muted)', marginTop: 4 }}>
+            {liveLen} chars{primary === 'x_tts' ? ' / 280' : ''}{overLimit ? ' — over the X limit, this will be refused' : ''}
+          </div>
+          <ComplianceBadges verdict={verdict} />
+          <div style={{ fontSize: '.6rem', color: 'var(--muted)', marginTop: 6 }}>
+            Compliance is re-checked on the server before anything is sent — edits here can't bypass it.
+          </div>
+
+          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button onClick={postNow} disabled={busy === 'post'}
+              style={{ background: 'rgba(231,76,60,.15)', border: '1px solid rgba(231,76,60,.45)', color: '#e74c3c', padding: '9px 20px', borderRadius: 6, cursor: 'pointer', fontSize: '.72rem', fontWeight: 800 }}>
+              {busy === 'post' ? 'Posting…' : '🚀 POST NOW'}
+            </button>
+            <input type="datetime-local" value={when} onChange={e => setWhen(e.target.value)}
+              style={{ background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.12)', color: 'var(--text)', borderRadius: 6, padding: '7px 10px', fontSize: '.7rem' }} />
+            <button onClick={schedule} disabled={busy === 'schedule'} style={{ ...btn(true), padding: '9px 18px' }}>
+              {busy === 'schedule' ? 'Scheduling…' : '📅 Schedule'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LOG */}
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 10, fontSize: '.8rem' }}>Post log <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({log.length} most recent — every attempt, including refusals)</span></div>
+        {log.length === 0 && <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>Nothing posted yet.</div>}
+        {log.map(r => (
+          <div key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.06)', padding: '8px 0', fontSize: '.68rem' }}>
+            <span style={{ color: r.status === 'posted' ? '#2ecc71' : r.status === 'blocked' ? '#e74c3c' : '#f39c12', fontWeight: 700 }}>{r.status}</span>
+            <span style={{ color: 'var(--muted)', marginLeft: 8 }}>{new Date(r.created_at).toLocaleString()}</span>
+            <span style={{ color: 'var(--muted)', marginLeft: 8 }}>{(r.platforms || []).join(' + ')}</span>
+            {r.x_tweet_id && <a href={`https://twitter.com/TemptationToken/status/${r.x_tweet_id}`} target="_blank" rel="noreferrer" style={{ marginLeft: 8, color: 'var(--gold)' }}>view tweet ↗</a>}
+            <div style={{ color: 'var(--muted)', marginTop: 3, whiteSpace: 'pre-wrap' }}>{(r.caption || '').slice(0, 140)}</div>
+            {r.error && <div style={{ color: '#e74c3c', marginTop: 3 }}>{r.error}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const NAV = [
   { section: "Command", items: [
     { key: "command",    icon: "🎯", label: "Command Center" },
@@ -5596,6 +5863,7 @@ const NAV = [
     { key: "verifications",  icon: "🪪", label: "KYC Status" },
     { key: "content",        icon: "📅", label: "Content Calendar" },
     { key: "social",         icon: "📱", label: "Social Media" },
+    { key: "composer",       icon: "✨", label: "Social Composer" },
     { key: "system",         icon: "🛡️", label: "System Health" },
   ]},
   { section: "Finance", items: [
@@ -5667,6 +5935,7 @@ export default function AdminApp() {
     verifications:  <VerificationsScreen {...screenProps} />,
     content:        <ContentCalendarErrorBoundary><ContentCalendarScreen {...screenProps} /></ContentCalendarErrorBoundary>,
     social:     <SocialScreen {...screenProps} />,
+    composer:   <SocialComposerScreen {...screenProps} />,
     users:      <UsersScreen {...screenProps} />,
     wallets:    <WalletsScreen />,
     payouts:    <PayoutsScreen {...screenProps} />,
@@ -5679,7 +5948,7 @@ export default function AdminApp() {
 
   const titles = {
     command: "Command Center", priorities: "Daily Priorities", kpi: "KPI Dashboard", manual: "Operations Manual",
-    overview: "Overview", outreach: "Outreach", review: "Photo Review", verifications: "Age Verifications", content: "Content Calendar", social: "Social Media",
+    overview: "Overview", outreach: "Outreach", review: "Photo Review", verifications: "Age Verifications", content: "Content Calendar", social: "Social Media", composer: "Social Composer",
     users: "User Management", wallets: "Wallets", payouts: "Payouts",
     staking: "Staking", referral: "Referrals", settings: "Settings", system: "System Health",
     finance: "Financial KPI",

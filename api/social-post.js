@@ -223,7 +223,38 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end()
 
-  const body = req.body || {}
+  let body = req.body || {}
+  if (typeof body === 'string') { try { body = JSON.parse(body) } catch { body = {} } }
+
+  // ── Social AI Composer (?action=composer-*) ───────────────────────────────
+  // Folded in here rather than a new api/*.js so the Hobby 12-function ceiling
+  // holds. Every action is admin-token-gated; the handlers live in
+  // lib/social/composer.js.
+  const act = req.query?.action || ''
+  if (act.startsWith('composer-')) {
+    const { requireAdmin } = await import('../lib/adminAuth.js')
+    if (!requireAdmin(req, res, body)) return
+    const c = await import('../lib/social/composer.js')
+    switch (act) {
+      case 'composer-capabilities': return c.handleCapabilities(req, res)
+      case 'composer-upload-url':   return c.handleUploadUrl(req, res, body)
+      case 'composer-generate':     return c.handleGenerate(req, res, body)
+      case 'composer-post':         return c.handlePost(req, res, body)
+      case 'composer-schedule':     return c.handleSchedule(req, res, body)
+      case 'composer-assets':       return c.handleAssets(req, res)
+      case 'composer-delete': {
+        // Test-cleanup path: remove a post this composer made.
+        const out = {}
+        if (body.tweet_id) out.x = await c.xDeleteTweet(String(body.tweet_id))
+        if (Array.isArray(body.telegram)) {
+          out.telegram = []
+          for (const m of body.telegram) out.telegram.push(await c.tgDeleteMessage(m.chat_id, m.message_id))
+        }
+        return res.status(200).json({ ok: true, ...out })
+      }
+      default: return res.status(400).json({ error: `Unknown composer action: ${act}` })
+    }
+  }
 
   // ── Admin submission notify (from /api/notify rewrite) ────────────────────
   if (req.query?.action === 'notify') {

@@ -613,6 +613,35 @@ async function firePost(post) {
   // Resolve content — instagram uses selected_caption, others use content directly
   const content = post.content
 
+  // Composer posts carry media. Delegate to the shared publish core so the
+  // X-media-upload and Telegram sendPhoto/sendVideo paths exist in one place.
+  // The hard gate is re-checked here: an asset re-classified as creator media
+  // between scheduling and firing must not go out.
+  if (post.media_asset_id && (post.platform === 'x_tts' || post.platform === 'telegram')) {
+    const c = await import('../lib/social/composer.js')
+    let asset
+    try {
+      asset = await c.loadAsset(post.media_asset_id)
+      c.assertPublishable(asset)
+    } catch (e) {
+      await sbPatch('scheduled_posts', `id=eq.${post.id}`, {
+        status: 'failed', posted_at: null, error: `blocked: ${e.message}`.slice(0, 300),
+      })
+      return { platform: post.platform, id: post.id, blocked: e.message }
+    }
+    const { results, anyError } = await c.publish({
+      asset, caption: content,
+      wantX: post.platform === 'x_tts',
+      wantTG: post.platform === 'telegram',
+    })
+    await sbPatch('scheduled_posts', `id=eq.${post.id}`, {
+      status: anyError ? 'failed' : 'posted',
+      posted_at: anyError ? null : new Date().toISOString(),
+      error: anyError || null,
+    })
+    return { platform: post.platform, id: post.id, results }
+  }
+
   const results = {}
   let anyError = null
 

@@ -58,6 +58,7 @@ const ALLOWED = new Set([
   'bonus_claims', 'referrals', 'referral_credits', 'referral_settings', 'club_partners',
   'pending_clubs',
   'scheduled_posts', 'admin_config', 'admin_audit_log', 'age_acknowledgments',
+  'social_assets', 'social_post_log',
   'verified_submitters', 'verified_wallet_links', 'wallet_verifications',
   'project_expenses', 'project_income',
   // marketing engine tables (service-role only; CRM board reads/writes via this proxy)
