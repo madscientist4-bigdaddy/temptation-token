@@ -56,6 +56,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import TTSChatbot from './TTSChatbot.jsx'
 import StakePanel from './StakePanel.jsx'
 import { STAKING_ENABLED } from './config/staking.js'
+import GetTtsModal from './components/GetTtsModal.jsx'
 import { describeTxError } from './lib/txError.js'
 import { useSendMaybeSponsored, useSponsorshipAvailable, waitForCallsTxHash } from './lib/gasless.js'
 import { useAccount, useDisconnect, useWalletClient } from 'wagmi'
@@ -1597,6 +1598,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   // I3: if the fee is paid on-chain but the DB insert fails, we keep the payload
   // here so the user can retry the save WITHOUT paying the 5 TTS fee again.
   const [pendingSubmit, setPendingSubmit] = useState(null)
+  // 'Get $TTS' modal: opened when a user runs out of free TTS, and from the Buy tab.
+  const [getTts, setGetTts] = useState(null) // null | { reason }
 
   // Saves the submission record. Returns true on success. On failure it shows a
   // clear error (incl. the fee tx hash) — never a false "queued" message.
@@ -1669,7 +1672,8 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         .then(raw => raw != null ? Math.floor(Number(raw) / 1e18) : balance)
         .catch(() => balance)
       if (onchain < 5) {
-        showToast('Not enough $TTS yet — your 500 welcome bonus may still be confirming. Grab $TTS in the Buy tab, then try again in a moment.', 'i')
+        // Out of $TTS. Offer the way forward instead of a dead-end toast.
+        setGetTts({ reason: "You're out of $TTS — the 5 $TTS entry fee needs a top-up." })
         return
       }
       setBalance(onchain)
@@ -1841,6 +1845,19 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         {pendingSubmit && <div className="addr-warn" style={{ marginTop:8 }}>Your 5 TTS fee was paid but the submission didn’t save. Retry above — you won’t be charged again.</div>}
       </div>
       )}
+    <GetTtsModal
+        open={!!getTts}
+        reason={getTts?.reason}
+        onClose={() => setGetTts(null)}
+        onFunded={async () => {
+          setGetTts(null)
+          // Re-read the real on-chain balance so the fee gate reflects the top-up.
+          try {
+            const raw = await readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address])
+            if (raw != null) setBalance(Math.floor(Number(raw) / 1e18))
+          } catch { /* the user can retry submit; the gate re-reads anyway */ }
+        }}
+      />
     </div>
   )
 }
