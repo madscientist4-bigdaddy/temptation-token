@@ -117,7 +117,7 @@ def check() -> tuple[bool, list[str]]:
 
 
 def build(cfg: config.Config, to: str, subject: str, body: str,
-          in_reply_to: str = "") -> EmailMessage:
+          in_reply_to: str = "", unsubscribe: bool = True) -> EmailMessage:
     sender = from_address(cfg)
     msg = EmailMessage()
     msg["From"] = sender
@@ -129,21 +129,25 @@ def build(cfg: config.Config, to: str, subject: str, body: str,
         # Keeps the answer inside the thread the agency already has open.
         msg["In-Reply-To"] = in_reply_to
         msg["References"] = in_reply_to
-    for k, v in guardrails.unsubscribe_headers(sender).items():
-        msg[k] = v
+    # List-Unsubscribe belongs on BULK COMMERCIAL mail. Putting it on a reply to your
+    # own attorney, or on a correction letter to a security vendor, is both wrong and a
+    # tell that the message was machine-generated. send_one.py passes unsubscribe=False.
+    if unsubscribe:
+        for k, v in guardrails.unsubscribe_headers(sender).items():
+            msg[k] = v
     msg.set_content(body)
     return msg
 
 
 def deliver(cfg: config.Config, to: str, subject: str, body: str,
-            in_reply_to: str = "") -> str:
+            in_reply_to: str = "", unsubscribe: bool = True) -> str:
     """Send and return the Message-ID. Raises on any failure — never returns a
     fake success, because a reply the operator believes was sent is worse than an error."""
     t = transport()
     if t == "none":
         raise PermissionError("No mail transport configured (set PROTON_BRIDGE_PW or GMAIL_APP_PW)")
 
-    msg = build(cfg, to, subject, body, in_reply_to)
+    msg = build(cfg, to, subject, body, in_reply_to, unsubscribe=unsubscribe)
 
     if t == "proton":
         ok, _ = check()

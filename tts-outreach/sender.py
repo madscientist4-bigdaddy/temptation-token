@@ -13,6 +13,24 @@ Every attempt is logged to SQLite whether it sends or not.
 
 from __future__ import annotations
 
+
+# ── SUPERSEDED — DO NOT RUN ──────────────────────────────────────────────────
+# Replaced by ../outreach/, which sends unattended over Proton Bridge SMTP.
+#
+# A DRY_RUN of this file wrote 27 .eml files addressed to real agencies containing
+# claims now known to be false ("$2,500 funded prize pool", "keeps 50% of every vote",
+# "paid weekly in USDC") plus a footer with no postal address (CAN-SPAM). macOS binds
+# .eml to Mail.app, so opening one produced a Mail compose window that looked like a
+# draft waiting to be sent. Those files are quarantined in ./QUARANTINE/.
+#
+#   cd ../outreach && make send        # campaign, unattended
+#   cd ../outreach && make send-one    # one-off correspondence
+import sys as _sys
+print("SUPERSEDED — use ../outreach/. See tts-outreach/QUARANTINE/README.txt",
+      file=_sys.stderr)
+raise SystemExit(2)
+# ─────────────────────────────────────────────────────────────────────────────
+
 import argparse
 import os
 import smtplib

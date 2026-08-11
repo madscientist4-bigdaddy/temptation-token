@@ -2,7 +2,7 @@
 PY := /usr/local/bin/python3
 DIR := /Users/functionisedproductions/Projects/temptation-token
 
-.PHONY: help setup verify harvest owners schedule send brief posts card pack test api mail-check status live-check install install-schedule uninstall uninstall-schedule
+.PHONY: send-one help setup verify harvest owners schedule send brief posts card pack test api mail-check status live-check install install-schedule uninstall uninstall-schedule
 
 help:
 	@awk -F':.*##' '/^[a-z-]+:.*##/ {printf "  \033[1m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -17,6 +17,11 @@ owners:           ## Sunbiz / CA bizfile owner + address lookup
 	@$(PY) sunbiz.py
 schedule:         ## build the sequence in SQLite, send nothing
 	@$(PY) sender.py --schedule
+send-one:         ## one-off correspondence email (TO= SUBJECT= BODY=file)
+	@test -n "$(TO)"   || (echo "usage: make send-one TO=x@y.com SUBJECT='...' BODY=path/to/body.txt"; exit 1)
+	@test -n "$(BODY)" || (echo "usage: make send-one TO=x@y.com SUBJECT='...' BODY=path/to/body.txt"; exit 1)
+	@$(PY) send_one.py --to "$(TO)" --subject "$(SUBJECT)" --body-file "$(BODY)" $(if $(DRY),--dry-run,)
+
 send:             ## run due sends (DRY_RUN from .env)
 	@$(PY) sender.py
 brief:            ## write + open TODAY.md and dm_copilot.html
