@@ -7,12 +7,26 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0B0F",
-    "ios": { "bundleIdentifier": "io.temptationtoken.app", "supportsTablet": false },
-    "android": { "package": "io.temptationtoken.app" },
+    "ios": {
+      "bundleIdentifier": "io.temptationtoken.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "io.temptationtoken.app"
+    },
     "extra": {
       "//": "Public, client-safe values only. NEVER put service keys or private keys here.",
       "appUrl": "https://app.temptationtoken.io",
-      "chainId": 8453
+      "chainId": 8453,
+      "eas": {
+        "projectId": "65630368-822e-46d0-8bcf-5653955046ff"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/65630368-822e-46d0-8bcf-5653955046ff"
     }
   }
 }
