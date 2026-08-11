@@ -47,9 +47,16 @@ const RULES = [
   },
 ]
 
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'out', '.vercel', 'build', 'coverage', '.next'])
+
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === '.git' || entry === 'dist' || entry === 'out') continue
+    // Generated output is skipped, never scanned. `.vercel/output` is written by
+    // `vercel build` — which the pre-deploy guard itself runs — and contains MINIFIED
+    // bundles where minification collapses unrelated tokens next to each other. That
+    // produced a "40% prize split" FAIL against a stale artifact while every source
+    // file was clean, blocking commits on this tool's own leftovers.
+    if (SKIP_DIRS.has(entry)) continue
     const full = join(dir, entry)
     if (statSync(full).isDirectory()) { walk(full, files); continue }
     if (EXTENSIONS.has(extname(entry))) files.push(full)
