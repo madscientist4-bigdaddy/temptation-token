@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { createPublicClient, http, parseAbi } from 'viem'
 import { base } from 'viem/chains'
 import { clubLink, clubQrSvg, openClubOnePager } from './lib/clubKit.js'
+import ClubContact from './ClubContact.jsx'
 
 const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const ABI = parseAbi(['function clubWallets(string) view returns (address)'])
@@ -75,6 +76,7 @@ export default function ClubKitScreen({ code }) {
         your application page — it updates by itself the moment you're approved.
       </p>
       <a href="/clubs" style={S.ghost}>Back to my application</a>
+      <ClubContact />
     </div></div>
   )
 
@@ -111,6 +113,8 @@ export default function ClubKitScreen({ code }) {
           week's pool is sent here automatically at settlement.
         </div>
       </div>
+
+      <ClubContact />
     </div></div>
   )
 }

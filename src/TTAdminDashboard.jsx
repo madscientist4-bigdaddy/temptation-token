@@ -2766,11 +2766,16 @@ function ReferralScreen({ showToast }) {
             : pendingClubs.length === 0
               ? <div style={{color:"var(--muted)",fontSize:".8rem"}}>No applications waiting.</div>
               : <table className="data-table" style={{width:"100%"}}>
-                  <thead><tr><th>Club</th><th>City</th><th>Code</th><th>Payout Wallet</th><th>Applied</th><th>Decision</th></tr></thead>
+                  <thead><tr><th>Club</th><th>City</th><th>Contact</th><th>Code</th><th>Payout Wallet</th><th>Applied</th><th>Decision</th></tr></thead>
                   <tbody>{pendingClubs.map(c => (
                     <tr key={c.club_code}>
                       <td style={{fontWeight:700}}>{c.club_name}</td>
                       <td style={{fontSize:".78rem",color:"var(--muted)"}}>{c.city}</td>
+                      <td style={{fontSize:".78rem",maxWidth:190,wordBreak:"break-word",userSelect:"text"}}>
+                        {c.contact
+                          ? <span title={c.contact}>{c.contact}</span>
+                          : <span style={{color:"var(--rose)",fontStyle:"italic"}}>none given</span>}
+                      </td>
                       <td><span style={{fontFamily:"monospace",fontSize:".82rem",color:"var(--gold)"}}>{c.club_code}</span></td>
                       <td><span style={{fontFamily:"monospace",fontSize:".68rem",color:"var(--muted)"}}>{c.wallet_address?.slice(0,10)}…{c.wallet_address?.slice(-6)}</span></td>
                       <td style={{fontSize:".68rem",color:"var(--muted)"}}>{c.created_at ? new Date(c.created_at).toLocaleDateString() : "—"}</td>

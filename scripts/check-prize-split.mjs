@@ -47,10 +47,18 @@ const RULES = [
   },
 ]
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'out', '.vercel', 'build', 'coverage', '.next'])
+// Pods/ and .venv/ hold vendored dependency source, never our copy. Pods in particular
+// accumulates iCloud-duplicated entries ("Foo 2.h") that are frequently BROKEN symlinks —
+// statSync on one throws ENOENT and killed this entire check, so the guard was exiting
+// with a stack trace instead of a verdict. A canonical-value guard that crashes reads,
+// at a glance, a lot like one that passed.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'out', '.vercel', 'build',
+  'coverage', '.next', 'Pods', '.venv', '__pycache__'])
 
 function walk(dir, files = []) {
-  for (const entry of readdirSync(dir)) {
+  let entries
+  try { entries = readdirSync(dir) } catch { return files }  // unreadable dir: skip, don't die
+  for (const entry of entries) {
     // Generated output is skipped, never scanned. `.vercel/output` is written by
     // `vercel build` — which the pre-deploy guard itself runs — and contains MINIFIED
     // bundles where minification collapses unrelated tokens next to each other. That
@@ -58,7 +66,9 @@ function walk(dir, files = []) {
     // file was clean, blocking commits on this tool's own leftovers.
     if (SKIP_DIRS.has(entry)) continue
     const full = join(dir, entry)
-    if (statSync(full).isDirectory()) { walk(full, files); continue }
+    let st
+    try { st = statSync(full) } catch { continue }   // broken symlink / vanished file
+    if (st.isDirectory()) { walk(full, files); continue }
     if (EXTENSIONS.has(extname(entry))) files.push(full)
   }
   return files

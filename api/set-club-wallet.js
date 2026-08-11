@@ -96,9 +96,14 @@ async function handleApply(req, res) {
   const clubName = String(b.clubName || '').trim()
   const city     = String(b.city || '').trim()
   const wallet   = String(b.walletAddress || '').trim()
+  // Free-form on purpose: clubs answer on wildly different channels, and forcing a
+  // format here would either reject a working IG handle or push someone into typing a
+  // dead email. The column is NOT NULL, so this is enforced at the DB too.
+  const contact  = String(b.contact || '').trim().replace(/\s+/g, ' ')
 
   if (clubName.length < 2 || clubName.length > 80) return res.status(400).json({ ok: false, error: 'Club name must be 2–80 characters.' })
   if (city.length < 2 || city.length > 80)         return res.status(400).json({ ok: false, error: 'City must be 2–80 characters.' })
+  if (contact.length < 3 || contact.length > 120)  return res.status(400).json({ ok: false, error: 'A best contact (phone, email or IG) is required.' })
   if (!isAddr(wallet) || wallet.toLowerCase() === ZERO) return res.status(400).json({ ok: false, error: 'A valid payout wallet is required.' })
 
   const walletLc = wallet.toLowerCase()
@@ -145,7 +150,7 @@ async function handleApply(req, res) {
   const r = await sb('/pending_clubs', {
     method: 'POST',
     body: JSON.stringify({
-      club_code: code, club_name: clubName, city,
+      club_code: code, club_name: clubName, city, contact,
       wallet_address: walletLc, status: 'pending',
       applicant_ip: clientIp(req), created_at: new Date().toISOString(),
     }),

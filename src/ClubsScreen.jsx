@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { useAppKit } from '@reown/appkit/react'
+import ClubContact from './ClubContact.jsx'
 
 const POLL_MS = 8000
 
@@ -24,6 +25,7 @@ export default function ClubsScreen() {
 
   const [clubName, setClubName] = useState('')
   const [city, setCity] = useState('')
+  const [contact, setContact] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [app, setApp] = useState(null)   // { clubCode, status }
@@ -55,13 +57,14 @@ export default function ClubsScreen() {
     setErr('')
     if (clubName.trim().length < 2) return setErr('Please enter your club name.')
     if (city.trim().length < 2) return setErr('Please enter your city.')
+    if (contact.trim().length < 3) return setErr('Please add a best contact — phone, email or IG.')
     if (!isConnected || !address) return setErr('Connect or create a wallet first — this is where your payouts go.')
     setBusy(true)
     try {
       const r = await fetch('/api/clubs/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clubName: clubName.trim(), city: city.trim(), walletAddress: address }),
+        body: JSON.stringify({ clubName: clubName.trim(), city: city.trim(), contact: contact.trim(), walletAddress: address }),
       })
       const d = await r.json()
       if (!d.ok) setErr(d.error || 'Something went wrong. Please try again.')
@@ -157,6 +160,14 @@ export default function ClubsScreen() {
         <input style={S.input} value={city} onChange={e => setCity(e.target.value)}
                placeholder="Tampa, FL" autoComplete="address-level2" />
 
+        <label style={S.label}>Best contact (phone, email, or IG)</label>
+        <input style={S.input} value={contact} onChange={e => setContact(e.target.value)}
+               placeholder="(813) 555-0134 · manager@club.com · @thedollhouse"
+               autoComplete="tel" inputMode="text" />
+        <p style={{ fontSize: '.7rem', color: '#7a7a88', margin: '-6px 0 14px', lineHeight: 1.5 }}>
+          How we reach you about your application, payouts and promo. Whatever you actually answer.
+        </p>
+
         <label style={S.label}>Where your payouts go</label>
         {isConnected ? (
           <div style={{ marginBottom: 14 }}>
@@ -191,6 +202,8 @@ export default function ClubsScreen() {
         <div style={S.li}>2. Your club kit unlocks: a printable one-pager with your QR code.</div>
         <div style={S.li}>3. Your performers scan it, enter, and you earn when they win.</div>
       </div>
+
+      <ClubContact />
 
       <p style={{ fontSize: '.7rem', color: '#6a6a78', lineHeight: 1.6 }}>
         Entrants must be 18+ and pass a one-time ID check. Photos must be clothed and SFW.
