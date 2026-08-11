@@ -165,8 +165,12 @@ async function handleStatus(req, res) {
   const wallet = String(req.query?.wallet || '').trim().toLowerCase()
   if (!isAddr(wallet)) return res.status(400).json({ ok: false, error: 'wallet required' })
   try {
-    const rows = await sb(`/pending_clubs?wallet_address=eq.${wallet}&select=club_code,club_name,city,status,created_at&order=created_at.desc&limit=1`).then(r => r.json())
-    if (!Array.isArray(rows) || !rows.length) return res.status(200).json({ ok: true, found: false })
+    // sbRows, not sb(): a missing table or an RLS denial makes PostgREST return a JSON
+    // error OBJECT, and an Array.isArray() guard here would swallow it into
+    // `found: false` — telling an applicant who really did apply that we have no record
+    // of them. Fail closed so they see "unavailable" and try again instead.
+    const rows = await sbRows(`/pending_clubs?wallet_address=eq.${wallet}&select=club_code,club_name,city,status,created_at&order=created_at.desc&limit=1`)
+    if (!rows.length) return res.status(200).json({ ok: true, found: false })
     const row = rows[0]
     return res.status(200).json({ ok: true, found: true, clubCode: row.club_code, clubName: row.club_name, city: row.city, status: row.status })
   } catch {
@@ -178,8 +182,12 @@ async function handleStatus(req, res) {
 async function handlePending(req, res) {
   if (!requireAdmin(req, res, req.body || {})) return
   try {
-    const rows = await sb('/pending_clubs?status=eq.pending&select=*&order=created_at.asc').then(r => r.json())
-    return res.status(200).json({ ok: true, pending: Array.isArray(rows) ? rows : [] })
+    // sbRows, not sb(): `Array.isArray(rows) ? rows : []` would turn a missing table or an
+    // RLS denial into an EMPTY QUEUE with HTTP 200 — the admin dashboard would show "no
+    // pending applications" while real ones piled up unseen. An error must look like an
+    // error here, because nobody goes looking for a queue they were told was empty.
+    const rows = await sbRows('/pending_clubs?status=eq.pending&select=*&order=created_at.asc')
+    return res.status(200).json({ ok: true, pending: rows })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message })
   }
@@ -215,8 +223,12 @@ async function handleApprove(req, res) {
 
   let row
   try {
-    const rows = await sb(`/pending_clubs?club_code=eq.${code}&select=*`).then(r => r.json())
-    if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ ok: false, error: 'application not found' })
+    // Correct via sbRows rather than via the Array.isArray() guard below. The old form
+    // reached the same 404 by accident when PostgREST errored; relying on that meant a
+    // later edit to the guard could silently start approving on a garbage read, and this
+    // path signs an on-chain transaction.
+    const rows = await sbRows(`/pending_clubs?club_code=eq.${code}&select=*`)
+    if (!rows.length) return res.status(404).json({ ok: false, error: 'application not found' })
     row = rows[0]
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message })
