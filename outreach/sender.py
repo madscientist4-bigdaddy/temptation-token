@@ -151,8 +151,13 @@ def due_emails(c, today: date) -> list[tuple[dict, int]]:
                 continue
             if (start + timedelta(days=offset)) > today:
                 continue
+            # dry_run = 0 ONLY. A preview must never consume a real send slot:
+            # previewing step 1 and 2 marked them "done", so the first genuine
+            # email these agencies would have received was the step-3 breakup,
+            # referring to a conversation that never happened.
             already = c.execute(
-                "SELECT 1 FROM sends WHERE agency_id = ? AND step = ?", (r["id"], step)
+                "SELECT 1 FROM sends WHERE agency_id = ? AND step = ? AND dry_run = 0",
+                (r["id"], step),
             ).fetchone()
             if already:
                 continue
