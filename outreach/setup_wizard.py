@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Interactive setup. Asks for every credential, explains where to get each one, then
-proves the Gmail login actually works before writing anything.
+proves the Proton Bridge login actually works before writing anything.
 
     python3 setup_wizard.py            # interactive
     python3 setup_wizard.py --show     # just print the questions + how-to, ask nothing
@@ -27,11 +27,15 @@ Q = [
      "The address the outreach sends from — e.g. partnerships@temptationtoken.io.\n"
      "     Use a real mailbox you can open; replies land there.\n"
      "     Do NOT use your personal address: if it gets filtered, you lose your own mail too."),
-    ("GMAIL_APP_PW", "Gmail / Workspace app password (16 chars)", True,
-     "Google Account -> Security -> 2-Step Verification (must be ON) -> App passwords\n"
-     "     -> select 'Mail' -> Generate. Google shows 16 characters in 4 groups.\n"
-     "     Paste it with or without spaces; spaces are stripped. This is NOT your\n"
-     "     normal Google password, and it only works if 2-Step is already enabled."),
+    ("PROTON_SMTP_USER", "Proton Bridge SMTP username", True,
+     "This is the Proton address the Bridge is logged in as — normally the SAME as\n"
+     "     FROM_EMAIL above. Proton Mail Bridge -> Settings -> the account row shows it.\n"
+     "     Bridge must be RUNNING for anything to send; it is a local process."),
+    ("PROTON_BRIDGE_PW", "Proton Bridge password (NOT your Proton login)", True,
+     "Proton Mail Bridge -> pick your account -> 'Mailbox details' / 'Configure'\n"
+     "     -> copy the generated Bridge password. It is machine-generated and specific to\n"
+     "     this device; it is NOT the password you log into Proton with, and it only works\n"
+     "     while Bridge is open. Requires a paid Proton Mail plan."),
     ("CALENDLY_URL", "Calendly booking link", True,
      "calendly.com -> New Event Type -> One-on-One -> name it 'TTS Partnership 15 min'\n"
      "     -> set duration 15 min -> Save -> copy the public link.\n"
@@ -66,7 +70,7 @@ def show() -> None:
         tag = "\033[31mrequired\033[0m" if required else "\033[2moptional\033[0m"
         print(f"  \033[1m{key}\033[0m — {label}  [{tag}]")
         print(f"     {how}\n")
-    print("Then: a REAL SMTP login to smtp.gmail.com:587 to prove the credentials work.\n")
+    print("Then: a REAL SMTP login to the Proton Bridge on 127.0.0.1:1025 to prove it works.\n")
 
 
 def read_existing() -> dict[str, str]:
@@ -82,24 +86,46 @@ def read_existing() -> dict[str, str]:
 
 
 def verify_smtp(user: str, pw: str) -> tuple[bool, str]:
-    """Real login. Returns (ok, human-readable message)."""
-    pw = (pw or "").replace(" ", "")
-    if not user or not pw:
-        return False, "FROM_EMAIL or GMAIL_APP_PW empty"
-    if len(pw) != 16:
-        return False, (f"app password is {len(pw)} chars, expected 16 — you may have pasted "
-                       "your normal Google password instead of an app password")
+    """
+    Prove the configured transport is actually usable, via the SAME mailer the sender
+    uses — so a green check here means sending works, not that a string looks right.
+
+    For Proton this is a real connect to the Bridge on loopback, then a real LOGIN.
+    Bridge being closed is the single most common failure and it is silent otherwise.
+    """
+    import os
+    os.environ["PROTON_SMTP_USER"] = user or ""
+    os.environ["PROTON_BRIDGE_PW"] = pw or ""
+    sys.path.insert(0, str(ROOT))
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as s:
+        import importlib
+        import mailer as _m
+        importlib.reload(_m)
+    except Exception as e:
+        return False, f"could not load mailer.py: {e}"
+
+    t = _m.transport()
+    if t != "proton":
+        return False, ("transport did not resolve to proton — PROTON_SMTP_USER / "
+                       "PROTON_BRIDGE_PW are not both set")
+
+    ok, lines = _m.check()
+    if not ok:
+        return False, ("Proton Bridge is not reachable on loopback:\n      "
+                       + "\n      ".join(lines)
+                       + "\n      → open the Proton Mail Bridge app and leave it running.")
+
+    import smtplib
+    try:
+        with smtplib.SMTP(_m.PROTON_SMTP_HOST, _m.PROTON_SMTP_PORT, timeout=20) as s:
             s.starttls()
             s.login(user, pw)
-        return True, "SMTP login OK — Gmail accepted the app password"
-    except smtplib.SMTPAuthenticationError as e:
-        return False, (f"Gmail REJECTED the credentials ({e.smtp_code}). Usual causes: "
-                       "2-Step Verification is off, the app password was revoked, or the "
-                       "address is not the mailbox the password belongs to.")
-    except Exception as e:  # network, DNS, TLS
-        return False, f"could not reach smtp.gmail.com: {e}"
+        return True, f"Bridge login OK on {_m.PROTON_SMTP_HOST}:{_m.PROTON_SMTP_PORT} as {user}"
+    except smtplib.SMTPAuthenticationError:
+        return False, ("Bridge REJECTED the password. It must be the generated Bridge "
+                       "password from Bridge -> Mailbox details, not your Proton login.")
+    except Exception as e:
+        return False, f"Bridge connect failed: {e}"
 
 
 def write_env(vals: dict[str, str]) -> None:
@@ -127,7 +153,7 @@ def write_env(vals: dict[str, str]) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--show", action="store_true", help="print questions and exit")
-    ap.add_argument("--verify", action="store_true", help="re-test SMTP from existing .env")
+    ap.add_argument("--verify", action="store_true", help="re-test the transport from existing .env")
     a = ap.parse_args()
 
     if a.show:
@@ -137,7 +163,7 @@ def main() -> int:
     existing = read_existing()
 
     if a.verify:
-        ok, msg = verify_smtp(existing.get("FROM_EMAIL", ""), existing.get("GMAIL_APP_PW", ""))
+        ok, msg = verify_smtp(existing.get("PROTON_SMTP_USER", "") or existing.get("FROM_EMAIL", ""), existing.get("PROTON_BRIDGE_PW", ""))
         print(("\033[32m✓ \033[0m" if ok else "\033[31m✗ \033[0m") + msg)
         return 0 if ok else 1
 
@@ -159,7 +185,7 @@ def main() -> int:
             print(f"  \033[2m{ln}\033[0m")
         shown = f" [{'*' * 8 if 'PW' in key or 'KEY' in key else cur}]" if cur else ""
         while True:
-            raw = (getpass.getpass(f"  > {key}{shown}: ") if ("PW" in key or "KEY" in key)
+            raw = (getpass.getpass(f"  > {key}{shown}: ") if ("PW" in key or "KEY" in key or "BRIDGE" in key)
                    else input(f"  > {key}{shown}: ")).strip()
             val = raw or cur
             if required and not val:
@@ -169,8 +195,8 @@ def main() -> int:
             break
         print()
 
-    print("Testing the Gmail login for real…")
-    ok, msg = verify_smtp(vals.get("FROM_EMAIL", ""), vals.get("GMAIL_APP_PW", ""))
+    print("Testing the Proton Bridge login for real…")
+    ok, msg = verify_smtp(vals.get("PROTON_SMTP_USER", "") or vals.get("FROM_EMAIL", ""), vals.get("PROTON_BRIDGE_PW", ""))
     print(("  \033[32m✓ \033[0m" if ok else "  \033[31m✗ \033[0m") + msg)
     if not ok:
         # Refuse to write credentials we have proven do not work — a saved bad password

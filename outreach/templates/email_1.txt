@@ -1,15 +1,28 @@
-SUBJECT: Your creators earn from every fan vote — funded launch pool
+SUBJECT: A new revenue line for your creators — launch cohort
 Hi {{name}} team,
 
 {{angle_line}}
 
-Temptation Token is a vote-to-earn game: fans buy votes for their favorite creators, and
-the creator keeps 50% of every vote — paid weekly in USDC — plus tracked traffic back to
-her pages.
+Temptation Token is a weekly vote-to-earn contest on Base. Fans buy votes in $TTS for the
+creator they want to win. At the end of each round the contract settles on-chain and pays
+out automatically:
 
-Launch cohort: $2,500 funded prize pool, 5 agency slots. We supply the contestant kit,
-captions, and links; creators post twice a week on IG/X. Nothing ever posts on OnlyFans
-itself, and every vote settles on-chain, audited.
+  • winning creator — 35% of the votes cast on her
+  • top voter       — 35%
+  • charity         — 10%
+  • house           — 20%
+
+Two things I want to be straight about, because they matter to you: votes cast on
+creators who don't win that round are burned, not paid out, so this is upside on a good
+week rather than a guaranteed monthly figure. And payouts settle in $TTS on-chain — not
+in fiat or stablecoin.
+
+What your creators get regardless of the result is a trafficked profile page linking
+back to their own channels, and the contest itself as content.
+
+Launch cohort: 5 agency slots. We supply the contestant kit, captions and links; creators
+post twice a week on IG/X. Nothing ever posts on OnlyFans itself, and every settlement is
+verifiable on Basescan.
 
 Worth 15 minutes this week? {{CALENDLY}}
 

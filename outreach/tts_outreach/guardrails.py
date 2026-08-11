@@ -92,7 +92,7 @@ def assert_manual_only(channel: str) -> None:
 #     - naming the platform is a SELLING POINT — "nothing ever posts on OnlyFans
 #       itself" is the reassurance the agency actually wants, and suppressing it makes
 #       the pitch worse and less honest
-#     - stating commercial terms ($2,500 pool, 50% revenue share) is ordinary
+#     - stating VERIFIABLE commercial terms (the on-chain 35/35/10/20 split) is ordinary
 #       contracting language, not an earnings claim
 #     - what stays banned is TOKEN speculation: price targets, market cap, APY,
 #       guaranteed returns, "10x". That is the thing that creates securities and
@@ -180,7 +180,7 @@ def email_body_violations(text: str) -> list[Violation]:
 
     Intentionally permits what caption_violations() rejects: naming the platform (the
     "nothing ever posts on OnlyFans itself" reassurance) and stating commercial terms
-    ("$2,500 pool", "keeps 50%"). Those are the pitch. Token speculation is still out.
+    the real on-chain split. Those are the pitch. Token speculation is still out.
     """
     out: list[Violation] = []
     m = _TOKEN_SPECULATION.search(text)

@@ -40,9 +40,7 @@ SCHEDULE = [(0, "EMAIL", 1), (1, "EMAIL", 2), (3, "DM", 0), (4, "EMAIL", 3),
             (7, "FEDEX", 0), (12, "NURTURE", 0)]
 
 DM_TEXT = (
-    "Hey — Temptation Token here. Fans buy votes for their favorite creators; your girls "
-    "keep 50% of every vote + tracked traffic back to their pages. $2,500 funded launch "
-    "pool, 5 agency slots, zero OnlyFans posting. Want the one-pager?"
+    "Hey — Temptation Token here. It's a weekly vote-to-earn contest on Base: fans buy votes in $TTS for a creator, and at settlement the winning creator takes 35% of the votes cast on her, paid on-chain. Votes on creators who don't win that round are burned, so it's upside, not a guaranteed monthly number. Every entrant also gets a trafficked profile page linking back to her channels. 5 launch slots, zero OnlyFans posting. Want the one-pager?"
 )
 
 

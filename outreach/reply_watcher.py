@@ -108,7 +108,10 @@ def draft_for(kind: str, agency: str, cfg: config.Config) -> str:
         return (f"Subject: Re: Temptation Token — {agency}\n\n"
                 "Fair question, and the honest answer is that the incentives line up: we earn "
                 "when fans buy the same votes your creators earn on. There is no fee to you and "
-                "no cost to your creators — they keep 50% of every vote, paid weekly in USDC.\n\n"
+                "no cost to your creators. The contract pays the winning creator 35% of the votes cast "
+                "on her, on-chain at settlement; votes on creators who don't win that round "
+                "are burned. So it is upside on a good week, not a guaranteed monthly figure — "
+                "I would rather you hear that from me than find it later.\n\n"
                 "The only catch worth naming: the launch cohort is 5 agency slots, so it is "
                 "first come.\n\n"
                 f"One-pager: {one}\nBook 15 min: {cal}\n\nJim")
