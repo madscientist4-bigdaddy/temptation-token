@@ -51,11 +51,12 @@ live sending on a mismatch until you either fix the copy or acknowledge it via
 
 ## Three things to resolve before going live
 
-1. **The copy does not match the contract.** The email says creators keep *50% of every
-   vote, paid weekly in USDC*. V3d pays **35% to the winning profile only**, in **$TTS**.
-   A creator who doesn't win gets nothing; losing votes burn. If the 50% is a separate
-   share you fund off-chain, say that explicitly — as written it reads as a description
-   of the on-chain mechanic. `make claims` lists all four flagged claims.
+1. **Copy vs contract — RESOLVED 2026-08-11.** The templates, the DM text, every
+   per-agency `angle_line` and the referral follow-up now state the deployed terms:
+   the winning creator takes **35% of the votes cast on her**, paid on-chain in
+   **$TTS**, with losing votes burned. The old "50% of every vote, paid weekly in
+   USDC" and the "$2,500 funded pool" claim are gone from both trees. `make claims`
+   and `tests/test_guardrails.py` (9 passing) guard against regression.
 
 2. **EU/UK targets need a lawful basis.** Six of fifteen are flagged in `TODAY.md`
    section 6. Two publish a German **Impressum**, which is where their address came
