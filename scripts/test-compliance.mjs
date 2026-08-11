@@ -32,6 +32,14 @@ t('not-financial-advice wink',  `Buy the dip, not financial advice ${LINK}`, 'fi
 console.log('\nSFW —')
 t('nsfw blocked',   `Hottest nudes on ${LINK}`, 'nsfw_explicit')
 t('sexy blocked',   `Vote for the sexy winner ${LINK}`, 'nsfw_explicit')
+// Inflections: a bare \bsexy\b misses these, and "sexiest" is the form a
+// caption actually reaches for — this escaped the first adversarial pass.
+t('sexiest blocked',  `The sexiest profiles of Round 7 are live ${LINK}`, 'nsfw_explicit')
+t('sexier blocked',   `Round 7 is sexier than ever ${LINK}`, 'nsfw_explicit')
+t('steamy blocked',   `A steamy week on ${LINK}`, 'nsfw_explicit')
+t('naughty blocked',  `The naughty list is live ${LINK}`, 'nsfw_explicit')
+// "hot" must stay allowed — the game is literally Hot or Not.
+t('brand word "hot" allowed', `Hot or Not, Round 7. Vote now at ${LINK}`, 'ok')
 t('minor blocked',  `Teen contestants this week ${LINK}`, 'minor_risk')
 t('objectifying is warn only', `Smash or pass? ${LINK}`, '!objectifying')
 
