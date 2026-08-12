@@ -799,7 +799,7 @@ function TransferModal({ dir, onClose, showToast, address, walletClient, chainId
 let photoCache = null
 
 // ── PLAY SCREEN ───────────────────────────────────────────────────────────────
-function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
+function PlayScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork, requestTopUp }) {
   // Gasless: when the connected wallet is a smart account and our paymaster grants it,
   // approve+vote go out as ONE sponsored batch (one Face ID prompt, zero ETH). Falls back
   // to the exact legacy path for EOAs, capped-out users, or a declining paymaster.
@@ -918,7 +918,14 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
     if (!walletClient) { showToast('Wallet not ready', 'e'); return }
     const a = Number(va[photo.id] || 0)
     if (a < 5) { showToast('Minimum vote is 5 $TTS', 'e'); return }
-    if (a > balance) { showToast('Insufficient $TTS balance', 'e'); return }
+    if (a > balance) {
+      // Running out mid-vote is the moment the top-up path exists for. A bare toast
+      // dead-ends the user on the one screen where they have already decided to spend.
+      requestTopUp(balance <= 0
+        ? "You're out of $TTS — top up to keep voting."
+        : `That vote needs ${a} $TTS and you have ${balance}. Top up the difference to place it.`)
+      return
+    }
 
     setVoting(v => ({ ...v, [photo.id]: true }))
     try {
@@ -1491,7 +1498,7 @@ function BuySellScreen({ showToast, connected }) {
 }
 
 // ── SUBMIT SCREEN ─────────────────────────────────────────────────────────────
-function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork }) {
+function SubmitScreen({ balance, setBalance, showToast, connected, address, walletClient, chainId, onWrongNetwork, requestTopUp }) {
   // Identity verification status for this wallet. 'approved' → skip ID (one-time-per-
   // wallet). 'unverified'/'declined' → require ID + selfie upload. 'pending' → awaiting
   // admin review. Authoritative check is server-side at submit; this only drives the UI.
@@ -1599,7 +1606,6 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
   // here so the user can retry the save WITHOUT paying the 5 TTS fee again.
   const [pendingSubmit, setPendingSubmit] = useState(null)
   // 'Get $TTS' modal: opened when a user runs out of free TTS, and from the Buy tab.
-  const [getTts, setGetTts] = useState(null) // null | { reason }
 
   // Saves the submission record. Returns true on success. On failure it shows a
   // clear error (incl. the fee tx hash) — never a false "queued" message.
@@ -1673,7 +1679,7 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         .catch(() => balance)
       if (onchain < 5) {
         // Out of $TTS. Offer the way forward instead of a dead-end toast.
-        setGetTts({ reason: "You're out of $TTS — the 5 $TTS entry fee needs a top-up." })
+        requestTopUp("You're out of $TTS — the 5 $TTS entry fee needs a top-up.")
         return
       }
       setBalance(onchain)
@@ -1845,19 +1851,6 @@ function SubmitScreen({ balance, setBalance, showToast, connected, address, wall
         {pendingSubmit && <div className="addr-warn" style={{ marginTop:8 }}>Your 5 TTS fee was paid but the submission didn’t save. Retry above — you won’t be charged again.</div>}
       </div>
       )}
-    <GetTtsModal
-        open={!!getTts}
-        reason={getTts?.reason}
-        onClose={() => setGetTts(null)}
-        onFunded={async () => {
-          setGetTts(null)
-          // Re-read the real on-chain balance so the fee gate reflects the top-up.
-          try {
-            const raw = await readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address])
-            if (raw != null) setBalance(Math.floor(Number(raw) / 1e18))
-          } catch { /* the user can retry submit; the gate re-reads anyway */ }
-        }}
-      />
     </div>
   )
 }
@@ -2113,7 +2106,13 @@ export default function App() {
     { k:'nfts', l:'NFTs' }, { k:'submit', l:'Submit' }, { k:'refer', l:'Refer' }, { k:'howto', l:'How to Win' }, { k:'faqs', l:'FAQs' },
   ]
 
-  const sp = { balance, setBalance, showToast, connected: isConnected, address, walletClient, chainId, onWrongNetwork: () => setShowWrongNet(true) }
+  // Lifted to the parent: running out of $TTS happens on Play (mid-vote) AND on
+  // Submit (entry fee). Owning it in one place means one modal instance and one
+  // balance refresh, instead of a screen-local copy Play could not reach.
+  const [getTts, setGetTts] = useState(null) // null | { reason }
+  const requestTopUp = (reason) => setGetTts({ reason })
+
+  const sp = { balance, setBalance, showToast, connected: isConnected, address, walletClient, chainId, onWrongNetwork: () => setShowWrongNet(true), requestTopUp }
 
   useEffect(() => {
     if (!isConnected || !address) { setBalance(0); return }
@@ -2249,6 +2248,20 @@ export default function App() {
         {tab==='faqs'        && <FAQScreen />}
       </div>
 
+      <GetTtsModal
+        open={!!getTts}
+        reason={getTts?.reason}
+        onClose={() => setGetTts(null)}
+        onFunded={async () => {
+          setGetTts(null)
+          // Re-read the real on-chain balance so both the vote gate and the fee gate
+          // reflect the top-up without a page refresh.
+          try {
+            const raw = await readContract(TTS_ADDRESS, TTS_ABI, 'balanceOf', [address])
+            if (raw != null) setBalance(Math.floor(Number(raw) / 1e18))
+          } catch { /* gates re-read on next action anyway */ }
+        }}
+      />
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
       {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} />}
       {showWrongNet && <WrongNetworkModal onClose={() => setShowWrongNet(false)} />}
