@@ -734,15 +734,17 @@ function WrongNetworkModal({ onClose }) {
 }
 
 // ── TRANSFER MODAL ────────────────────────────────────────────────────────────
-function TransferModal({ dir, onClose, showToast, address, walletClient, chainId, onWrongNetwork }) {
+function TransferModal({ dir, onClose, showToast, address, walletClient, chainId, onWrongNetwork, requestTopUp }) {
   const [amt, setAmt] = useState('')
   const [toAddr, setToAddr] = useState('')
   const [sending, setSending] = useState(false)
 
   const go = async () => {
     if (dir === 'in') {
-      window.open(`https://app.uniswap.org/swap?outputCurrency=${TTS_ADDRESS}&chain=base`, '_blank')
+      // Second raw Uniswap deep-link, same problem as the Buy tab's: it dropped the
+      // user into an unguarded swap with no impact ceiling. Route to the in-app modal.
       onClose()
+      requestTopUp?.('Swap ETH or USDC for $TTS — quoted live, with a 5% price-impact limit.')
       return
     }
     if (chainId !== BASE_CHAIN_ID) { onWrongNetwork(); return }
@@ -2268,7 +2270,7 @@ export default function App() {
         }}
       />
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
-      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} />}
+      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} requestTopUp={requestTopUp} />}
       {showWrongNet && <WrongNetworkModal onClose={() => setShowWrongNet(false)} />}
       {showAgeModal && isConnected && address && (
         <AgeAcknowledgmentModal onAccept={() => {
