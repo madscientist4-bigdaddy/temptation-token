@@ -1397,7 +1397,7 @@ async function fetchPoolRate() {
   return Math.round(Number(r1 * 10000n / r0) / 10000)
 }
 
-function BuySellScreen({ showToast, connected }) {
+function BuySellScreen({ showToast, connected, requestTopUp }) {
   const [tab, setTab] = useState('buy')
   const [amt, setAmt] = useState('')
   const [cur, setCur] = useState('ETH')
@@ -1448,12 +1448,17 @@ function BuySellScreen({ showToast, connected }) {
                 {!rateLoading && rate && <span style={{ fontSize:'.58rem', color:'var(--muted)', marginLeft:6 }}>· Uniswap V2 · updates every 60s</span>}
               </span>
             </div>
-            <a href={`https://app.uniswap.org/swap?outputCurrency=${TTS_ADDRESS}&chain=base`} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none', display:'block' }}>
+            {/* Was a raw Uniswap deep-link, which sent users to an unguarded swap with
+                no impact ceiling — on a ~$1.9k pool a $100 buy silently costs ~10%. The
+                in-app modal quotes live, floors minOut at 1% slippage and refuses >5%
+                impact in plain English. Sell still leaves for Uniswap: we only guard buys. */}
+            <div onClick={() => { if (tab === 'buy') requestTopUp?.('Swap ETH or USDC for $TTS — quoted live, with a 5% price-impact limit.') }}
+                 style={{ textDecoration:'none', display:'block', cursor: tab === 'buy' ? 'pointer' : 'default' }}>
               <button className="pbtn">
-                {tab === 'buy' ? 'Buy $TTS on Uniswap' : 'Sell $TTS on Uniswap'}
+                {tab === 'buy' ? 'Get $TTS — guarded swap' : 'Sell $TTS on Uniswap'}
               </button>
-            </a>
-            <div className="sub-note">Powered by Uniswap V2 on Base · Contract: {TTS_ADDRESS.slice(0,10)}…</div>
+            </div>
+            <div className="sub-note">Uniswap V2 liquidity on Base · buys are quoted and impact-capped in-app · Contract: {TTS_ADDRESS.slice(0,10)}…</div>
           </>
         )}
 

@@ -187,6 +187,44 @@ def deliver(cfg: config.Config, to: str, subject: str, body: str) -> str:
     return mailer.deliver(cfg, to, subject, body)
 
 
+
+CANARY_TO = "jim@temptationtoken.io"
+
+
+def canary(cfg) -> tuple[bool, str]:
+    """
+    Send one real email to the owner through the FULL campaign path before any agency
+    mail moves. Returns (ok, detail).
+
+    This exists because of 2026-08-12: the campaign was armed against a transport that
+    could not authenticate, and the first thing that discovered it was a live batch —
+    98 SMTP failures across 14 real agencies. A transport regression must never meet a
+    live batch first. mailer.check() alone is not enough: it proves the Bridge socket is
+    open, not that a message is accepted, and the Gmail failure would have passed it.
+
+    Runs once per calendar day. Suppression is not consulted — this is our own address.
+    """
+    today = date.today().isoformat()
+    with db.connect() as c:
+        if db.get_meta(c, "canary_ok_date") == today:
+            return True, "already verified today"
+
+    body = (
+        f"Campaign canary — {today}\n\n"
+        "Sent through sender.deliver() before this window's batch. If you have this, the "
+        "campaign transport is working and the batch was cleared to send.\n"
+    )
+    try:
+        mid = deliver(cfg, CANARY_TO, f"TTS campaign canary {today}", body)
+    except Exception as e:
+        return False, str(e)
+
+    with db.connect() as c:
+        db.set_meta(c, "canary_ok_date", today)
+        db.set_meta(c, "canary_last_mid", mid)
+    return True, mid
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--schedule", action="store_true", help="only build the schedule")
@@ -227,6 +265,17 @@ def main() -> int:
         if not pending:
             print("  nothing due today.")
             return 0
+
+        # CANARY FIRST — nothing goes to an agency until one real message has left
+        # the building through this exact code path today.
+        if not cfg.dry_run:
+            good, detail = canary(cfg)
+            if not good:
+                print(f"  \033[31mABORT\033[0m canary failed — no agency mail sent.\n"
+                      f"         {detail}")
+                db.log(c, pending[0][0]["id"], "CANARY_FAILED", detail=detail[:300])
+                return 1
+            print(f"  \033[32mcanary ok\033[0m ({detail})")
 
         print(f"  {len(pending)} due · cap {cap}/day · {sent_today} already sent today\n")
         done = 0

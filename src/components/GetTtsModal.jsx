@@ -122,14 +122,15 @@ export default function GetTtsModal({ open, onClose, onFunded, reason }) {
                 <button className={tab === 'swap' ? 'on' : ''} onClick={() => setTab('swap')}>
                   I have ETH / USDC
                 </button>
-                <button
-                  className={tab === 'card' ? 'on' : ''}
-                  onClick={() => setTab('card')}
-                  disabled={!BUY_ENABLED}
-                  title={BUY_ENABLED ? '' : 'Card purchases are not enabled yet'}
-                >
-                  Pay by card
-                </button>
+                {/* Rendered only when the card leg is genuinely available. A visible-
+                    but-disabled tab advertises a payment method we cannot honour, and
+                    invites support questions we have no answer to. assertBuyConfigured()
+                    additionally refuses a STAGING key inside a production build. */}
+                {BUY_ENABLED && assertBuyConfigured() && (
+                  <button className={tab === 'card' ? 'on' : ''} onClick={() => setTab('card')}>
+                    Pay by card
+                  </button>
+                )}
               </div>
 
               {tab === 'swap' && SWAP_ENABLED && (
@@ -237,7 +238,7 @@ color:var(--text,#f0e8d8);margin-bottom:6px;text-align:center}
 font-size:1.5rem;cursor:pointer;min-height:44px;min-width:44px}
 .gtts-reason{font-size:.76rem;color:var(--gold,#d4af37);text-align:center;margin-bottom:16px;line-height:1.5}
 .gtts-tabs{display:flex;gap:8px;margin:16px 0 18px}
-.gtts-tabs button{flex:1;background:none;border:1px solid var(--border2,rgba(255,255,255,.07));
+.gtts-tabs button{flex:1;min-width:0;background:none;border:1px solid var(--border2,rgba(255,255,255,.07));
 color:var(--muted,#8a8580);border-radius:8px;padding:11px;font-size:.72rem;cursor:pointer;min-height:44px;font-family:inherit}
 .gtts-tabs button.on{border-color:var(--gold,#d4af37);color:var(--gold,#d4af37)}
 .gtts-tabs button:disabled{opacity:.35;cursor:not-allowed}
