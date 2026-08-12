@@ -33,6 +33,7 @@ from email.utils import formatdate, make_msgid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mailer
 from tts_outreach import config, db, guardrails  # noqa: E402
 
 STEPS = {1: "email_1.txt", 2: "email_2.txt", 3: "email_3.txt"}
@@ -167,21 +168,23 @@ def due_emails(c, today: date) -> list[tuple[dict, int]]:
 
 
 def deliver(cfg: config.Config, to: str, subject: str, body: str) -> str:
-    msg = EmailMessage()
-    msg["From"] = cfg.from_email
-    msg["To"] = to
-    msg["Subject"] = subject
-    msg["Date"] = formatdate(localtime=True)
-    mid = make_msgid(domain=cfg.from_email.partition("@")[2] or "localhost")
-    msg["Message-ID"] = mid
-    for k, v in guardrails.unsubscribe_headers(cfg.from_email).items():
-        msg[k] = v
-    msg.set_content(body)
-    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as s:
-        s.starttls()
-        s.login(cfg.from_email, cfg.gmail_app_pw)
-        s.send_message(msg)
-    return mid
+    """
+    Hand off to mailer.py — the ONE place that knows which transport is configured.
+
+    This used to open smtp.gmail.com directly. When the mail layer was moved to Proton
+    Bridge, mailer.py was created and api.py was rewired to it, but this function was
+    missed — so the campaign kept dialling Gmail with an empty GMAIL_APP_PW. The first
+    live batch produced 98 SMTP 535 BadCredentials failures across 14 agencies before
+    anyone noticed, because a transport that is merely misconfigured looks identical to
+    one that is quiet.
+
+    Never reintroduce a transport here. mailer.transport() is the single source of truth.
+    """
+    up, detail = mailer.check()
+    if not up:
+        # Fail loudly with the actual reason rather than 14 opaque SMTP errors.
+        raise ConnectionError("mail transport unavailable: " + "; ".join(detail))
+    return mailer.deliver(cfg, to, subject, body)
 
 
 def main() -> int:
