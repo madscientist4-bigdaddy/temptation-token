@@ -47,8 +47,12 @@ const TD_MONO = 'style="padding:8px;font-family:monospace;font-size:.8rem"'
 const INSERTS = [
   {
     what: 'add Trophy NFT row (page currently lists no NFT contract)',
-    after: `<td ${TD_MONO}>0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d</td>\n</tr>`,
-    html: `\n<tr>\n<td ${TD}>Trophy NFT</td>\n<td ${TD_MONO}>0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5</td>\n</tr>`,
+    // content.raw keeps each <tr> on ONE line; content.rendered splits the tags
+    // across lines. Anchoring on the rendered shape matched during the dry run
+    // and then matched 0 times against raw, which is what the hit-count guard
+    // caught. Anchor on the raw single-line form.
+    after: `<td ${TD_MONO}>0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d</td></tr>`,
+    html: `\n<tr><td ${TD}>Trophy NFT</td><td ${TD_MONO}>0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5</td></tr>`,
     skipIf: '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5',
   },
 ]
