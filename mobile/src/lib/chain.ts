@@ -48,7 +48,7 @@ export const SEL = {
 const encodeAddress = (a: string) => a.toLowerCase().replace(/^0x/, '').padStart(64, '0')
 
 /** One eth_call. Returns the raw hex, or null on any transport/revert failure. */
-async function ethCall(to: string, data: string): Promise<string | null> {
+export async function ethCall(to: string, data: string): Promise<string | null> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 12000)
   try {
@@ -70,7 +70,7 @@ async function ethCall(to: string, data: string): Promise<string | null> {
   }
 }
 
-const word = (hex: string, i: number): bigint => {
+export const word = (hex: string, i: number): bigint => {
   const start = 2 + i * 64
   const slice = hex.slice(start, start + 64)
   if (slice.length < 64) return 0n

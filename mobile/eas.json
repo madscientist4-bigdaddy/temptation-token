@@ -16,7 +16,11 @@
       "distribution": "internal",
       "channel": "apk-wallet",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
+      "env": {
+        "EXPO_PUBLIC_WALLET_ENABLED": "true",
+        "EXPO_PUBLIC_GASLESS_ENABLED": "true",
+        "EXPO_PUBLIC_GASLESS_PAYMASTER": "https://app.temptationtoken.io/api/paymaster"
+      }
     },
     "ios-simulator": {
       "distribution": "internal",
@@ -30,6 +34,21 @@
       "ios": { "simulator": false },
       "env": { "EXPO_PUBLIC_WALLET_ENABLED": "true" }
     },
+    "testflight": {
+      "distribution": "store",
+      "channel": "testflight",
+      "autoIncrement": true,
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_WALLET_ENABLED": "true",
+        "EXPO_PUBLIC_GASLESS_ENABLED": "true",
+        "EXPO_PUBLIC_GASLESS_PAYMASTER": "https://app.temptationtoken.io/api/paymaster",
+        "EXPO_PUBLIC_STAKING_LIVE": "false"
+      }
+    },
     "production": {
       "channel": "production",
       "autoIncrement": true,
@@ -41,6 +60,13 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "testflight": {
+      "ios": {
+        "appleId": "REPLACE_WITH_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+      }
+    }
   }
 }

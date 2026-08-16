@@ -18,6 +18,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { WALLET_ENABLED } from '../config/features'
 import { isAddress } from './chain'
+import { useConnectedAddress } from '../wallet/appkit'
 
 const STORAGE_KEY = 'tts.wallet.address'
 
@@ -61,9 +62,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // A REAL connected wallet outranks a typed address. Typing is the fallback for builds
+  // with no connector; once a wallet is actually connected it is the only address that can
+  // sign, so letting a stale typed value win would send a vote from the wrong account.
+  const { address: connectedAddress, isConnected } = useConnectedAddress()
+  const effective = connectedAddress ?? address
+
   const value = useMemo<Ctx>(
-    () => ({ address, connected: WALLET_ENABLED && !!address, canTransact: WALLET_ENABLED && !!address, setAddress, ready }),
-    [address, setAddress, ready]
+    () => ({
+      address: effective,
+      connected: isConnected,
+      // Only a genuinely connected wallet can sign. A typed address is identity, never
+      // capability — see the header of this file.
+      canTransact: WALLET_ENABLED && isConnected && !!connectedAddress,
+      setAddress,
+      ready,
+    }),
+    [effective, isConnected, connectedAddress, setAddress, ready]
   )
   return <WalletCtx.Provider value={value}>{children}</WalletCtx.Provider>
 }

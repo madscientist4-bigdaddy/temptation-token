@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   SafeAreaView, View, Text, Pressable, StatusBar, StyleSheet, Linking, ScrollView,
+  useWindowDimensions,
 } from 'react-native'
 import { PlayScreen } from './src/screens/PlayScreen'
 import { LeaderboardScreen } from './src/screens/LeaderboardScreen'
@@ -15,8 +16,10 @@ import { StakingScreen } from './src/screens/StakingScreen'
 import { ReferralScreen } from './src/screens/ReferralScreen'
 import { WalletSheet } from './src/components/WalletSheet'
 import { WalletProvider, useWallet } from './src/lib/wallet'
-import { loadWallet } from './src/wallet/loader'
-import { readTtsBalance, formatTTS } from './src/lib/chain'
+import { WalletStack } from './src/wallet/appkit'
+import { readTtsBalance, formatTTS, compactTTS } from './src/lib/chain'
+import { GetTtsSheet } from './src/components/GetTtsSheet'
+import { TopUpProvider } from './src/lib/topup'
 import { colors, serif, sans, MAX_WIDTH } from './src/theme'
 
 type TabKey = 'play' | 'leaderboard' | 'submit' | 'stake' | 'refer'
@@ -31,10 +34,17 @@ const TABS: { k: TabKey; l: string }[] = [
 // WalletProvider has to sit above everything that reads the address, so App is a thin
 // wrapper around the real shell.
 export default function App() {
+  // WalletStack must be OUTERMOST: WalletProvider reads the connected account through a
+  // wagmi hook, which needs WagmiProvider above it. In a wallet-less build the metro
+  // resolver swaps in a pass-through stub, so this nesting costs nothing there.
   return (
-    <WalletProvider>
-      <Shell />
-    </WalletProvider>
+    <WalletStack>
+      <WalletProvider>
+        <TopUpProvider>
+          <Shell />
+        </TopUpProvider>
+      </WalletProvider>
+    </WalletStack>
   )
 }
 
@@ -43,21 +53,27 @@ function Shell() {
   const [walletOpen, setWalletOpen] = useState(false)
   const { address } = useWallet()
   const [balance, setBalance] = useState<bigint | null>(null)
+  const { width } = useWindowDimensions()
+
+  // At 6.1" (390pt) the five tabs overflowed and REFER rendered as "RE". The strip did
+  // scroll, but nothing said so, so the tab looked broken rather than off-screen. Shrink
+  // the type and padding on narrow screens so all five fit; the ScrollView stays as a
+  // backstop for anything narrower still.
+  const tight = width < 420
+  const navItemStyle = tight ? { paddingHorizontal: 8, paddingVertical: 13 } : null
+  const navTxtStyle = tight ? { fontSize: 10, letterSpacing: 0.5 } : null
 
   // The wallet bar shows a real balance as soon as an address is known — this is a plain
-  // eth_call, so it works in Expo Go with no wallet SDK involved.
+  // eth_call, so it works with no wallet SDK involved.
   useEffect(() => {
     let live = true
     if (!address) { setBalance(null); return }
-    readTtsBalance(address).then((b) => { if (live) setBalance(b) }).catch(() => {})
+    // Only overwrite on a SUCCESSFUL read. readTtsBalance resolves null when the public
+    // RPC rate-limits or times out, and writing that through blanked a known-good balance
+    // to "—" on every tab switch.
+    readTtsBalance(address).then((b) => { if (live && b != null) setBalance(b) }).catch(() => {})
     return () => { live = false }
   }, [address, tab])
-
-  // In a dev build (WALLET_ENABLED) initialise Reown AppKit lazily. In Expo Go this is a
-  // no-op — loadWallet() returns null without ever importing the native modules.
-  useEffect(() => {
-    loadWallet().then((w) => w?.initWallet()).catch(() => {})
-  }, [])
 
   return (
     <SafeAreaView style={st.root}>
@@ -72,8 +88,12 @@ function Shell() {
           </View>
           <View style={st.bal}>
             <Text style={st.balLabel}>Balance</Text>
-            <Text style={st.balAmt}>
-              {balance != null ? formatTTS(balance, 0) : '—'}
+            {/* Compact above a million: a founder-sized 10,000,000,000 rendered full-width
+                squeezed the brand lockup down to a clipped sliver of the "TT" mark. */}
+            <Text style={st.balAmt} numberOfLines={1}>
+              {balance != null
+                ? (balance >= 1_000_000n * 10n ** 18n ? compactTTS(balance) : formatTTS(balance, 0))
+                : '—'}
               <Text style={st.balUnit}> $TTS</Text>
             </Text>
           </View>
@@ -95,8 +115,14 @@ function Shell() {
       <View style={st.nav}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.navInner}>
           {TABS.map((t) => (
-            <Pressable key={t.k} style={[st.navItem, tab === t.k && st.navItemActive]} onPress={() => setTab(t.k)}>
-              <Text style={[st.navTxt, tab === t.k && st.navTxtActive]}>{t.l}</Text>
+            <Pressable
+              key={t.k}
+              style={[st.navItem, navItemStyle, tab === t.k && st.navItemActive]}
+              onPress={() => setTab(t.k)}
+            >
+              <Text style={[st.navTxt, navTxtStyle, tab === t.k && st.navTxtActive]} numberOfLines={1}>
+                {t.l}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -112,6 +138,10 @@ function Shell() {
       </View>
 
       <WalletSheet visible={walletOpen} onClose={() => setWalletOpen(false)} />
+      {/* Owned at the shell, like the web app's lifted Get-$TTS modal: running dry happens
+          on Play (mid-vote), Submit (entry fee) and Stake, so one instance serves all
+          three and every screen can raise it through useTopUp(). */}
+      <GetTtsSheet onConnect={() => setWalletOpen(true)} />
     </SafeAreaView>
   )
 }

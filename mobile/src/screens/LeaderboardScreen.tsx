@@ -51,6 +51,11 @@ export function LeaderboardScreen() {
 
   const maxV = useMemo(() => Math.max(1, ...items.map((p) => p.votes)), [items])
 
+  // Medals are a claim about standings, and until a single vote is cast there are no
+  // standings — the order is just whatever the API returned. Awarding gold/silver/bronze
+  // to three profiles all sitting on 0 $TTS invents a result the round has not produced.
+  const ranked = useMemo(() => items.some((p) => p.votes > 0), [items])
+
   return (
     <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={colors.gold} />}>
       <SectionHead title="Leaderboard" subtitle="Live rankings · Auto-refreshes every 30s" />
@@ -59,6 +64,9 @@ export function LeaderboardScreen() {
         <Text style={st.colTxt}>Total $TTS</Text>
       </View>
       {offline ? <Text style={st.offline}>Offline preview — showing sample standings</Text> : null}
+      {!offline && !loading && items.length > 0 && !ranked ? (
+        <Text style={st.offline}>No votes cast yet this round — this is the line-up, not a ranking.</Text>
+      ) : null}
 
       {loading && items.length === 0 ? (
         <Text style={st.msg}>Loading rankings…</Text>
@@ -68,8 +76,16 @@ export function LeaderboardScreen() {
         <View style={st.list}>
           {items.map((p, i) => (
             <View key={p.profileId} style={st.row}>
-              <Text style={[st.rank, { color: RANK_COLOR[i] || colors.muted, fontSize: i < 3 ? 20 : 16 }]}>
-                {MEDALS[i] ?? i + 1}
+              <Text
+                style={[
+                  st.rank,
+                  {
+                    color: ranked && i < 3 && p.votes > 0 ? RANK_COLOR[i] : colors.muted,
+                    fontSize: ranked && i < 3 && p.votes > 0 ? 20 : 16,
+                  },
+                ]}
+              >
+                {ranked && i < 3 && p.votes > 0 ? MEDALS[i] : i + 1}
               </Text>
               {p.image_url ? (
                 <Image source={{ uri: p.image_url }} style={st.thumb} resizeMode="cover" />
@@ -80,7 +96,7 @@ export function LeaderboardScreen() {
                 <Text style={st.name} numberOfLines={1}>{p.display_name || 'Anonymous'}</Text>
                 <Text style={st.votes}>
                   <Text style={st.votesNum}>{p.votes.toLocaleString()}</Text> $TTS
-                  {pool > 0 ? <Text style={st.share}>  · {Math.round((p.votes / pool) * 100)}%</Text> : null}
+                  {pool > 0 && p.votes > 0 ? <Text style={st.share}>  · {Math.round((p.votes / pool) * 100)}%</Text> : null}
                 </Text>
                 <View style={st.barWrap}>
                   <View style={[st.bar, { width: `${(p.votes / maxV) * 100}%` }]} />

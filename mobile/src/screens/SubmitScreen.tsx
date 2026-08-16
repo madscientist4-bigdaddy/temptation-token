@@ -22,6 +22,8 @@ import { SectionHead } from '../components/SectionHead'
 import { Card, Field, Label, Btn, Note, Checkbox, Row } from '../components/Form'
 import { AddressGate, AddressChip } from '../components/AddressGate'
 import { useWallet } from '../lib/wallet'
+import { useTopUp } from '../lib/topup'
+import { readTtsBalance, formatTTS } from '../lib/chain'
 import { api, KycStatus } from '../api/client'
 import { WALLET_ENABLED, FULL_APP_URL } from '../config/features'
 import { colors, sans } from '../theme'
@@ -48,6 +50,8 @@ async function pickImage(opts: { square?: boolean } = {}): Promise<Pick | null> 
 
 export function SubmitScreen({ onConnect }: { onConnect: () => void }) {
   const { address, canTransact } = useWallet()
+  const { requireBalance } = useTopUp()
+  const [balance, setBalance] = useState<bigint | null>(null)
 
   const [kyc, setKyc] = useState<KycStatus | null>(null)
   const [kycLoading, setKycLoading] = useState(false)
@@ -85,6 +89,13 @@ export function SubmitScreen({ onConnect }: { onConnect: () => void }) {
   }, [address])
 
   useEffect(() => { refresh() }, [refresh])
+
+  useEffect(() => {
+    let live = true
+    if (!address) { setBalance(null); return }
+    readTtsBalance(address).then((b) => { if (live && b != null) setBalance(b) }).catch(() => {})
+    return () => { live = false }
+  }, [address])
 
   if (!address) {
     return (
@@ -135,7 +146,13 @@ export function SubmitScreen({ onConnect }: { onConnect: () => void }) {
     if (linkUrl.trim() && !/^https?:\/\/.+/.test(linkUrl.trim())) e.linkUrl = 'Must start with http:// or https://'
     if (!photo) e.photo = 'Choose the photo you are entering.'
     setErrors(e)
-    if (Object.keys(e).length) return false
+    if (Object.keys(e).length) {
+      // The inline errors sit beside the photo/name fields, which on a phone are a long
+      // way above the button. Without this the tap looked like it did nothing at all.
+      const which = [e.name && 'display name', e.photo && 'photo', e.linkUrl && 'link URL'].filter(Boolean)
+      setMsg({ t: `Check your ${which.join(' and ')} above — the details are marked in red.`, tone: 'warn' })
+      return false
+    }
     if (!terms) { setMsg({ t: 'You must confirm you are 18+ and own the rights to the photo.', tone: 'warn' }); return false }
     if (!nftConsent) { setMsg({ t: 'Please tick the NFT/photo consent box — it is required to submit.', tone: 'warn' }); return false }
     if (!verified && (!idDoc || !selfie)) { setMsg({ t: 'First-time entries need a government ID and a selfie.', tone: 'warn' }); return false }
@@ -145,6 +162,10 @@ export function SubmitScreen({ onConnect }: { onConnect: () => void }) {
   const onSubmit = async () => {
     setMsg(null)
     if (!validate()) return
+    // Check the fee BEFORE uploading a government ID. Discovering you are 3 $TTS short
+    // after handing over your passport photo is the wrong order to find that out in.
+    const feeWei = BigInt(SUBMISSION_FEE) * 10n ** 18n
+    if (!requireBalance({ need: feeWei, have: balance, action: 'The entry fee' })) return
     setBusy(true)
     try {
       const paths = await uploadIdentity()
@@ -302,7 +323,7 @@ export function SubmitScreen({ onConnect }: { onConnect: () => void }) {
           <Note tone="gold">
             {WALLET_ENABLED
               ? 'Connect your wallet to pay the entry fee.'
-              : `Everything above works here. Paying the ${SUBMISSION_FEE} $TTS fee needs a wallet signature, which Expo Go cannot do — you'll finish that step in the full app.`}
+              : `Everything above works here. Paying the ${SUBMISSION_FEE} $TTS fee needs a wallet signature, which this build cannot make — you'll finish that step in the full app.`}
           </Note>
         )}
         {msg ? <Note tone={msg.tone}>{msg.t}</Note> : null}

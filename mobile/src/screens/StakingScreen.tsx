@@ -18,6 +18,7 @@ import { SectionHead } from '../components/SectionHead'
 import { Card, Label, Btn, Note, Row } from '../components/Form'
 import { AddressGate, AddressChip } from '../components/AddressGate'
 import { useWallet } from '../lib/wallet'
+import { useTopUp } from '../lib/topup'
 import { STAKING_LIVE, FULL_APP_URL } from '../config/features'
 import {
   readStakingStats, readStakePosition, readTtsBalance, StakingStats, StakePosition,
@@ -40,6 +41,7 @@ function countdown(toUnix: number): string {
 
 export function StakingScreen({ onConnect }: { onConnect: () => void }) {
   const { address, canTransact } = useWallet()
+  const { requireBalance } = useTopUp()
   const [stats, setStats] = useState<StakingStats | null>(null)
   const [pos, setPos] = useState<StakePosition | null>(null)
   const [bal, setBal] = useState<bigint | null>(null)
@@ -150,15 +152,26 @@ export function StakingScreen({ onConnect }: { onConnect: () => void }) {
 
           {canTransact ? (
             <View style={{ gap: 8, marginTop: 12 }}>
-              <Btn onPress={() => Linking.openURL(FULL_APP_URL)}>Stake</Btn>
+              {/* Bronze is the entry tier, so it is the floor worth checking against —
+                  below it, staking earns the base rate and the user should know they are
+                  short before they are bounced by the contract. */}
+              <Btn
+                onPress={() => {
+                  const floor = stats?.thresholds?.[0] ?? 0n
+                  if (floor > 0n && !requireBalance({ need: floor, have: bal, action: 'Staking at Bronze' })) return
+                  Linking.openURL(FULL_APP_URL)
+                }}
+              >
+                Stake
+              </Btn>
               <Btn kind="ghost" onPress={() => Linking.openURL(FULL_APP_URL)}>Unstake</Btn>
               <Btn kind="ghost" onPress={() => Linking.openURL(FULL_APP_URL)}>Claim rewards</Btn>
             </View>
           ) : (
             <>
               <Note tone="gold">
-                Staking, unstaking and claiming each need a wallet signature, which Expo Go cannot do.
-                Everything above is the real on-chain state for this wallet.
+                Staking, unstaking and claiming each need a wallet signature, which this build cannot
+                make. Everything above is the real on-chain state for this wallet.
               </Note>
               <Btn kind="ghost" onPress={() => Linking.openURL(FULL_APP_URL)}>Stake in the full app →</Btn>
             </>

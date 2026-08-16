@@ -15,6 +15,13 @@ import { useCountdown } from '../lib/round'
 import { api } from '../api/client'
 import { PLACEHOLDER_PROFILES } from '../lib/placeholder'
 import { colors, sans, MAX_WIDTH } from '../theme'
+import { useWallet } from '../lib/wallet'
+import { useTopUp } from '../lib/topup'
+import { readTtsBalance, formatTTS } from '../lib/chain'
+import { ScrollView } from 'react-native'
+
+/** MIN_VOTE on TTSVotingV3d — 5 $TTS, enforced on-chain. */
+const MIN_VOTE_TTS = 5n
 
 export function PlayScreen({ onConnect }: { onConnect: () => void }) {
   const { width: screenW } = useWindowDimensions()
@@ -29,7 +36,48 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
   const [idx, setIdx] = useState(0)
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [detail, setDetail] = useState<{ p: VoteProfile; rank: number } | null>(null)
+  const [note, setNote] = useState<string | null>(null)
   const listRef = useRef<FlatList>(null)
+  const { address, canTransact } = useWallet()
+  const { requireBalance } = useTopUp()
+  const [balance, setBalance] = useState<bigint | null>(null)
+
+  useEffect(() => {
+    let live = true
+    if (!address) { setBalance(null); return }
+    readTtsBalance(address).then((b) => { if (live && b != null) setBalance(b) }).catch(() => {})
+    return () => { live = false }
+  }, [address])
+
+  /**
+   * The vote gate. Previously this was `onVote={onConnect}` for everyone, so a funded
+   * player tapping Vote got the connect sheet and no explanation.
+   *
+   * Order matters: identity, then the on-chain minimum, then funds. Checking funds first
+   * would tell someone they are short when the real problem is a 2 $TTS entry.
+   */
+  const handleVote = (p: VoteProfile) => {
+    setNote(null)
+    if (!address) { onConnect(); return }
+    const raw = (amounts[p.profileId] || '').trim()
+    const n = Number(raw)
+    if (!raw || !isFinite(n) || n <= 0) { setNote('Enter how much $TTS to place first.'); return }
+    const wei = BigInt(Math.round(n * 1e6)) * 10n ** 12n
+    if (wei < MIN_VOTE_TTS * 10n ** 18n) {
+      setNote(`The minimum vote is ${MIN_VOTE_TTS} $TTS — that floor is enforced on-chain.`)
+      return
+    }
+    // Opens the Get-$TTS sheet naming the exact shortfall, and returns false.
+    if (!requireBalance({ need: wei, have: balance, action: `Voting ${formatTTS(wei, 0)} $TTS` })) return
+    if (!canTransact) {
+      setNote(
+        `Your ${formatTTS(wei, 0)} $TTS vote is ready, but casting it needs a wallet signature this ` +
+        `build cannot make. Finish in the full app — nothing has been charged.`
+      )
+      return
+    }
+    setNote('Confirm the vote in your wallet.')
+  }
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +113,18 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* The whole board scrolls VERTICALLY. Without this the page was exactly one screen
+          tall: header (~370pt) + a 3:4 card image (~477pt) already exceeds a 6.1" screen's
+          844pt, so the card's own vote section — total votes, the amount field and the
+          Vote button — sat below the fold with no way to reach it. Voting was unreachable
+          from the Play screen entirely; the only route was photo → detail → Vote.
+          A horizontal FlatList nested in a vertical ScrollView is the supported
+          combination (perpendicular axes), unlike two lists sharing an axis. */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={colors.gold} />}
+        contentContainerStyle={{ paddingBottom: 32 }}
+      >
       {/* The header sits ABOVE the carousel, not in ListHeaderComponent.
           On a horizontal FlatList the header is laid out along the horizontal axis —
           i.e. beside the cards, at its natural unconstrained width — which pushed the
@@ -95,7 +155,6 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
       <FlatList
         data={loading ? [] : profiles}
         keyExtractor={(p) => p.profileId}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={colors.gold} />}
         renderItem={({ item, index }) => (
           <View style={{ width: cardW, paddingHorizontal: 0 }}>
             <VoteCard
@@ -105,7 +164,7 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
               maxVotes={maxVotes}
               amount={amounts[item.profileId] || ''}
               onAmountChange={(v) => setAmounts((a) => ({ ...a, [item.profileId]: v }))}
-              onVote={onConnect}
+              onVote={() => handleVote(item)}
               onOpenPhoto={() => setDetail({ p: item, rank: index + 1 })}
               width={cardW}
             />
@@ -126,22 +185,27 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
             <Text style={[st.empty, { width: cardW }]}>No approved profiles in this round yet.</Text>
           )
         }
-        ListFooterComponent={
-          !loading && profiles.length > 0 ? (
-            <View style={st.footer}>
-              <Text style={st.count}>{idx + 1} of {profiles.length}</Text>
-              <View style={st.dots}>
-                {profiles.map((_, i) => (
-                  <View key={i} style={[st.pageDot, i === idx && st.pageDotActive]} />
-                ))}
-              </View>
-              <Text style={[st.count, { textAlign: 'right' }]}>
-                {maxVotes > 1 ? `${Math.round((profiles[idx]?.votes / maxVotes) * 100)}% votes` : '—'}
-              </Text>
-            </View>
-          ) : null
-        }
       />
+
+      {/* The pager lives OUTSIDE the list. As ListFooterComponent it inherited the list's
+          horizontal axis and was laid out to the right of the last card — permanently
+          off-screen, the same trap the header fell into. */}
+      {!loading && profiles.length > 0 ? (
+        <View style={st.footer}>
+          <Text style={st.count}>{idx + 1} of {profiles.length}</Text>
+          <View style={st.dots}>
+            {profiles.map((_, i) => (
+              <View key={i} style={[st.pageDot, i === idx && st.pageDotActive]} />
+            ))}
+          </View>
+          <Text style={[st.count, { textAlign: 'right' }]}>
+            {maxVotes > 1 ? `${Math.round((profiles[idx]?.votes / maxVotes) * 100)}% votes` : '—'}
+          </Text>
+        </View>
+      ) : null}
+
+      {note ? <Text style={st.note}>{note}</Text> : null}
+      </ScrollView>
 
       <ProfileDetail
         profile={detail?.p ?? null}
@@ -173,4 +237,9 @@ const st = StyleSheet.create({
   dots: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   pageDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(212,175,55,0.22)' },
   pageDotActive: { width: 20, borderRadius: 3, backgroundColor: colors.gold },
+  note: {
+    fontFamily: sans, fontSize: 12.5, color: colors.goldLight, lineHeight: 19,
+    marginHorizontal: 16, marginTop: 4, padding: 12, borderRadius: 8,
+    backgroundColor: 'rgba(212,175,55,0.08)', borderLeftWidth: 3, borderLeftColor: colors.gold,
+  },
 })

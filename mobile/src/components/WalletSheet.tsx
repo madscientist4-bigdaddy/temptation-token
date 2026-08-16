@@ -11,9 +11,11 @@ import { colors, serif, sans } from '../theme'
 import { WALLET_ENABLED, FULL_APP_URL } from '../config/features'
 import { useWallet } from '../lib/wallet'
 import { isAddress } from '../lib/chain'
+import { useConnectWallet } from '../wallet/appkit'
 
 export function WalletSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { address, setAddress } = useWallet()
+  const connect = useConnectWallet()
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
@@ -35,12 +37,21 @@ export function WalletSheet({ visible, onClose }: { visible: boolean; onClose: (
 
           {WALLET_ENABLED ? (
             <>
-              <Text style={st.body}>Choose a wallet to connect on Base and vote with $TTS.</Text>
-              <Pressable style={st.primary} onPress={() => Linking.openURL(FULL_APP_URL)}>
+              <Text style={st.body}>
+                Connect on Base to vote with $TTS. No wallet yet? A Smart Wallet is created with a
+                passkey — Face ID and nothing to install.
+              </Text>
+              {/* Was Linking.openURL(FULL_APP_URL) — i.e. "connect wallet" bounced you out
+                  to the website. This opens the real in-app connect sheet. */}
+              <Pressable style={st.primary} onPress={() => { onClose(); connect() }}>
                 <Text style={st.primaryTxt}>Choose Wallet</Text>
               </Pressable>
+              {address ? <Text style={st.addr} selectable>{address}</Text> : null}
               <View style={st.note}>
-                <Text style={st.noteTxt}>MetaMask · Rainbow · Coinbase · Trust · or a passkey Smart Wallet.</Text>
+                <Text style={st.noteTxt}>
+                  Coinbase Smart Wallet (passkey / Face ID) · MetaMask · Rainbow · Trust.
+                  {'\n'}A Smart Wallet can also have its gas sponsored, so you can vote holding no ETH.
+                </Text>
               </View>
             </>
           ) : address ? (
