@@ -16,9 +16,16 @@
 //      you touch this table.
 import { ADDRESSES, CHAIN_ID } from '../config/contracts'
 
-// Public Base RPC. Reads only, and the app degrades to "—" if it is unreachable, so an
-// outage is cosmetic rather than blocking.
-const RPC_URL = 'https://mainnet.base.org'
+// Reads only, and the app degrades to "—" if unreachable, so an outage is cosmetic
+// rather than blocking.
+//
+// PRIMARY is our own cached proxy — the same one the web app uses. The public endpoint
+// rate-limits under real load, and during the 2026-08-16 device pass it did exactly
+// that: the Staking screen showed "Could not reach Base right now" while the identical
+// call through the proxy succeeded. FALLBACK keeps the app working if our API is down,
+// so this is strictly more available than either endpoint alone.
+const RPC_PRIMARY = 'https://app.temptationtoken.io/api/rpc'
+const RPC_FALLBACK = 'https://mainnet.base.org'
 
 export const STAKING_ADDRESS = '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d'
 
@@ -47,12 +54,11 @@ export const SEL = {
 
 const encodeAddress = (a: string) => a.toLowerCase().replace(/^0x/, '').padStart(64, '0')
 
-/** One eth_call. Returns the raw hex, or null on any transport/revert failure. */
-export async function ethCall(to: string, data: string): Promise<string | null> {
+async function ethCallVia(url: string, to: string, data: string): Promise<string | null> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 12000)
   try {
-    const r = await fetch(RPC_URL, {
+    const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: ctrl.signal,
@@ -68,6 +74,19 @@ export async function ethCall(to: string, data: string): Promise<string | null> 
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * One eth_call, proxy first then public. Returns the raw hex, or null if both fail.
+ *
+ * A null from the primary is indistinguishable here from a revert, so the fallback runs
+ * in both cases. That costs one extra request on a genuine revert, which is rare on these
+ * read paths and much cheaper than showing a funded user an empty screen.
+ */
+export async function ethCall(to: string, data: string): Promise<string | null> {
+  const primary = await ethCallVia(RPC_PRIMARY, to, data)
+  if (primary != null) return primary
+  return ethCallVia(RPC_FALLBACK, to, data)
 }
 
 export const word = (hex: string, i: number): bigint => {
