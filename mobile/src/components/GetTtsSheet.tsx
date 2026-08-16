@@ -18,7 +18,7 @@ import { useTopUp } from '../lib/topup'
 import { useWallet } from '../lib/wallet'
 import { FULL_APP_URL } from '../config/features'
 import { readReserves, quoteEthForTts, maxSpendUnderCeiling, MAX_IMPACT_BPS, type Reserves } from '../lib/swap'
-import { formatTTS } from '../lib/chain'
+import { formatTTS, parseTts } from '../lib/chain'
 
 const UNISWAP_URL =
   'https://app.uniswap.org/swap?chain=base&outputCurrency=0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
@@ -58,12 +58,8 @@ export function GetTtsSheet({ onConnect }: { onConnect: () => void }) {
     return () => { live = false }
   }, [open])
 
-  const ethIn = useMemo(() => {
-    const n = Number(amount)
-    if (!isFinite(n) || n <= 0) return 0n
-    // Via string to avoid float drift on the way into wei.
-    return BigInt(Math.round(n * 1e9)) * 10n ** 9n
-  }, [amount])
+  // parseTts is decimal-string -> wei with no float in the path; ETH is 18dp too.
+  const ethIn = useMemo(() => parseTts(amount) ?? 0n, [amount])
 
   const q = useMemo(() => (res ? quoteEthForTts(ethIn, res) : null), [ethIn, res])
   const cap = useMemo(() => (res ? maxSpendUnderCeiling(res) : 0n), [res])
@@ -125,7 +121,16 @@ export function GetTtsSheet({ onConnect }: { onConnect: () => void }) {
                   </View>
                 ) : null}
 
-                {q && !q.allowed ? (
+                {/* Two different reasons the button is off, and they must not be confused:
+                    a malformed amount is not a price-impact problem, and telling someone
+                    their typo would move the market is just wrong. */}
+                {ethIn <= 0n ? (
+                  <View style={st.refuse}>
+                    <Text style={st.refuseTxt}>
+                      Enter an amount to spend, as a plain number like 0.01.
+                    </Text>
+                  </View>
+                ) : q && !q.allowed ? (
                   <View style={st.refuse}>
                     <Text style={st.refuseTxt}>
                       Refused — this trade would move the $TTS price by more than{' '}

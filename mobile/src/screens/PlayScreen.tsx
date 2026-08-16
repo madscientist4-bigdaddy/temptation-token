@@ -17,7 +17,7 @@ import { PLACEHOLDER_PROFILES } from '../lib/placeholder'
 import { colors, sans, MAX_WIDTH } from '../theme'
 import { useWallet } from '../lib/wallet'
 import { useTopUp } from '../lib/topup'
-import { readTtsBalance, formatTTS } from '../lib/chain'
+import { readTtsBalance, formatTTS, parseTts } from '../lib/chain'
 import { ScrollView } from 'react-native'
 
 /** MIN_VOTE on TTSVotingV3d — 5 $TTS, enforced on-chain. */
@@ -60,9 +60,8 @@ export function PlayScreen({ onConnect }: { onConnect: () => void }) {
     setNote(null)
     if (!address) { onConnect(); return }
     const raw = (amounts[p.profileId] || '').trim()
-    const n = Number(raw)
-    if (!raw || !isFinite(n) || n <= 0) { setNote('Enter how much $TTS to place first.'); return }
-    const wei = BigInt(Math.round(n * 1e6)) * 10n ** 12n
+    const wei = parseTts(raw)
+    if (wei == null || wei <= 0n) { setNote('Enter how much $TTS to place first.'); return }
     if (wei < MIN_VOTE_TTS * 10n ** 18n) {
       setNote(`The minimum vote is ${MIN_VOTE_TTS} $TTS — that floor is enforced on-chain.`)
       return

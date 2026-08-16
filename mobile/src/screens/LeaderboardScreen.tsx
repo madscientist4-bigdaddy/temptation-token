@@ -58,7 +58,11 @@ export function LeaderboardScreen() {
 
   return (
     <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={colors.gold} />}>
-      <SectionHead title="Leaderboard" subtitle="Live rankings · Auto-refreshes every 30s" />
+      {/* "Live rankings" flatly contradicted the no-votes-yet line directly beneath it. */}
+      <SectionHead
+        title="Leaderboard"
+        subtitle={ranked ? 'Live rankings · Auto-refreshes every 30s' : 'Auto-refreshes every 30s'}
+      />
       <View style={st.colHead}>
         <Text style={st.colTxt}>Profile</Text>
         <Text style={st.colTxt}>Total $TTS</Text>

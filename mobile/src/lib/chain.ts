@@ -169,6 +169,28 @@ export function readCurrentRoundId(): Promise<bigint | null> {
 
 export const isAddress = (a: string) => /^0x[0-9a-fA-F]{40}$/.test((a || '').trim())
 
+/**
+ * Decimal string → wei, with no float in the path.
+ *
+ * The obvious `BigInt(Math.round(n * 1e6)) * 10n ** 12n` silently loses precision above
+ * ~9e9 $TTS, because n * 1e6 passes Number.MAX_SAFE_INTEGER — and 9e9 is a perfectly
+ * ordinary balance here (the founder wallet holds 10B). Parsing the digits directly has
+ * no such ceiling.
+ *
+ * Returns null for anything that is not a plain non-negative decimal.
+ */
+export function parseTts(input: string, decimals = 18): bigint | null {
+  const s = (input || '').trim().replace(/,/g, '')
+  if (!/^\d*\.?\d*$/.test(s) || s === '' || s === '.') return null
+  const [whole = '', frac = ''] = s.split('.')
+  const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals)
+  try {
+    return BigInt(whole || '0') * 10n ** BigInt(decimals) + BigInt(fracPadded || '0')
+  } catch {
+    return null
+  }
+}
+
 /** wei → display string. Not for arithmetic — presentation only. */
 export function formatTTS(wei: bigint, decimals = 2): string {
   const neg = wei < 0n
