@@ -6,9 +6,15 @@
 // (see src/config/features.ts, src/wallet/loader.ts, eas.json).
 import React, { useEffect, useState } from 'react'
 import {
-  SafeAreaView, View, Text, Pressable, StatusBar, StyleSheet, Linking, ScrollView,
+  View, Text, Pressable, StatusBar, StyleSheet, Linking, ScrollView,
   useWindowDimensions,
 } from 'react-native'
+// NOT react-native's SafeAreaView: that one is iOS-only and a no-op on Android, so the
+// wallet bar rendered UNDERNEATH the Android status bar and the CONNECT button was not
+// tappable at all — verified on an emulator, where taps on it did nothing while taps on
+// the tab strip worked. This version applies real insets on both platforms. (RN's own
+// SafeAreaView is also deprecated and warns at runtime.)
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { PlayScreen } from './src/screens/PlayScreen'
 import { LeaderboardScreen } from './src/screens/LeaderboardScreen'
 import { SubmitScreen } from './src/screens/SubmitScreen'

@@ -15,15 +15,20 @@
 // unconditionally; a missing one is a red screen in the very builds this file exists to
 // protect.
 import React from 'react'
+// The stub still provides SafeAreaProvider: App.tsx uses SafeAreaView from
+// react-native-safe-area-context on BOTH paths (RN's own is a no-op on Android),
+// and that component needs a provider above it regardless of whether a wallet is
+// linked into this build.
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 export const projectId = ''
 export const wagmiConfig = null
 export const PAYMASTER_URL = ''
 export const GASLESS_ENABLED = false
 
-/** Pass-through: there is no wallet stack to mount. */
+/** No wallet stack to mount — only the safe-area provider App.tsx depends on. */
 export function WalletStack({ children }: { children: React.ReactNode }) {
-  return children as React.ReactElement
+  return React.createElement(SafeAreaProvider, null, children)
 }
 
 /** No connector exists, so connecting is a no-op; the UI keeps its address-entry path. */
