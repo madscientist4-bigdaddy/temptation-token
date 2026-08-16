@@ -4,7 +4,18 @@ Guidance for Claude Code working in this repo. **Canonical CURRENT-STATE only.**
 Resolved sagas, dated audits, and superseded-contract narrative live in
 [CLAUDE_HISTORY.md](./CLAUDE_HISTORY.md).
 
-**Last verified: 2026-07-05.** User-journey fixes deployed & prod-verified: play
+**Last verified: 2026-08-16.** On-chain re-read: V3d `currentRoundId` = **7**
+(`endTime` 2026-08-17 04:59 UTC, `settled=false`, `vrfPending=false`), `owner` =
+Keeper3, `nftContract` = Trophy. Rounds 4-6 settled (round 6 had **zero votes** → no
+winner, no mint, by design). Trophy `totalSupply()=0` and the old TTSRoundNFT is at
+**6** — the pointer flipped to Trophy *after* round 5, so rounds 4-5 minted into the
+retired contract and **round 7 is the first mint into Trophy**. Mint path proven
+healthy: `Trophy.minter()` = V3d and a mint estimates **142k gas** against V3d's 200k
+per-mint cap. Frontend NFT screen rewritten + deployed (it had never been able to
+render a trophy — see the NFT row below); `?buy=1` from the live WP /buy page now
+lands on the top-up modal.
+
+**Prior anchor — 2026-07-05.** User-journey fixes deployed & prod-verified: play
 screen renders all approved profiles round-agnostic + `profiles?action=sync` carries
 them onto the current on-chain round (round 2 now has 16 votable profiles); signup-bonus
 UI silence fixed (bonus was always paid — old client just showed nothing on
@@ -12,7 +23,7 @@ already-claimed); KYC manual-review (`kyc?action=request` + admin approve) is th
 launch path (Persona stays sandbox); iOS Safari-Private storage trap on the welcome
 screen guarded.
 
-**Prior anchor — 2026-06-28.** V3d + TTSKeeper3 are LIVE on Base mainnet, fully
+**Earlier anchor — 2026-06-28.** V3d + TTSKeeper3 are LIVE on Base mainnet, fully
 wired, Chainlink-automated, and the frontend is deployed to production
 (`app.temptationtoken.io`). Round 1 on V3d has started (calendar-pinned). NFT
 auto-mint is now authorized to V3d. Always re-verify on-chain values before acting
@@ -104,12 +115,12 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 
 | Feature | State | Notes |
 |---|---|---|
-| Voting (V3d) | ✅ LIVE | Round 1 started, calendar-pinned, Chainlink-automated |
+| Voting (V3d) | ✅ LIVE | Round **7** in flight (ends 2026-08-17 04:59 UTC), calendar-pinned, Chainlink-automated. Rounds 1-6 settled |
 | Prize split 35/35/10/20 | ✅ LIVE | hardcoded in V3d; CI-guarded |
 | Frontend (prod) | ✅ LIVE | `app.temptationtoken.io`, 12 functions |
 | Admin dashboard | ✅ LIVE | server-side auth, gated data proxy, anon key purged |
 | Club referral codes | ✅ LIVE | user enters club code on submit → auto-linked on-chain at admin approval. Club registration is admin-only |
-| NFT auto-mint | 🟢 WIRED (unexercised) | V3d mints 3 NFTs on settlement (winner / top voter / house). `V3d.nftContract()` = **Trophy NFT `0x02DDd0e6…`** (verified on-chain 2026-08-08), NOT the old TTSRoundNFT. Trophy `totalSupply()=0` — mints from Round 6 on. `src/App.jsx` still points at the old NFT address |
+| NFT auto-mint | ✅ EXERCISED (old contract) / Trophy pending round 7 | V3d mints 3 NFTs on settlement (winner / top voter / house). `V3d.nftContract()` = **Trophy `0x02DDd0e6…`**. Rounds 4-5 minted **6 tokens into the retired TTSRoundNFT** (pointer flipped after round 5); round 6 had zero votes; **round 7 is the first Trophy mint**. Verified 2026-08-16: `Trophy.minter()`=V3d, mint estimates 142k gas vs the 200k `try/catch` cap → will not silently no-op. `src/App.jsx` now reads **both** contracts |
 | Telegram bot | ✅ LIVE + honest | running on Railway; staking/referral/VIP copy says "coming soon" — no undeliverable promises |
 | **Staking** | 🟢 ON-CHAIN LIVE / UI gated | Contracts deployed+verified on Base; **10B reward pool migrated 2026-08-07** into proxy `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` (old `0xaA12B889…` drained to 0, impl now RescueUUPS). V3d wired to it; mainnet E2E stake/unstake proven tax-free. Thresholds (TTS): 6k/12k/30k/120k/600k · APR 8/12/18/32/45% · **no lock-up** · 7-day multiplier clock. Frontend/bot still show "Coming Soon" — go-live is env-only (`VITE_STAKING_ENABLED` + `STAKING_LIVE`). See `staking/PHASE2_RUNBOOK.md` |
 | **User referral payouts** | ✅ LIVE (E2E-verified in prod 2026-07-01) | Web `?ref=` capture → `/api/bonus?action=refer-capture` (unique referee). Qualifying-vote payout via `?action=referral`, paid ONLY from `REFERRAL_WALLET_PRIVATE_KEY` (never Bank). `referral_enabled=true`. Anti-sybil all verified rejecting in prod: self-referral, double-capture, referrer-hijack, kill-switch, funding-source (Alchemy `getAssetTransfers`, bounded at TTS deploy block), fail-closed; ≥500 TTS threshold gates payout. Auto-funder (Marketing→referral wallet, never Bank) armed & correctly idle. Bot referral still coming-soon (no telegram→wallet bridge). |
@@ -143,12 +154,16 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 `107234397534438678…823641`. Several orphaned V3d duplicate deploys (2026-06-12) — see
 history.
 
-### V3d / Keeper3 — verified on-chain (2026-06-24/28)
-- V3d `owner` = Keeper3 ✓ · `admin` = Bank ✓ · `nftContract` = TTSRoundNFT ✓
+### V3d / Keeper3 — verified on-chain (round state 2026-08-16; wiring 2026-06-24/28)
+- V3d `owner` = Keeper3 ✓ (re-verified 2026-08-16 — returned after the round-4 VRF-stall
+  recovery, automation intact) · `admin` = Bank ✓ · `nftContract` = **Trophy `0x02DDd0e6…`** ✓
 - V3d `houseWallet` = Marketing `0x7a9ff2f5…` ✓ · `charityWallet` = Polaris `0xf7dd429d…` ✓
 - V3d is a **VRF consumer** on sub `58222014…263722` ✓ · **`isTaxExempt(V3d)=true`** ✓
-- V3d `currentRoundId` = **1** (Round 1 started) · Round 1 `endTime` = `1782709140`
-  (Mon 2026-06-29 04:59 UTC = Sun 23:59 EST)
+- V3d `currentRoundId` = **7** · Round 7 `endTime` = `1786942740` (Mon 2026-08-17 04:59
+  UTC = Sun 23:59 EST), `settled=false`, `vrfPending=false`
+- Settled history: round 4 end 2026-07-20 (10 TTS, VRF-stall recovered manually — see
+  `outputs/recover_round4_report.txt`) · round 5 end 2026-08-03 (5 TTS) · round 6 end
+  2026-08-10 (**0 votes** → no winner, no payout, no mint, as designed)
 - Keeper3 `votingContract`=V3d ✓ · `owner`=Bank ✓ · `s_forwarder`=`0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82` ✓ · `s_nextSettleTarget`=`1783313940` (advances +604800/round)
 
 ### Chainlink Automation (V3d) — LIVE
@@ -316,8 +331,18 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
 - **Staking**: build frontend stake path + deploy `TTSStakingV2` (`upgradeToAndCall`
   initializeV2 from Bank) — see `outputs/staking_v2_diff.md`. Until then, voting tier
   boost is 1x for all.
-- **NFT**: V3d mints to Trophy `0x02DDd0e6…` (`totalSupply` still 0; mints from Round 6 on).
-  `src/App.jsx` still hardcodes the retired TTSRoundNFT `0x0768e862…` — update it.
+- **NFT (frontend: DONE 2026-08-16)**: `src/App.jsx` now reads Trophy + legacy and
+  enumerates via `ownerOf` over Multicall3. **Neither NFT contract is ERC721Enumerable**
+  (`supportsInterface(0x780e9d63)` = false on both) — never reach for
+  `tokenOfOwnerByIndex`/`tokenByIndex` on them. Also note `readContract()` in `App.jsx`
+  runs `parseAbi` itself, so pass **string-signature ABIs**, never pre-parsed ones —
+  double-parsing throws `Unknown signature` and the helper swallows it as `null`.
+- **NFT (still stale)**: `src/TTAdminDashboard.jsx` (~L2055, L2929, L3047) still names
+  the retired TTSRoundNFT as *the* NFT contract, including the **"NFT Minter" write
+  control** — a `setMinter` from that panel would target the dead contract. Fix before
+  anyone uses it.
+- **NFT (watch)**: round 7 settles 2026-08-17 04:59 UTC and is the **first Trophy mint**.
+  Confirm `Trophy.totalSupply()` goes 0 → 3 afterwards; `api/scheduler.js` announces it.
 - **Trust/scanners**: SolidProof portal access + KYC ($600); GoPlus appeal
   (`service@gopluslabs.io`); Blockaid #1263614; CoinGecko/DexScreener resubmission.
   Detail + templates in history / `outputs/`.
