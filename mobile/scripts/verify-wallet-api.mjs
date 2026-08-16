@@ -29,7 +29,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REQUIRED = {
   '@reown/appkit-react-native': ['createAppKit', 'AppKit', 'AppKitProvider', 'useAppKit'],
   '@reown/appkit-wagmi-react-native': ['WagmiAdapter'],
-  '@wagmi/connectors': ['coinbaseWallet'],
   wagmi: ['WagmiProvider', 'useAccount', 'useCapabilities', 'useSendCalls', 'useWriteContract', 'usePublicClient'],
   '@tanstack/react-query': ['QueryClient', 'QueryClientProvider'],
 }

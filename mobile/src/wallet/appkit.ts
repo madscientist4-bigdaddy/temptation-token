@@ -30,7 +30,6 @@ import 'react-native-get-random-values'
 import React, { useCallback } from 'react'
 import { createAppKit, AppKit, AppKitProvider, useAppKit } from '@reown/appkit-react-native'
 import { WagmiAdapter } from '@reown/appkit-wagmi-react-native'
-import { coinbaseWallet } from '@wagmi/connectors'
 import { WagmiProvider, useAccount, useCapabilities, useSendCalls, useWriteContract, usePublicClient } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { base } from 'wagmi/chains'
@@ -54,16 +53,19 @@ const metadata = {
   redirect: { native: 'temptationtoken://', universal: 'https://app.temptationtoken.io' },
 }
 
-// Coinbase Smart Wallet is the no-app onboarding path: a passkey (Face ID) creates the
-// account, so a creator with no wallet and no ETH can sign up on the phone. It is also the
-// only connector here that can be gas-sponsored — sponsorship needs a smart account,
-// because an EOA cannot accept a paymaster.
+// NO explicit wagmi connector is passed. Two dead ends got us here, both found by
+// bundling rather than by reading docs:
+//   • `@wagmi/connectors` as a direct dependency resolved AHEAD of the tree's
+//     @wagmi/core and the bundle died on a missing '@wagmi/core/tempo';
+//   • `wagmi/connectors` is a barrel that drags in @metamask/sdk, which imports
+//     `node:crypto` — absent in React Native, so the bundle died again.
+// AppKit v2 ships its own connector set (WalletConnect + the wallet list, Coinbase
+// Smart Wallet among them), so the adapter needs none from us. Sponsorship still keys
+// off the wallet advertising EIP-5792 paymasterService, which is a property of the
+// connected account being a smart account — not of which connector object created it.
 const wagmiAdapter = new WagmiAdapter({
   projectId,
   networks: [base],
-  connectors: [
-    coinbaseWallet({ appName: 'Temptation Token', preference: 'smartWalletOnly' }),
-  ],
 })
 
 export const wagmiConfig = wagmiAdapter.wagmiConfig
