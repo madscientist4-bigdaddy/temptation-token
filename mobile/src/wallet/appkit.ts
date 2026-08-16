@@ -32,6 +32,9 @@ import { createAppKit, AppKit, AppKitProvider, useAppKit } from '@reown/appkit-r
 import { WagmiAdapter } from '@reown/appkit-wagmi-react-native'
 import { WagmiProvider, useAccount, useCapabilities, useSendCalls, useWriteContract, usePublicClient } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+// AppKit's modal measures insets and throws 'No safe area value available' without
+// this above it — the third launch crash this stack produced on a real emulator.
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { base } from 'wagmi/chains'
 
 // Public, client-safe id (same as web VITE_WALLETCONNECT_PROJECT_ID). Not a secret.
@@ -83,16 +86,20 @@ const queryClient = new QueryClient()
 /** Mounts the wallet stack. Rendered by App.tsx above everything that reads an address. */
 export function WalletStack({ children }) {
   return React.createElement(
-    WagmiProvider,
-    { config: wagmiConfig },
+    SafeAreaProvider,
+    null,
     React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
+      WagmiProvider,
+      { config: wagmiConfig },
       React.createElement(
-        AppKitProvider,
-        { instance: appKit },
-        children,
-        React.createElement(AppKit, null)
+        QueryClientProvider,
+        { client: queryClient },
+        React.createElement(
+          AppKitProvider,
+          { instance: appKit },
+          children,
+          React.createElement(AppKit, null)
+        )
       )
     )
   )
