@@ -3,7 +3,13 @@
 const TTS_ADDRESS     = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const STAKING_ADDRESS = '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d'
-const NFT_ADDRESS     = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2'
+// Trophies live in two contracts. V3d's nftContract() was repointed at Trophy after
+// round 5 settled, so rounds 4-5 minted into the retired TTSRoundNFT and round 7 on
+// mints into Trophy. Both are read — a legacy winner must not lose sight of their
+// trophy just because the contract moved.
+const NFT_ADDRESS     = '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5' // Trophy — canonical, = V3d.nftContract()
+const NFT_LEGACY      = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2' // TTSRoundNFT — retired, holds rounds 4-5
+const NFT_CONTRACTS   = [NFT_ADDRESS, NFT_LEGACY]
 const BASE_CHAIN_ID   = 8453
 
 const TTS_ABI = [
@@ -21,7 +27,13 @@ const VOTING_ABI = [
   'function currentRoundId() view returns (uint256)',
 ]
 const _baseClient = createPublicClient({
-  chain: { id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['https://mainnet.base.org'] } } },
+  chain: {
+    id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: { default: { http: ['https://mainnet.base.org'] } },
+    // Needed by client.multicall — the NFT screen enumerates trophies by owner and
+    // would otherwise be one RPC round-trip per token id.
+    contracts: { multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11' } },
+  },
   transport: http('https://mainnet.base.org')
 })
 
@@ -1289,48 +1301,87 @@ function LeaderboardScreen() {
 }
 
 // ── NFT SCREEN ────────────────────────────────────────────────────────────────
-const NFT_ABI_READ = parseAbi([
-  'function balanceOf(address owner) view returns (uint256)',
-  'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
+// Human-readable form: readContract() runs parseAbi itself, so handing it an
+// already-parsed ABI made every NFT read throw "Unknown signature" and get swallowed
+// by the helper's catch — the screen could never show a trophy it did in fact own.
+const NFT_ABI_READ = [
+  'function totalSupply() view returns (uint256)',
+  'function ownerOf(uint256 tokenId) view returns (address)',
   'function tokenURI(uint256 tokenId) view returns (string)',
-])
+]
+const NFT_ABI_PARSED = parseAbi(NFT_ABI_READ)
+
+function parseTokenMeta(uri) {
+  if (!uri) return {}
+  try {
+    if (uri.startsWith('data:application/json;base64,')) return JSON.parse(atob(uri.slice(29)))
+    if (uri.startsWith('{')) return JSON.parse(uri)
+  } catch { /* fall through to the generic trophy card */ }
+  return {}
+}
+
+// Neither trophy contract implements ERC721Enumerable, so tokenOfOwnerByIndex does not
+// exist and balanceOf alone cannot name the tokens. Supply is 3 per settled round, so
+// walk every id and keep the ones this wallet owns — batched through Multicall3, that
+// is one RPC round-trip per contract rather than one per token.
+async function fetchTrophies(contract, owner) {
+  // readContract swallows RPC errors into null. Left as 0 that reads as "you own
+  // nothing", which is the wrong thing to tell a winner when the public RPC merely
+  // rate-limited us — so treat a failed read as a failure, not an empty shelf.
+  const raw = await readContract(contract, NFT_ABI_READ, 'totalSupply')
+  if (raw == null) throw new Error(`totalSupply read failed for ${contract}`)
+  const supply = Number(raw)
+  if (!supply) return []
+  const ids = Array.from({ length: supply }, (_, i) => BigInt(i + 1))
+  const owners = await _baseClient.multicall({
+    contracts: ids.map(id => ({ address: contract, abi: NFT_ABI_PARSED, functionName: 'ownerOf', args: [id] })),
+    allowFailure: true,
+  })
+  const me = String(owner).toLowerCase()
+  const mine = owners
+    .map((o, i) => (o?.status === 'success' && String(o.result).toLowerCase() === me ? ids[i] : null))
+    .filter(Boolean)
+  if (!mine.length) return []
+  const uris = await _baseClient.multicall({
+    contracts: mine.map(id => ({ address: contract, abi: NFT_ABI_PARSED, functionName: 'tokenURI', args: [id] })),
+    allowFailure: true,
+  })
+  return mine.map((id, i) => {
+    const meta = parseTokenMeta(uris[i]?.status === 'success' ? uris[i].result : null)
+    return {
+      key: `${contract}-${id}`,
+      id: Number(id),
+      contract,
+      name: meta.name || `Trophy #${id}`,
+      image: meta.image || null,
+      description: meta.description || '',
+    }
+  })
+}
 
 function NFTScreen({ address, connected }) {
   const [nfts, setNfts] = useState([])
   const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     if (!connected || !address) return
+    let cancelled = false
     setLoading(true)
+    // `failed` is not reset here — the loading branch renders ahead of it, so a stale
+    // value is never visible, and it is always reassigned once the reads settle.
     ;(async () => {
-      try {
-        const bal = await readContract(NFT_ADDRESS, NFT_ABI_READ, 'balanceOf', [address])
-        const count = Number(bal)
-        if (!count) { setNfts([]); return }
-        const ids = await Promise.all(
-          Array.from({ length: count }, (_, i) =>
-            readContract(NFT_ADDRESS, NFT_ABI_READ, 'tokenOfOwnerByIndex', [address, i])
-          )
-        )
-        const metas = await Promise.all(ids.map(async id => {
-          try {
-            const uri = await readContract(NFT_ADDRESS, NFT_ABI_READ, 'tokenURI', [id])
-            let meta = {}
-            if (uri && uri.startsWith('data:application/json;base64,')) {
-              meta = JSON.parse(atob(uri.slice(29)))
-            } else if (uri && uri.startsWith('{')) {
-              meta = JSON.parse(uri)
-            }
-            return { id: Number(id), name: meta.name || `Round #${id}`, image: meta.image || null, description: meta.description || '' }
-          } catch { return { id: Number(id), name: `Trophy #${id}`, image: null, description: '' } }
-        }))
-        setNfts(metas)
-      } catch (e) {
-        console.error('NFT fetch error:', e)
-      } finally {
-        setLoading(false)
-      }
+      // Settled per contract, so a failure on one still shows what the other holds.
+      const results = await Promise.allSettled(NFT_CONTRACTS.map(c => fetchTrophies(c, address)))
+      if (cancelled) return
+      results.filter(r => r.status === 'rejected').forEach(r => console.error('NFT fetch error:', r.reason))
+      setNfts(results.filter(r => r.status === 'fulfilled').flatMap(r => r.value))
+      // Only claim an outright failure when nothing at all could be read; a partial
+      // result is shown as-is rather than hidden behind an error.
+      setFailed(results.every(r => r.status === 'rejected'))
+      setLoading(false)
     })()
+    return () => { cancelled = true }
   }, [address, connected])
 
   return (
@@ -1340,6 +1391,14 @@ function NFTScreen({ address, connected }) {
         <div className="nft-empty"><span className="nft-ei">💎</span><div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>Connect wallet to view trophies</div></div>
       ) : loading ? (
         <div className="nft-empty"><span className="nft-ei">⏳</span><div style={{ color:'var(--muted)' }}>Loading your trophies...</div></div>
+      ) : failed ? (
+        <div className="nft-empty">
+          <span className="nft-ei">⚠️</span>
+          <div style={{ fontWeight:700, color:'var(--text)', marginBottom:8 }}>Couldn't reach Base right now</div>
+          <div style={{ fontSize:'.85rem', color:'var(--muted)', lineHeight:1.6 }}>
+            This is a network hiccup, not a missing trophy — anything you own is safe on-chain. Refresh in a moment.
+          </div>
+        </div>
       ) : nfts.length === 0 ? (
         <div className="nft-empty">
           <span className="nft-ei">💎</span>
@@ -1352,7 +1411,7 @@ function NFTScreen({ address, connected }) {
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:16, margin:'0 16px 24px' }}>
           {nfts.map(nft => (
-            <div key={nft.id} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', textAlign:'center' }}>
+            <div key={nft.key} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', textAlign:'center' }}>
               {nft.image
                 ? <img src={nft.image} alt={nft.name} style={{ width:'100%', aspectRatio:'1', objectFit:'cover' }} />
                 : <div style={{ width:'100%', aspectRatio:'1', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'3rem', background:'var(--bg)' }}>🏆</div>
@@ -1360,7 +1419,7 @@ function NFTScreen({ address, connected }) {
               <div style={{ padding:'10px 8px' }}>
                 <div style={{ fontSize:'.8rem', fontWeight:700, color:'var(--text)', marginBottom:4 }}>{nft.name}</div>
                 {nft.description && <div style={{ fontSize:'.7rem', color:'var(--muted)', lineHeight:1.4, marginBottom:6 }}>{nft.description}</div>}
-                <a href={`https://opensea.io/assets/base/0x0768e862D3AB14d85213BfeF8f1D012E77721da2/${nft.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'.65rem', color:'var(--gold)', textDecoration:'none' }}>View on OpenSea →</a>
+                <a href={`https://opensea.io/assets/base/${nft.contract}/${nft.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:'.65rem', color:'var(--gold)', textDecoration:'none' }}>View on OpenSea →</a>
               </div>
             </div>
           ))}
