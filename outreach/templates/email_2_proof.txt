@@ -1,0 +1,29 @@
+SUBJECT: The part you can check yourself
+Hi {{name}} team,
+
+Following up on my note. Rather than describe how this pays out, here are two settlements
+you can open and read yourself — no account, no signup:
+
+  https://basescan.org/tx/0x12010ff383e78f3775613a591e88a7c0d44f314c171c476599cf0926cb16d8d0
+  https://basescan.org/tx/0xbc5791cb405f532a055456297c3856d4f7494e8ac824b103e37e1053a1319ad8
+
+Each one is a single transaction paying four recipients in the split we publish: 35% to
+the winning creator, 35% to her top voter, 10% to charity, 20% to us. Scroll to the token
+transfers and you can check the arithmetic against those percentages.
+
+Two honest caveats, since you can see them in the data anyway: these are early rounds and
+the pools are small, and votes cast on creators who don't win that round are burned rather
+than paid out. This is upside on a good week, not a floor.
+
+Our contract addresses and audit status are here:
+  https://temptationtoken.io/audit
+
+How it works for one of your creators: she gets a profile page on the contest with links
+back to her own channels, posts twice a week on IG/X pointing fans at it, and the contract
+settles every Sunday night on its own. She never posts on OnlyFans, and there is nothing
+to install and no cost to enter.
+
+Still happy to walk through it: {{CALENDLY}}
+
+Jim Goetz
+Founder — Temptation Token · Blockchain Entertainment LLC

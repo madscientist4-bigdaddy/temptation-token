@@ -36,7 +36,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mailer
 from tts_outreach import config, db, guardrails  # noqa: E402
 
-STEPS = {1: "email_1.txt", 2: "email_2.txt", 3: "email_3.txt"}
+# Template per step. Step 2 has TWO variants and the sender picks at send time.
+#
+# RULE (applies to every template): a template may hard-block on a REQUIRED config value
+# (CALENDLY_URL, MAIL_ADDR — without them the email is broken or unlawful), but it may
+# NEVER hard-block on an OPTIONAL asset. An optional asset gets an alternate variant.
+#
+# email_2 used to be video-only and raised when LOOM_URL was unset, which silently
+# stalled the whole cadence: 14 agencies received email 1 and then nothing, while every
+# window logged BLOCKED. The proof variant carries its own weight — two real on-chain
+# settlements the recipient can open and check — so the follow-up always goes out.
+STEPS = {1: "email_1.txt", 2: "email_2_video.txt", 3: "email_3.txt"}
+STEP2_FALLBACK = "email_2_proof.txt"
+
+
+def template_for(step: int, cfg: config.Config) -> str:
+    """Resolve a step to a template, degrading rather than refusing."""
+    if step == 2 and not cfg.loom_url.strip():
+        return STEP2_FALLBACK
+    return STEPS[step]
 SCHEDULE = [(0, "EMAIL", 1), (1, "EMAIL", 2), (3, "DM", 0), (4, "EMAIL", 3),
             (7, "FEDEX", 0), (12, "NURTURE", 0)]
 
@@ -162,6 +180,24 @@ def due_emails(c, today: date) -> list[tuple[dict, int]]:
             ).fetchone()
             if already:
                 continue
+
+            # HARD GATE: the breakup may only follow a DELIVERED step 2.
+            #
+            # Ordering alone used to imply this (the break below stops at the first
+            # unsent step), but that is an accident of loop order, not a rule — reorder
+            # SCHEDULE or drop the break and the breakup starts jumping the queue. It is
+            # stated explicitly because the failure is unrecoverable: "I'm closing out
+            # launch-cohort conversations" landing on someone who got one email and no
+            # follow-up reads as contempt, and you cannot unsend it.
+            if step == 3:
+                step2_delivered = c.execute(
+                    "SELECT 1 FROM sends WHERE agency_id = ? AND step = 2 AND dry_run = 0",
+                    (r["id"],),
+                ).fetchone()
+                if not step2_delivered:
+                    # Cadence PAUSES here rather than advancing past the gap.
+                    continue
+
             out.append((r, step))
             break  # one email per target per run
     return out
@@ -290,7 +326,7 @@ def main() -> int:
                 continue
 
             try:
-                subject, body = render(STEPS[step], cfg, r)
+                subject, body = render(template_for(step, cfg), cfg, r)
                 guardrails.assert_can_spam_ready(body, cfg.mail_addr)
                 guardrails.assert_email_sendable(body)
                 guardrails.assert_no_attachments(step, None)

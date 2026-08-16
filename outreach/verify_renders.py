@@ -135,7 +135,10 @@ def main() -> int:
 
         # THE REAL RENDER — sender's own function, same as a live send.
         try:
-            subject, body = sender.render(sender.STEPS[step], cfg, row)
+            # Resolve via template_for() — the SAME selector the sender uses — so a
+            # variant swap can never verify one template and ship another.
+            tpl = sender.template_for(step, cfg)
+            subject, body = sender.render(tpl, cfg, row)
         except Exception as e:
             failures.append(f"{label}: render raised {type(e).__name__}: {e}")
             print(f"  {RED}FAIL{OFF} {label}: render raised {e}")
@@ -197,7 +200,7 @@ def main() -> int:
             for e in errs:
                 print(f"         {e}")
         else:
-            print(f"  {GRN}PASS{OFF} {label}  -> {row['email']}  "
+            print(f"  {GRN}PASS{OFF} {label} [{tpl}]  -> {row['email']}  "
                   f"{DIM}({len(urls)} link(s) 200){OFF}")
             samples.append((name, subject, body))
 
