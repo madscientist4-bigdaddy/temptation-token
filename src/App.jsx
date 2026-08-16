@@ -2199,12 +2199,22 @@ export default function App() {
     } catch {}
   }, [])
 
-  // Handle redirect back from Persona (?kyc_complete=1) — navigate to submit tab
+  // Entry params. Both strip themselves from the URL so a refresh does not replay them.
+  //   ?kyc_complete=1 — redirect back from Persona → submit tab
+  //   ?buy=1          — the marketing site's "get $TTS" CTA links here and promises the
+  //                     top-up screen, so open the modal directly. It renders a
+  //                     "connect your wallet first" note when cold, which is the right
+  //                     landing for someone arriving from the website with no wallet.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('kyc_complete') === '1') {
-      window.history.replaceState({}, '', window.location.pathname)
-      setTab('submit')
+    const kyc = params.get('kyc_complete') === '1'
+    const buy = params.get('buy') === '1'
+    if (!kyc && !buy) return
+    window.history.replaceState({}, '', window.location.pathname)
+    if (kyc) setTab('submit')
+    if (buy) {
+      setTab('buysell')
+      requestTopUp()
     }
   }, [])
 
