@@ -1,26 +1,36 @@
 // @ts-nocheck — DEV/PREVIEW-BUILD ONLY. The modules below are native and are not in the
-// Expo Go dependency set, so tsc cannot resolve them here. metro.config.js redirects every
-// request for this module to appkit.stub.ts unless EXPO_PUBLIC_WALLET_ENABLED=true, so in
-// any wallet-less build this file is never bundled and never typechecked against.
+// wallet-less dependency set, so tsc cannot resolve them here. metro.config.js redirects
+// every request for this module to appkit.stub.ts unless EXPO_PUBLIC_WALLET_ENABLED=true,
+// so in any wallet-less build this file is never bundled and never typechecked against.
 //
-// WHAT CHANGED (2026-08-16): this module used to only call createAppKit() and stop. The
-// AppKit component was never mounted, there was no WagmiProvider, and the "Choose Wallet"
-// button in WalletSheet called Linking.openURL(app.temptationtoken.io) — so even in a
-// wallet-enabled build, connecting a wallet on mobile did nothing but open the website.
-// The whole point of the 100-creator flow is that a phone user never has to leave.
+// ── WHY THIS FILE WAS REWRITTEN TWICE (2026-08-16) ───────────────────────────
 //
-// The stack, in the order it must nest:
-//   WagmiProvider -> QueryClientProvider -> children + <AppKit />
+// 1. It only ever called createAppKit() and stopped. The modal component was never
+//    mounted, there was no WagmiProvider, and WalletSheet's "Choose Wallet" button called
+//    Linking.openURL(the website) — so on mobile, "connect wallet" opened a web page.
 //
-// GASLESS: mirrors src/lib/gasless.js on web. Sponsorship is attempted only when the
-// connected wallet advertises EIP-5792 paymasterService on Base (i.e. it is a smart
-// account) AND our paymaster proxy grants it. Everything degrades to a normal user-paid
-// transaction otherwise — an EOA user, a capped-out user and a downed paymaster must all
-// still be able to transact.
+// 2. The bigger problem, found by actually running the wallet APK on an emulator: it was
+//    written against the AppKit **v1** API while v2.0.6 is installed. v1's
+//    `createAppKit` / `defaultWagmiConfig` / `AppKit` / `useAppKit` do not exist in
+//    @reown/appkit-wagmi-react-native v2 — that package now exports ONLY `WagmiAdapter`.
+//    Importing the missing names crashed the app at module load:
+//      ReactNativeJS: [runtime not ready]: TypeError: undefined is not a function
+//      A module failed to load and AppRegistry.registerComponent wasn't called
+//    i.e. the wallet build did not merely fail to connect, it did not start. That never
+//    surfaced because this path had never been run on a device.
+//
+// The v2 shape, verified against the installed package source:
+//   @reown/appkit-react-native        → createAppKit, AppKit, AppKitProvider, useAppKit
+//   @reown/appkit-wagmi-react-native  → WagmiAdapter (exposes .wagmiConfig for wagmi)
+//
+// Nesting is load-bearing: useAppKit() throws outside AppKitProvider, and every wagmi
+// hook throws outside WagmiProvider.
 import '@walletconnect/react-native-compat'
 import 'react-native-get-random-values'
 import React, { useCallback } from 'react'
-import { createAppKit, defaultWagmiConfig, AppKit, useAppKit } from '@reown/appkit-wagmi-react-native'
+import { createAppKit, AppKit, AppKitProvider, useAppKit } from '@reown/appkit-react-native'
+import { WagmiAdapter } from '@reown/appkit-wagmi-react-native'
+import { coinbaseWallet } from '@wagmi/connectors'
 import { WagmiProvider, useAccount, useCapabilities, useSendCalls, useWriteContract, usePublicClient } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { base } from 'wagmi/chains'
@@ -44,28 +54,29 @@ const metadata = {
   redirect: { native: 'temptationtoken://', universal: 'https://app.temptationtoken.io' },
 }
 
-export const wagmiConfig = defaultWagmiConfig({
-  chains: [base],
+// Coinbase Smart Wallet is the no-app onboarding path: a passkey (Face ID) creates the
+// account, so a creator with no wallet and no ETH can sign up on the phone. It is also the
+// only connector here that can be gas-sponsored — sponsorship needs a smart account,
+// because an EOA cannot accept a paymaster.
+const wagmiAdapter = new WagmiAdapter({
+  projectId,
+  networks: [base],
+  connectors: [
+    coinbaseWallet({ appName: 'Temptation Token', preference: 'smartWalletOnly' }),
+  ],
+})
+
+export const wagmiConfig = wagmiAdapter.wagmiConfig
+
+const appKit = createAppKit({
   projectId,
   metadata,
-  // Coinbase Smart Wallet is the no-app onboarding path: a passkey (Face ID) creates the
-  // account, so a creator with no wallet and no ETH can sign up on the phone. It is also
-  // the only connector here that can be gas-sponsored, because sponsorship needs a smart
-  // account — an EOA cannot accept a paymaster.
-  coinbaseConfig: {
-    appName: 'Temptation Token',
-    preference: 'smartWalletOnly',
-  },
+  networks: [base],
+  defaultNetwork: base,
+  adapters: [wagmiAdapter],
 })
 
 const queryClient = new QueryClient()
-
-createAppKit({
-  projectId,
-  wagmiConfig,
-  defaultChain: base,
-  enableAnalytics: true,
-})
 
 /** Mounts the wallet stack. Rendered by App.tsx above everything that reads an address. */
 export function WalletStack({ children }) {
@@ -75,8 +86,12 @@ export function WalletStack({ children }) {
     React.createElement(
       QueryClientProvider,
       { client: queryClient },
-      children,
-      React.createElement(AppKit, null)
+      React.createElement(
+        AppKitProvider,
+        { instance: appKit },
+        children,
+        React.createElement(AppKit, null)
+      )
     )
   )
 }
@@ -84,7 +99,7 @@ export function WalletStack({ children }) {
 /** Opens the real connect sheet (was: opened the marketing website). */
 export function useConnectWallet() {
   const { open } = useAppKit()
-  return useCallback(() => open({ view: 'Connect' }), [open])
+  return useCallback(() => open(), [open])
 }
 
 /** The connected account, for bridging into the app's own wallet context. */
