@@ -33,7 +33,8 @@ CONTRACT ADDRESSES (Base Mainnet):
 - TTS Token: 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
 - Voting (active): 0x783b8cd80b586b723188c93ef94ee1beede617b4
 - Staking: 0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d
-- NFT: 0x0768e862D3AB14d85213BfeF8f1D012E77721da2
+- NFT trophies (current): 0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5
+- NFT trophies (retired, holds rounds 4-5 only): 0x0768e862D3AB14d85213BfeF8f1D012E77721da2
 
 ${STAKING_BLOCK}
 REFERRALS: Users can share a referral link to invite friends. Referral rewards/payouts are NOT active yet — they are coming soon. New users still get the 500 $TTS sign-up bonus when they connect a wallet. Do not promise any referral payout to the referrer.
