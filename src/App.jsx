@@ -734,7 +734,7 @@ function WrongNetworkModal({ onClose }) {
 }
 
 // ── TRANSFER MODAL ────────────────────────────────────────────────────────────
-function TransferModal({ dir, onClose, showToast, address, walletClient, chainId, onWrongNetwork, requestTopUp }) {
+function TransferModal({ dir, onClose, showToast, address, walletClient, chainId, onWrongNetwork, requestTopUp, balance = 0 }) {
   const [amt, setAmt] = useState('')
   const [toAddr, setToAddr] = useState('')
   const [sending, setSending] = useState(false)
@@ -749,6 +749,13 @@ function TransferModal({ dir, onClose, showToast, address, walletClient, chainId
     }
     if (chainId !== BASE_CHAIN_ID) { onWrongNetwork(); return }
     if (!amt || isNaN(amt) || Number(amt) <= 0) { showToast('Enter a valid amount', 'e'); return }
+    // Pre-check rather than letting the ERC-20 revert: an on-chain failure costs gas
+    // and surfaces as an opaque "Transfer failed" with no route to fixing it.
+    if (Number(amt) > balance) {
+      onClose()
+      requestTopUp?.(`That transfer needs ${Number(amt).toLocaleString()} $TTS and you have ${Number(balance).toLocaleString()}. Top up the difference first.`)
+      return
+    }
     if (!toAddr || !/^0x[0-9a-fA-F]{40}$/.test(toAddr)) { showToast('Enter a valid Base wallet address', 'e'); return }
     if (!walletClient) { showToast('Wallet not ready', 'e'); return }
     setSending(true)
@@ -1465,7 +1472,7 @@ function BuySellScreen({ showToast, connected, requestTopUp }) {
         )}
 
         {tab === 'stake' && (STAKING_ENABLED ? (
-          <StakePanel showToast={showToast} />
+          <StakePanel showToast={showToast} requestTopUp={requestTopUp} />
         ) : (
           <>
             <div style={{ textAlign:'center', padding:'28px 0 20px' }}>
@@ -2222,7 +2229,12 @@ export default function App() {
           </div>
           {isConnected
             ? <div className="wbtns">
-                <button className="btn-t" onClick={() => setTransDir('in')}>↓ In</button>
+                {/* Persistent, every screen. Topping up used to be reachable only from
+                    the moment a balance check failed, which is the worst time to ask. */}
+                <button className="btn-t" onClick={() => requestTopUp()}
+                        style={{ background:'linear-gradient(135deg,#d4af37,#b8952e)', color:'#12121c', fontWeight:800 }}>
+                  Get $TTS
+                </button>
                 <button className="btn-t" onClick={() => setTransDir('out')}>↑ Out</button>
                 <button className="btn-t" onClick={() => disconnect()} style={{ color:'var(--muted)', fontSize:'.62rem' }}>Disconnect</button>
               </div>
@@ -2270,7 +2282,7 @@ export default function App() {
         }}
       />
       {showW && <WalletModal onClose={() => setShowW(false)} showToast={showToast} />}
-      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} requestTopUp={requestTopUp} />}
+      {transDir && <TransferModal dir={transDir} onClose={() => setTransDir(null)} showToast={showToast} address={address} walletClient={walletClient} chainId={chainId} onWrongNetwork={() => setShowWrongNet(true)} requestTopUp={requestTopUp} balance={balance} />}
       {showWrongNet && <WrongNetworkModal onClose={() => setShowWrongNet(false)} />}
       {showAgeModal && isConnected && address && (
         <AgeAcknowledgmentModal onAccept={() => {

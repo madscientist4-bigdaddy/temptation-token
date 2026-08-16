@@ -72,7 +72,7 @@ function Countdown({ eligibleAt }) {
   return <span>Multiplier in {d}d {h}h {m}m</span>
 }
 
-export default function StakePanel({ showToast }) {
+export default function StakePanel({ showToast , requestTopUp }) {
   const { address, isConnected } = useAccount()
   const { data: walletClient } = useWalletClient()
 
@@ -120,6 +120,12 @@ export default function StakePanel({ showToast }) {
 
   const onStake = async () => {
     if (!amt || Number(amt) <= 0) return showToast?.('Enter an amount')
+    // Guard before approve(): otherwise a short balance costs the user an approval tx
+    // and then reverts on stake(), with nothing offering a way to top up.
+    if (balance != null && toWei(amt) > balance) {
+      const have = Number(balance) / 1e18
+      return requestTopUp?.(`Staking ${Number(amt).toLocaleString()} $TTS needs more than the ${have.toLocaleString(undefined,{maximumFractionDigits:0})} in your wallet. Top up the difference first.`)
+    }
     const wei = toWei(amt)
     setBusy('stake')
     try {

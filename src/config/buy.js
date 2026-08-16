@@ -26,8 +26,20 @@ const env = import.meta.env || {}
 export const TRANSAK_API_KEY = env.VITE_TRANSAK_API_KEY || ''
 export const TRANSAK_ENV = (env.VITE_TRANSAK_ENV || 'STAGING').toUpperCase()
 
-// The gate. Flag AND key — a flag alone renders a broken widget.
-export const BUY_ENABLED = env.VITE_BUY_ENABLED === 'true' && !!TRANSAK_API_KEY
+// AUTO-ARM: a PRODUCTION Transak env plus a key is, by itself, the go-live signal.
+// Requiring a third variable means the card path silently stays dark after KYB, and
+// somebody has to remember why. Precedence, most specific first:
+//   VITE_BUY_ENABLED=false -> forced OFF (kill switch, works even in production)
+//   VITE_BUY_ENABLED=true  -> ON if a key exists (lets STAGING be exercised on purpose)
+//   unset                  -> ON only when TRANSAK_ENV is PRODUCTION and a key exists
+// A staging key can therefore never arm the card path by accident, and going live is
+// purely: set the production key + VITE_TRANSAK_ENV=PRODUCTION.
+const _explicit = env.VITE_BUY_ENABLED
+export const BUY_AUTO_ARMED = TRANSAK_ENV === 'PRODUCTION' && !!TRANSAK_API_KEY
+export const BUY_ENABLED =
+  _explicit === 'false' ? false
+    : _explicit === 'true' ? !!TRANSAK_API_KEY
+      : BUY_AUTO_ARMED
 
 // The swap half needs no Transak account and no key, so it can be offered whenever a
 // wallet is connected. Only the CARD half is gated.
