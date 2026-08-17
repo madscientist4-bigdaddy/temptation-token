@@ -207,6 +207,4 @@ async function main() {
   }
 }
 
-// encodeAbiParameters imported for parity/debugging of performData; silence lints if unused.
-void encodeAbiParameters
 main().catch(e => die(e.shortMessage || e.message || String(e)))

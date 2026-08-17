@@ -1,0 +1,195 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2865
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red111\green111\blue111;\red0\green0\blue0;\red47\green180\blue29;
+\red64\green11\blue217;\red180\green36\blue25;\red159\green160\blue28;}
+{\*\expandedcolortbl;;\cssrgb\c51167\c51167\c51167;\csgray\c0;\cssrgb\c20241\c73898\c14950;
+\cssrgb\c32309\c18666\c88229;\cssrgb\c76411\c21697\c12527;\cssrgb\c68469\c68012\c14211;}
+\margl1440\margr1440\vieww37860\viewh16660\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f0\fs22 \cf2 \CocoaLigature0 <?php\cf3                                                                                \
+  \cf4 /**\cf3                              \
+  \cf4  * Plugin Name: TTS API Auth\cf3                                                         \
+  \cf4  * Plugin URI:  https://temptationtoken.io\cf3                                           \
+  \cf4  * Description: Custom REST endpoint for Temptation Token WordPress management. \cf3     \
+  \cf4 Token-auth only \'97 no Application Password needed.\cf3                                    \
+  \cf4  * Version:     1.0.0\cf3                                                                \
+  \cf4  * Author:      Blockchain Entertainment LLC\cf3                                         \
+  \cf4  */\cf3                                                                                \
+                                                                                    \
+  \cf5 if\cf3  ( ! defined( \cf6 'ABSPATH'\cf3  ) ) \cf5 exit\cf3 ;                                                 \
+  \
+  define( \cf6 'TTS_API_SECRET'\cf3 , \cf6 'TTS2026Admin!'\cf3  );                                        \
+                                                            \
+  add_action( \cf6 'rest_api_init'\cf3 , \cf5 function\cf7  () \cf3 \{                                          \
+      register_rest_route( \cf6 'tts/v1'\cf3 , \cf6 '/update'\cf3 , [           \
+          \cf6 'methods'\cf3              => \cf6 'POST'\cf3 ,                                            \
+          \cf6 'callback'\cf3             => \cf6 'tts_api_handle'\cf3 ,\
+          \cf6 'permission_callback'\cf3  => \cf6 'tts_api_check_token'\cf3 ,                             \
+      ] );                                                  \
+  \} );                                                                                \
+                                                            \
+  \cf5 function\cf7  \cf3 tts_api_check_token( WP_REST_Request $request ) \{                          \
+      $token = $request->get_header( \cf6 'X-TTS-Token'\cf3  );\
+      \cf5 if\cf3  ( $token !== TTS_API_SECRET ) \{                                              \
+          \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_unauthorized'\cf3 , \cf6 'Invalid or missing X-TTS-Token'\cf3 , [\
+   \cf6 'status'\cf3  => \cf4 401\cf3  ] );                                                               \
+      \}\
+      \cf5 return\cf3  \cf5 true\cf3 ;                                                                    \
+  \}                                                         \
+                                                                                    \
+  \cf5 function\cf7  \cf3 tts_api_handle( WP_REST_Request $request ) \{\
+      $action  = sanitize_text_field( $request->get_param( \cf6 'action'\cf3  ) );\
+      $id      = intval( $request->get_param( \cf6 'id'\cf3  ) );                               \
+      $title   = sanitize_text_field( $request->get_param( \cf6 'title'\cf3  ) );\
+      $slug    = sanitize_title( $request->get_param( \cf6 'slug'\cf3  ) );                     \
+      $content = wp_kses_post( $request->get_param( \cf6 'content'\cf3  ) );\
+                                                                                      \
+      \cf5 switch\cf3  ( $action ) \{                                                            \
+                                                                                    \
+          \cf4 // \uc0\u9472 \u9472  Create a new page \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \cf3    \
+          \cf5 case\cf3  \cf6 'create_page'\cf3 :                               \
+              \cf5 if\cf3  ( \cf5 empty\cf3 ( $title ) || \cf5 empty\cf3 ( $slug ) || \cf5 empty\cf3 ( $content ) ) \{       \
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_missing'\cf3 , \cf6 'title, slug, and content are \cf3   \
+  \cf6 required'\cf3 , [ \cf6 'status'\cf3  => \cf4 400\cf3  ] );\
+              \}                                                                       \
+              \cf4 // Check if slug already exists\cf3                \
+              $existing = get_page_by_path( $slug, \cf5 OBJECT\cf3 , \cf6 'page'\cf3  );                \
+              \cf5 if\cf3  ( $existing ) \{                                                      \
+                  \cf4 // Update instead of creating a duplicate\cf3 \
+                  $post_id = wp_update_post( [                                        \
+                      \cf6 'ID'\cf3            => $existing->ID,      \
+                      \cf6 'post_title'\cf3    => $title,                                     \
+                      \cf6 'post_content'\cf3  => $content,                                     \
+                      \cf6 'post_status'\cf3   => \cf6 'publish'\cf3 ,\
+                  ] );                                                                \
+                  \cf5 if\cf3  ( is_wp_error( $post_id ) ) \{          \
+                      \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_update_failed'\cf3 ,                     \
+  $post_id->get_error_message(), [ \cf6 'status'\cf3  => \cf4 500\cf3  ] );                               \
+                  \}\
+                  \cf5 return\cf3  [                                                            \
+                      \cf6 'ok'\cf3        => \cf5 true\cf3 ,                   \
+                      \cf6 'action'\cf3    => \cf6 'updated_existing'\cf3 ,                             \
+                      \cf6 'id'\cf3        => $post_id,                                         \
+                      \cf6 'slug'\cf3      => $slug,\
+                      \cf6 'url'\cf3       => get_permalink( $post_id ),                        \
+                  ];                                        \
+              \}                                                                     \
+              $post_id = wp_insert_post( [\
+                  \cf6 'post_title'\cf3    => $title,\
+                  \cf6 'post_name'\cf3     => $slug,                                            \
+                  \cf6 'post_content'\cf3  => $content,\
+                  \cf6 'post_status'\cf3   => \cf6 'publish'\cf3 ,                                        \
+                  \cf6 'post_type'\cf3     => \cf6 'page'\cf3 ,                 \
+              ] );                                                                  \
+              \cf5 if\cf3  ( is_wp_error( $post_id ) ) \{                                        \
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_insert_failed'\cf3 ,\
+  $post_id->get_error_message(), [ \cf6 'status'\cf3  => \cf4 500\cf3  ] );                               \
+              \}                                             \
+              \cf5 return\cf3  [                                                              \
+                  \cf6 'ok'\cf3      => \cf5 true\cf3 ,                                                   \
+                  \cf6 'action'\cf3  => \cf6 'created'\cf3 ,\
+                  \cf6 'id'\cf3      => $post_id,                                               \
+                  \cf6 'slug'\cf3    => $slug,                        \
+                  \cf6 'url'\cf3     => get_permalink( $post_id ),                            \
+              ];\
+\
+          \cf4 // \uc0\u9472 \u9472  Update existing page content \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \cf3    \
+          \cf5 case\cf3  \cf6 'update_content'\cf3 :\
+              \cf5 if\cf3  ( ! $id || \cf5 empty\cf3 ( $content ) ) \{                                     \
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_missing'\cf3 , \cf6 'id and content are required'\cf3 , [\
+   \cf6 'status'\cf3  => \cf4 400\cf3  ] );                                                               \
+              \}\
+              $result = wp_update_post( [                                             \
+                  \cf6 'ID'\cf3            => $id,                    \
+                  \cf6 'post_content'\cf3  => $content,                                       \
+              ] );\
+              \cf5 if\cf3  ( is_wp_error( $result ) ) \{\
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_update_failed'\cf3 ,                           \
+  $result->get_error_message(), [ \cf6 'status'\cf3  => \cf4 500\cf3  ] );\
+              \}                                                                       \
+              \cf5 return\cf3  [                                      \
+                  \cf6 'ok'\cf3      => \cf5 true\cf3 ,                                                 \
+                  \cf6 'action'\cf3  => \cf6 'content_updated'\cf3 ,\
+                  \cf6 'id'\cf3      => $result,                                                \
+                  \cf6 'url'\cf3     => get_permalink( $result ),\
+              ];                                                                      \
+                                                            \
+          \cf4 // \uc0\u9472 \u9472  Update Rank Math (or any post meta) fields \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \cf3  \
+          \cf5 case\cf3  \cf6 'update_meta'\cf3 :\
+              \cf5 if\cf3  ( ! $id ) \{\
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_missing'\cf3 , \cf6 'id is required'\cf3 , [ \cf6 'status'\cf3  => \
+  \cf4 400\cf3  ] );\
+              \}                                                                       \
+              $meta_input = $request->get_param( \cf6 'meta'\cf3  );  \
+              \cf5 if\cf3  ( ! is_array( $meta_input ) || \cf5 empty\cf3 ( $meta_input ) ) \{            \
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_missing'\cf3 , \cf6 'meta object is required'\cf3 , [    \
+  \cf6 'status'\cf3  => \cf4 400\cf3  ] );\
+              \}                                                                       \
+              $allowed_meta = [                             \
+                  \cf6 'rank_math_title'\cf3 ,                                                  \
+                  \cf6 'rank_math_description'\cf3 ,\
+                  \cf6 'rank_math_focus_keyword'\cf3 ,                                          \
+                  \cf6 'rank_math_robots'\cf3 ,                       \
+                  \cf6 'rank_math_canonical_url'\cf3 ,                                        \
+                  \cf6 '_yoast_wpseo_title'\cf3 ,\
+                  \cf6 '_yoast_wpseo_metadesc'\cf3 ,                                            \
+              ];\
+              $updated = [];                                                          \
+              $skipped = [];                                \
+              \cf5 foreach\cf3  ( $meta_input \cf5 as\cf3  $key => $value ) \{                           \
+                  \cf5 if\cf3  ( in_array( $key, $allowed_meta, \cf5 true\cf3  ) ) \{\
+                      update_post_meta( $id, $key, sanitize_text_field( $value ) );   \
+                      $updated[] = $key;\
+                  \} \cf5 else\cf3  \{                                                            \
+                      $skipped[] = $key;                    \
+                  \}                                                                 \
+              \}\
+              \cf5 return\cf3  [\
+                  \cf6 'ok'\cf3       => \cf5 true\cf3 ,                                                  \
+                  \cf6 'action'\cf3   => \cf6 'meta_updated'\cf3 ,\
+                  \cf6 'id'\cf3       => $id,                                                   \
+                  \cf6 'updated'\cf3  => $updated,                    \
+                  \cf6 'skipped'\cf3  => $skipped,                                            \
+              ];\
+\
+          \cf4 // \uc0\u9472 \u9472  Update content + meta in one call \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \u9472 \cf3    \
+          \cf5 case\cf3  \cf6 'update_all'\cf3 :\
+              \cf5 if\cf3  ( ! $id ) \{                                                          \
+                  \cf5 return\cf3  \cf5 new\cf3  WP_Error( \cf6 'tts_missing'\cf3 , \cf6 'id is required'\cf3 , [ \cf6 'status'\cf3  =>\
+  \cf4 400\cf3  ] );                                                                            \
+              \}\
+              $result = [];                                                           \
+              \cf5 if\cf3  ( ! \cf5 empty\cf3 ( $content ) ) \{                  \
+                  $r = wp_update_post( [ \cf6 'ID'\cf3  => $id, \cf6 'post_content'\cf3  => $content ] );\
+                  $result[\cf6 'content'\cf3 ] = is_wp_error( $r ) ? \cf6 'failed: '\cf3  .\
+  $r->get_error_message() : \cf6 'updated'\cf3 ;                                                \
+              \}\
+              $meta_input = $request->get_param( \cf6 'meta'\cf3  );                            \
+              \cf5 if\cf3  ( is_array( $meta_input ) ) \{              \
+                  $allowed_meta = [                                                   \
+                      \cf6 'rank_math_title'\cf3 , \cf6 'rank_math_description'\cf3 ,\
+  \cf6 'rank_math_focus_keyword'\cf3 ,                                                          \
+                      \cf6 'rank_math_robots'\cf3 , \cf6 'rank_math_canonical_url'\cf3 ,\
+                  ];                                                                \
+                  \cf5 foreach\cf3  ( $meta_input \cf5 as\cf3  $key => $value ) \{\
+                      \cf5 if\cf3  ( in_array( $key, $allowed_meta, \cf5 true\cf3  ) ) \{                  \
+                          update_post_meta( $id, $key, sanitize_text_field( $value )\
+  );                                                                                  \
+                      \}                                     \
+                  \}                                                                   \
+                  $result[\cf6 'meta'\cf3 ] = \cf6 'updated'\cf3 ;\
+              \}                                                                       \
+              \cf5 return\cf3  [ \cf6 'ok'\cf3  => \cf5 true\cf3 , \cf6 'action'\cf3  => \cf6 'update_all'\cf3 , \cf6 'id'\cf3  => $id, \cf6 'result'\cf3 \
+  => $result ];                                                                     \
+\
+          \cf5 default\cf3 :\
+              \cf5 return\cf3  \cf5 new\cf3  WP_Error(\
+                  \cf6 'tts_unknown_action'\cf3 ,                                               \
+                  \cf6 'Unknown action. Valid: create_page, update_content, update_meta, \cf3 \
+  \cf6 update_all'\cf3 ,                                                                        \
+                  [ \cf6 'status'\cf3  => \cf4 400\cf3  ]                       \
+              );                                                                    \
+      \}\
+  \}\
+}

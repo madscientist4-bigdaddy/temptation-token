@@ -1,0 +1,56 @@
+════════════ TTSVotingV3d VRF-STALL RECOVERY — Round 4 ════════════
+time: 2026-08-02T20:40:53.318Z  ·  Bank: 0xB1E991bF617459B58964eEf7756B350e675C53b5
+
+════ STEP 0 — PRE-FLIGHT (reads only) ════
+currentRoundId      = 4
+getRound(4).settled     = false   (want false)
+getRound(4).vrfPending  = true   (want true)
+getRound(4).profiles    = 18   rawVotes=10   endTime=2026-07-20T04:59:00.000Z
+V3d.owner()         = 0x363Ce4960E3B459f5892587A37Ae1fF2ED04442C  (Keeper3)   (want Keeper3)
+V3d.admin()         = 0xB1E991bF617459B58964eEf7756B350e675C53b5  (Bank/House)   (want Bank)
+VRF sub 58222014484560539249027457203866883376041731162442592604288474822166186263722
+  LINK balance      = 32.7690213993259   (want >= 2)
+  reserve estimate  ≈ 0.075 ETH worth of LINK per request (2.5M callback × 30-gwei lane)
+Bank ETH            = 0.031660835125115557   (need ~0.0000096 for 4 txs)
+
+✅ PRE-FLIGHT PASSED — proceeding to Bank transactions.
+
+── TX1 — adminTransferOwnership(Bank) ──
+  tx: 0x9a4d11290bdd2c27a3cb2f3cefe6efcb6cae3ab314ababdaeb19bad046e48dad
+  receipt status: success  block: 49456954
+  re-read owner() = 0xB1E991bF617459B58964eEf7756B350e675C53b5 (Bank/House)
+  ✓ owner() == Bank
+
+── TX2 — adminResetSettlement(4) ──
+  tx: 0x2e25a859de80be574856ffb928edb807c2b247431d6823454d5a12d5eff0962e
+  receipt status: success  block: 49456957
+  re-read vrfPending = false (want false)
+  ✓ vrfPending == false
+
+── TX3 — settleRound() (fires FRESH VRF request) ──
+  tx: 0x973217194d6a738da0aee022eff99fde4eb79df9618ad119ad9477208c9967d4
+  receipt status: success  block: 49456961
+  re-read vrfPending = true (want true)
+  ✓ fresh VRFRequested(4, requestId=3943032084590736616176192068735704107308831597943263252606883573278351493990)
+  coordinator commitment = 0x42dbca64bf9779659784a50ca53436b504264dcc6a774ca04ed034edca5d0048 (queued ✓)
+
+════ STEP 4 — WATCH for fulfillment (poll 30s, up to 45 min) ════
+  [+1m] settled=true vrfPending=false
+
+── TX4 — return V3d ownership to Keeper3 (post-settle) ──
+  tx: 0xaaeae4059529712bf62394348a20f36f8dfb918fac1842e82ce63fff51764447
+  receipt status: success
+  ✓ owner() == Keeper3 — automation restored.
+
+════ STEP 6 — POST-VERIFY REPORT ════
+getRound(4).settled = true
+
+(payout log read error: JSON is not a valid request object.)
+
+NFT totalSupply = 3  (expect 3)
+  NFT read error: The contract function "tokenByIndex" reverted.
+
+currentRoundId = 5
+✓ Round 5 auto-started by Keeper3.
+
+════════════ RECOVERY COMPLETE — settled=true ════════════
