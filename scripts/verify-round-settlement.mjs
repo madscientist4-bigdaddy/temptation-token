@@ -151,10 +151,10 @@ if (!noTelegram) {
     }).catch(() => null)
     sent = !!(res && res.ok)
   }
-  if (!sent && process.env.CRON_SECRET) {
+  if (!sent && process.env.ADMIN_SESSION_SECRET) {
     const res = await fetch('https://app.temptationtoken.io/api/social-post?action=admin-alert', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.CRON_SECRET}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.ADMIN_SESSION_SECRET}` },
       body: JSON.stringify({ text: body.slice(0, 4000) }),
     }).catch(() => null)
     sent = !!(res && res.ok)

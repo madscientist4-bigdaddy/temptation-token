@@ -269,7 +269,10 @@ export default async function handler(req, res) {
   // internet the way ?action=notify is.
   if (req.query?.action === 'admin-alert') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
-    const secret = process.env.CRON_SECRET
+    // Gated on ADMIN_SESSION_SECRET, not CRON_SECRET: CRON_SECRET is not set in Vercel
+    // production at all, so a gate on it would reject every request forever while looking
+    // like it worked.
+    const secret = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD
     const given = (req.headers.authorization || '').replace(/^Bearer /, '')
     if (!secret || given !== secret) return res.status(401).json({ error: 'Unauthorized' })
 
