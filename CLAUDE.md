@@ -296,6 +296,33 @@ Settings → Bonus Configuration.
 
 ---
 
+## WordPress editing rules (non-negotiable)
+
+Learned the hard way on 2026-08-16, when a homepage repair blanked ~1/3 of page 52.
+
+1. **Additive or revision-safe only. NEVER bulk find/replace page content.** A global
+   chain-name swap is what produced *"Temptation Token is on Base mainnet … It is not on
+   Base"* and *"TARGET $TTS ambitious long-term growth goals"*. Every edit anchors on an
+   exact string and asserts an expected occurrence count, so a drifted page fails loudly
+   instead of being half-patched.
+2. **Every WP change ships with a before/after diff.** Dry-run first (`node
+   scripts/wp-repair-homepage.mjs`), read the diff, then `--apply`.
+3. **Back up before every write**, to `outputs/wp_backups/`. Both `post_title`/`content`
+   AND `_elementor_data` — they live in different places and revisions only cover the
+   former.
+4. **`_elementor_data` writes MUST be pre-slashed.** `update_post_meta()` runs
+   `wp_unslash()` on the value, stripping the backslash before every escaped quote and
+   destroying the JSON. `wp-plugins/tts-api-auth` is missing the matching `wp_slash()`.
+   Client-side: `data.replace(/\\/g, '\\\\')` before POST. Skipping this stores
+   unparseable JSON and the page renders blank — it did.
+5. **After any `_elementor_data` write, read back and `JSON.parse()` it.** A 200 response
+   does not mean the stored value is valid. Roll back on failure.
+6. **Elementor pages are not covered by WP revisions.** Revisions capture `post_content`;
+   Elementor renders from post meta. A revision restore can look successful and change
+   nothing visible — verify against a fresh live fetch, never against the API response.
+7. **Verify with a cache-buster** (`?cb=<random>`). LiteSpeed will happily serve a stale
+   copy and make a successful write look like a failed one, and vice versa.
+
 ## Infrastructure
 | Service | ID |
 |---|---|
