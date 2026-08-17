@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <!-- Monday 06:00 ET settlement audit, reported to Telegram.
+
+       WHY LAUNCHD AND NOT AN IN-SESSION CRON: an in-session scheduler dies with the
+       session, and this has to survive until next Monday. launchd persists across
+       logout and reboot, and StartCalendarInterval catches up a missed run if the Mac
+       was asleep at the fire time — which is the whole point of a weekly check.
+
+       06:00 ET is ~1h after the calendar-pinned close (Mon 04:59 UTC = Sun 23:59 ET),
+       leaving Chainlink time to settle before we judge it stalled.
+
+       The job is READ-ONLY. It never sends a chain transaction: recovering a stalled
+       round needs a Bank wallet transaction, and that needs Jim's explicit go-ahead. -->
+  <key>Label</key><string>io.temptationtoken.round-audit</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>cd /Users/functionisedproductions/Projects/temptation-token &amp;&amp; set -a &amp;&amp; . ./.env &amp;&amp; set +a &amp;&amp; /usr/bin/env node scripts/verify-round-settlement.mjs</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/functionisedproductions/Projects/temptation-token</string>
+  <key>StandardOutPath</key><string>/Users/functionisedproductions/Projects/temptation-token/logs/round-audit.log</string>
+  <key>StandardErrorPath</key><string>/Users/functionisedproductions/Projects/temptation-token/logs/round-audit.err</string>
+  <key>StartCalendarInterval</key><dict>
+    <key>Weekday</key><integer>1</integer>
+    <key>Hour</key><integer>6</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+</dict></plist>

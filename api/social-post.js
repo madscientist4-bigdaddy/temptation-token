@@ -257,6 +257,41 @@ export default async function handler(req, res) {
   }
 
   // ── Admin submission notify (from /api/notify rewrite) ────────────────────
+  // ── ?action=admin-alert — generic operational alert to the admin chat ───────
+  //
+  // The Telegram bot token is marked Sensitive in Vercel, so `vercel env pull` returns it
+  // blank and a local cron job cannot send directly. Rather than leave the weekly
+  // settlement audit unable to reach anyone — a monitor that cannot alert is worse than no
+  // monitor, because it looks like everything is fine — the token stays server-side and
+  // the job posts through here.
+  //
+  // Shared-secret gated: this can message Jim's admin chat, so it must not be open to the
+  // internet the way ?action=notify is.
+  if (req.query?.action === 'admin-alert') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+    const secret = process.env.CRON_SECRET
+    const given = (req.headers.authorization || '').replace(/^Bearer /, '')
+    if (!secret || given !== secret) return res.status(401).json({ error: 'Unauthorized' })
+
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BROADCAST_BOT_TOKEN
+    const chatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+    if (!token) return res.status(503).json({ error: 'No Telegram bot token configured' })
+
+    const text = String(body.text || '').slice(0, 4000)
+    if (!text) return res.status(400).json({ error: 'text required' })
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+      })
+      const d = await r.json()
+      return res.status(r.ok ? 200 : 502).json({ ok: !!d.ok, telegram: d.description || 'sent' })
+    } catch (e) {
+      return res.status(502).json({ error: e.message })
+    }
+  }
+
   if (req.query?.action === 'notify') {
     const { name, wallet, link_url } = body
     const token  = process.env.TELEGRAM_BOT_TOKEN
