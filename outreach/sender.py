@@ -58,6 +58,19 @@ def template_for(step: int, cfg: config.Config) -> str:
 SCHEDULE = [(0, "EMAIL", 1), (1, "EMAIL", 2), (3, "DM", 0), (4, "EMAIL", 3),
             (7, "FEDEX", 0), (12, "NURTURE", 0)]
 
+# ABSOLUTE floor for the step-3 breakup, independent of per-target offsets.
+#
+# WHY AN ABSOLUTE DATE AND NOT JUST A BIGGER OFFSET. The offset is relative to each
+# target's seq_started, so "hold the breakup until Thursday" is not expressible as an
+# offset at all — you have to know when the cohort started, and every cohort differs.
+# On 2026-08-17 the breakup went to 14 agencies at 13:05 UTC because offset 4 against a
+# 2026-08-12 start came due on the 16th. The sequence itself was correct (step 2 had been
+# delivered on the 14th), but it landed three days before the intended floor, and a
+# breakup cannot be unsent.
+#
+# Set to None to disable. Compared against today's date in the send window.
+BREAKUP_NOT_BEFORE = date(2026, 8, 20)
+
 DM_TEXT = (
     "Hey — Temptation Token here. It's a weekly vote-to-earn contest on Base: fans buy votes in $TTS for a creator, and at settlement the winning creator takes 35% of the votes cast on her, paid on-chain. Votes on creators who don't win that round are burned, so it's upside, not a guaranteed monthly number. Every entrant also gets a trafficked profile page linking back to her channels. 5 launch slots, zero OnlyFans posting. Want the one-pager?"
 )
@@ -190,6 +203,10 @@ def due_emails(c, today: date) -> list[tuple[dict, int]]:
             # launch-cohort conversations" landing on someone who got one email and no
             # follow-up reads as contempt, and you cannot unsend it.
             if step == 3:
+                if BREAKUP_NOT_BEFORE and today < BREAKUP_NOT_BEFORE:
+                    # Hold, do not skip: the target stays eligible for the breakup on or
+                    # after the floor date rather than losing it.
+                    continue
                 step2_delivered = c.execute(
                     "SELECT 1 FROM sends WHERE agency_id = ? AND step = 2 AND dry_run = 0",
                     (r["id"],),

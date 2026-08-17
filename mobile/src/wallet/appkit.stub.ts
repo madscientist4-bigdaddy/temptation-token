@@ -54,6 +54,13 @@ export function useSendMaybeSponsored(): (calls: unknown[]) => Promise<never> {
   }
 }
 
+/** No signer in this build; the deletion UI falls back to the email route. */
+export function useSignPlainMessage(): (message: string) => Promise<string> {
+  return async () => {
+    throw new Error('This build cannot sign messages.')
+  }
+}
+
 export function initWallet(): void {
   // No-op. See WALLET_ENABLED in src/config/features.
 }

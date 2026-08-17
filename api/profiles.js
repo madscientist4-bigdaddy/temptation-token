@@ -444,6 +444,78 @@ function handleNftCollection(req, res) {
   })
 }
 
+// ── ?action=report — user-facing content report ─────────────────────────────
+//
+// App Store Guideline 1.2 requires that an app hosting user-generated content give users
+// a way to report offensive content and a published contact. Every entry here is already
+// admin-approved before it appears, which is stronger than a filter, but pre-moderation is
+// not a reporting mechanism — a reviewer looking for a report button will not find
+// pre-moderation, and neither will a user who sees something wrong.
+//
+// Deliberately open to unauthenticated callers: requiring a wallet to report abuse would
+// silence exactly the people most likely to notice it. Abuse of the mechanism is bounded
+// instead by a unique index on (profile_id, reporter_wallet) for identified reporters and
+// a short reason allowlist for everyone.
+const REPORT_REASONS = {
+  nudity: 'Nudity or sexually explicit content',
+  minor: 'Appears to involve a minor',
+  nonconsensual: 'Posted without the subject’s consent',
+  impersonation: 'Impersonation or stolen photo',
+  violence: 'Violence or hateful content',
+  spam: 'Spam or misleading',
+  other: 'Something else',
+}
+
+async function handleReport(req, res) {
+  if (req.method === 'GET') {
+    // Lets the client render the same reason list the server will accept, so the two
+    // cannot drift into "your report was rejected for an invalid reason".
+    return res.status(200).json({ reasons: REPORT_REASONS, contact: 'support@temptationtoken.io' })
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
+  const profileId = String(body.profileId || '').trim()
+  const reason = String(body.reason || '').trim()
+  const details = String(body.details || '').trim().slice(0, 2000)
+  const wallet = /^0x[0-9a-fA-F]{40}$/.test(body.reporterWallet || '')
+    ? String(body.reporterWallet).toLowerCase()
+    : null
+
+  if (!profileId) return res.status(400).json({ error: 'profileId required' })
+  if (!REPORT_REASONS[reason]) {
+    return res.status(400).json({ error: 'Unknown reason', reasons: Object.keys(REPORT_REASONS) })
+  }
+
+  const row = {
+    profile_id: profileId,
+    reason,
+    details: details || null,
+    reporter_wallet: wallet,
+    round_id: Number.isInteger(body.roundId) ? body.roundId : null,
+    source: String(body.source || 'app').slice(0, 24),
+  }
+
+  const r = await sb('/content_reports', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify(row),
+  })
+
+  // 23505 = the one-report-per-wallet-per-profile unique index. Report it as success:
+  // the report IS on file, and telling someone "you already reported this" is friendlier
+  // and less abusable than an error that invites retrying.
+  if (!r.ok) {
+    const text = await r.text()
+    if (text.includes('23505') || r.status === 409) {
+      return res.status(200).json({ ok: true, alreadyReported: true })
+    }
+    console.error('content report insert failed:', r.status, text.slice(0, 200))
+    return res.status(502).json({ error: 'Could not file the report. Please email support@temptationtoken.io.' })
+  }
+  return res.status(200).json({ ok: true })
+}
+
 export default async function handler(req, res) {
   const action = req.query.action || ''
   if (action === 'nft-metadata') return handleNftMetadata(req, res)   // public, no service key needed
@@ -453,5 +525,6 @@ export default async function handler(req, res) {
   if (action === 'submit') return handleSubmit(req, res)
   if (action === 'vote') return handleVote(req, res)
   if (action === 'sync') return handleSync(req, res)
+  if (action === 'report') return handleReport(req, res)
   res.status(400).json({ error: 'Unknown action' })
 }

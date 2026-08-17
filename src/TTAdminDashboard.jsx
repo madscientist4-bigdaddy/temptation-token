@@ -2052,7 +2052,8 @@ const WALLETS_CONFIG = [
   { label: "Charity", name: "Polaris Project Donations", addr: CHARITY_WALLET, role: "Charity cut (10%) per round" },
   { label: "Voting Contract", name: "TTSVotingV3d — Escrow", addr: '0x783b8cd80b586b723188c93ef94ee1beede617b4', role: "Holds votes during active round" },
   { label: "Staking Contract", name: "TTSStaking", addr: '0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d', role: "Staked TTS + APR rewards (no lock-up; principal withdrawable anytime)" },
-  { label: "NFT Contract", name: "TTSRoundNFT", addr: '0x0768e862D3AB14d85213BfeF8f1D012E77721da2', role: "Round winner NFT trophies (minting Round 2+)" },
+  { label: "NFT Contract", name: "TTS Round Trophy", addr: '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5', role: "Round winner NFT trophies — V3d.nftContract(); mints from Round 7" },
+  { label: "NFT (retired)", name: "TTSRoundNFT — SUPERSEDED", addr: '0x0768e862D3AB14d85213BfeF8f1D012E77721da2', role: "DEAD: no longer V3d.nftContract(). Holds the 6 legacy trophies from Rounds 4-5 only. Do not send transactions here" },
   { label: "Keeper / Automation", name: "TTSKeeper3", addr: '0x363ce4960e3b459f5892587a37ae1ff2ed04442c', role: "Chainlink automation (V3d): calendar-pinned start, snapshot, settle, rollover" },
   { label: "Deployer / Admin", name: "Blockchain Entertainment LLC", addr: DEPLOYER, role: "Profile approvals, admin calls" },
 ];
@@ -2926,7 +2927,12 @@ function ReferralScreen({ showToast }) {
   )
 }
 
-const NFT_ADDRESS = '0x0768e862D3AB14d85213BfeF8f1D012E77721da2';
+// Trophy — the contract V3d actually mints into (verified on-chain 2026-08-16). This used
+// to point at the retired TTSRoundNFT 0x0768e862, which meant the "NFT Minter" row below
+// read the minter of a dead contract and, worse, offered a setMinter write control aimed
+// at it. A setMinter fired there would have cost gas, appeared to succeed, and changed
+// nothing about the live game.
+const NFT_ADDRESS = '0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5';
 // Pre-computed 4-byte selectors
 const SEL = {
   charityWallet:    '0x7b208769',
@@ -3044,7 +3050,12 @@ function ContractSettingsSection() {
     { key: 'charityWallet', label: 'Charity Wallet', contract: V3_ADDRESS, sel: SEL.setCharityWallet, note: 'TTSVotingV3 · onlyAdmin (deployer)' },
     { key: 'houseWallet',   label: 'House Wallet',   contract: V3_ADDRESS, sel: SEL.setHouseWallet,   note: 'TTSVotingV3 · onlyAdmin (deployer)' },
     { key: 'stakingContract', label: 'Staking Contract', contract: V3_ADDRESS, sel: SEL.setStaking,  note: 'TTSVotingV3 · onlyAdmin (deployer)' },
-    { key: 'minter',        label: 'NFT Minter',     contract: NFT_ADDRESS, sel: SEL.setMinter,       note: 'TTSRoundNFT · owner only' },
+    // NFT Minter is deliberately READ-ONLY. Trophy.minter() is already V3d, which is the
+    // only correct value — settlement mints through it. There is no operational reason to
+    // change it, and every reason not to offer a one-click way to point the game's minter
+    // somewhere else. Re-enable only with a deliberate code change.
+    { key: 'minter', label: 'NFT Minter', contract: NFT_ADDRESS, sel: SEL.setMinter, readOnly: true,
+      note: 'Trophy 0x02DDd0e6 · must stay V3d — write disabled on purpose' },
   ];
 
   return (
@@ -3080,6 +3091,13 @@ function ContractSettingsSection() {
                 Current: {currentValues[s.key]}
               </div>
             </div>
+            {s.readOnly ? (
+              <div style={{fontSize:'.62rem',color:'var(--muted)',background:'rgba(243,156,18,0.06)',border:'1px solid var(--border2)',borderRadius:6,padding:'9px 12px',lineHeight:1.6}}>
+                🔒 Read-only. This value is correct and load-bearing: settlement mints the three
+                round trophies through it. Changing it would silently break minting, so the write
+                control is disabled in code rather than left one click away.
+              </div>
+            ) : (
             <div style={{display:'flex',gap:8}}>
               <input
                 value={inputs[s.key]}
@@ -3094,6 +3112,7 @@ function ContractSettingsSection() {
                 {pending[s.key] ? 'Sending…' : 'Update On-Chain'}
               </button>
             </div>
+            )}
           </div>
         ))}
       </div>

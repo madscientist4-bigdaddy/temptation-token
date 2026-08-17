@@ -30,7 +30,7 @@ import 'react-native-get-random-values'
 import React, { useCallback } from 'react'
 import { createAppKit, AppKit, AppKitProvider, useAppKit } from '@reown/appkit-react-native'
 import { WagmiAdapter } from '@reown/appkit-wagmi-react-native'
-import { WagmiProvider, useAccount, useCapabilities, useSendCalls, useWriteContract, usePublicClient } from 'wagmi'
+import { WagmiProvider, useAccount, useCapabilities, useSendCalls, useWriteContract, usePublicClient, useSignMessage } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 // AppKit's modal measures insets and throws 'No safe area value available' without
 // this above it — the third launch crash this stack produced on a real emulator.
@@ -174,6 +174,15 @@ export function useSendMaybeSponsored() {
     }
     return { hash: last, sponsored: false }
   }, [sponsorable, sendCallsAsync, writeContractAsync, publicClient])
+}
+
+/**
+ * Sign a plain message. Used by account deletion, which must prove wallet ownership —
+ * a wallet address is public, so it authenticates nothing on its own.
+ */
+export function useSignPlainMessage() {
+  const { signMessageAsync } = useSignMessage()
+  return useCallback((message) => signMessageAsync({ message }), [signMessageAsync])
 }
 
 /** Kept for the existing loader.ts contract. */

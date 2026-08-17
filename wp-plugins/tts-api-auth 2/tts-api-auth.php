@@ -3,7 +3,7 @@
  * Plugin Name: TTS API Auth
  * Plugin URI:  https://temptationtoken.io
  * Description: Programmatic REST API access for Temptation Token automation. Bypasses Hostinger's Application Password block via custom X-TTS-API-Key header. Auto-patches homepage logo on activation.
- * Version:     1.1.0
+ * Version:     1.0.0
  * Author:      Temptation Token
  * Requires at least: 5.8
  * Tested up to: 6.7
@@ -46,10 +46,11 @@ function tts_api_apply_logo_fix( $page_id = null ) {
             $modified = false;
             tts_api_patch_widget( $data, 'e7cd5ae', $modified );
             if ( $modified ) {
-                // Same guarded writer as the REST routes — this path wrote raw
-                // wp_json_encode() output straight into meta, which unslashing then
-                // destroyed. It is a widget-width tweak; it must not be able to blank a page.
-                tts_api_write_elementor_data( $page_id, $data );
+                update_post_meta( $page_id, '_elementor_data', wp_json_encode( $data ) );
+                delete_post_meta( $page_id, '_elementor_css' );
+                if ( class_exists( '\Elementor\Plugin' ) ) {
+                    \Elementor\Plugin::$instance->files_manager->clear_cache();
+                }
             }
         }
     }
@@ -282,91 +283,8 @@ function tts_api_route_status() {
         'user'       => $user->user_login,
         'site'       => get_bloginfo( 'url' ),
         'logo_fix'   => get_option( 'tts_api_logo_fix_applied', 'not applied' ),
-        'version'    => '1.1.0',
+        'version'    => '1.0.0',
     ];
-}
-
-// ── _elementor_data: the ONLY sanctioned write path ──────────
-//
-// THE LANDMINE THIS REMOVES. update_post_meta() runs wp_unslash() on its value. Elementor
-// stores its layout as a JSON string that is full of escaped quotes, so writing that JSON
-// straight through strips every backslash and the stored value becomes unparseable. The
-// page then renders BLANK. This is not theoretical: it blanked roughly a third of page 52
-// on 2026-08-16.
-//
-// The old contract pushed the burden onto callers — "pre-slash your JSON before POSTing".
-// That is a contract nobody remembers at 1am, and one forgetful caller silently destroys a
-// page. So correctness now lives HERE, and no caller can get it wrong:
-//
-//   1. Accept EITHER raw JSON or a pre-slashed payload. Which one it is is unambiguous:
-//      pre-slashed Elementor data does not parse as JSON at the top level, raw data does.
-//      Old pre-slashing callers therefore keep working, and are not double-escaped.
-//   2. REFUSE anything that is not valid JSON either way. A 400 is infinitely better than
-//      a 200 that blanks the homepage.
-//   3. wp_slash() before update_post_meta(), which is the actual fix.
-//   4. Read the value back, and require that it still parses. If it does not, restore the
-//      previous value and report failure — so a future WP change to slashing semantics
-//      surfaces as a loud error instead of silent corruption.
-//
-// Returns true on success, or WP_Error.
-function tts_api_write_elementor_data( $post_id, $incoming ) {
-    if ( is_array( $incoming ) ) {
-        $decoded = $incoming;
-    } else {
-        $s = (string) $incoming;
-        // Prefer the raw reading; fall back to treating the payload as pre-slashed.
-        $decoded = json_decode( $s, true );
-        if ( json_last_error() !== JSON_ERROR_NONE ) {
-            $decoded = json_decode( stripslashes( $s ), true );
-        }
-        if ( json_last_error() !== JSON_ERROR_NONE ) {
-            return new WP_Error(
-                'tts_bad_elementor_json',
-                'elementor_data is not valid JSON, raw or pre-slashed — refusing to write. '
-                . 'Storing it would render the page blank. (' . json_last_error_msg() . ')',
-                [ 'status' => 400 ]
-            );
-        }
-    }
-    if ( ! is_array( $decoded ) ) {
-        return new WP_Error(
-            'tts_bad_elementor_shape',
-            'elementor_data must decode to an array of Elementor elements.',
-            [ 'status' => 400 ]
-        );
-    }
-
-    $previous = get_post_meta( $post_id, '_elementor_data', true );
-    $canonical = wp_json_encode( $decoded );
-    if ( ! is_string( $canonical ) ) {
-        return new WP_Error( 'tts_encode_failed', 'Could not re-encode elementor_data.', [ 'status' => 500 ] );
-    }
-
-    update_post_meta( $post_id, '_elementor_data', wp_slash( $canonical ) );
-
-    // Verify what is actually STORED, not what we hoped to store. A 200 from
-    // update_post_meta() says nothing about whether the value survived unslashing.
-    $stored = get_post_meta( $post_id, '_elementor_data', true );
-    json_decode( is_string( $stored ) ? $stored : '', true );
-    if ( json_last_error() !== JSON_ERROR_NONE ) {
-        // Roll back rather than leave the page broken.
-        if ( $previous === '' || $previous === null ) {
-            delete_post_meta( $post_id, '_elementor_data' );
-        } else {
-            update_post_meta( $post_id, '_elementor_data', wp_slash( $previous ) );
-        }
-        return new WP_Error(
-            'tts_elementor_readback_failed',
-            'Stored elementor_data did not parse on read-back; previous value restored.',
-            [ 'status' => 500 ]
-        );
-    }
-
-    delete_post_meta( $post_id, '_elementor_css' );
-    if ( class_exists( '\Elementor\Plugin' ) ) {
-        \Elementor\Plugin::$instance->files_manager->clear_cache();
-    }
-    return true;
 }
 
 // ── /elementor/{page_id} ─────────────────────────────────────
@@ -391,9 +309,13 @@ function tts_api_route_elementor( WP_REST_Request $req ) {
     $body = $req->get_json_params() ?: [];
 
     if ( isset( $body['elementor_data'] ) ) {
-        $wrote = tts_api_write_elementor_data( $page_id, $body['elementor_data'] );
-        if ( is_wp_error( $wrote ) ) {
-            return $wrote; // fail loudly; nothing else in this request has run yet
+        $raw = is_string( $body['elementor_data'] )
+             ? $body['elementor_data']
+             : wp_json_encode( $body['elementor_data'] );
+        update_post_meta( $page_id, '_elementor_data', $raw );
+        delete_post_meta( $page_id, '_elementor_css' );
+        if ( class_exists( '\Elementor\Plugin' ) ) {
+            \Elementor\Plugin::$instance->files_manager->clear_cache();
         }
     }
 
@@ -423,23 +345,7 @@ function tts_api_route_meta( WP_REST_Request $req ) {
 
     $body = $req->get_json_params() ?: [];
     foreach ( $body as $k => $v ) {
-        $key = sanitize_key( $k );
-
-        // The generic meta route is the back door into the same landmine: anyone can POST
-        // _elementor_data here and bypass /elementor entirely. Route it through the guarded
-        // writer so there is exactly ONE way to write this key.
-        if ( '_elementor_data' === $key ) {
-            $wrote = tts_api_write_elementor_data( $post_id, $v );
-            if ( is_wp_error( $wrote ) ) {
-                return $wrote;
-            }
-            continue;
-        }
-
-        // Every other meta value: slash strings on the way in, because update_post_meta()
-        // unslashes unconditionally. Without this, ANY string containing a backslash — a
-        // Windows path, a regex, a JSON blob in some other meta key — is silently corrupted.
-        update_post_meta( $post_id, $key, is_string( $v ) ? wp_slash( $v ) : $v );
+        update_post_meta( $post_id, sanitize_key( $k ), $v );
     }
     return [ 'ok' => true, 'post_id' => $post_id ];
 }

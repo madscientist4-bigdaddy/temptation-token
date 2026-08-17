@@ -1,9 +1,10 @@
 // Full-screen profile detail — opens when a vote card photo is tapped. Large photo,
 // rank, name, live vote total + share of pool, the external link, and a Vote CTA that
 // routes through the wallet sheet (stubbed in Expo Go).
-import React from 'react'
+import React, { useState } from 'react'
 import { Modal, ScrollView, View, Text, Image, Pressable, StyleSheet, Linking } from 'react-native'
 import { colors, serif, sans } from '../theme'
+import { ReportSheet } from './ReportSheet'
 import type { VoteProfile } from './VoteCard'
 
 export function ProfileDetail({
@@ -19,6 +20,10 @@ export function ProfileDetail({
   onVote: () => void
   onClose: () => void
 }) {
+  // Report lives on the profile detail because that is the one screen reachable from
+  // EVERY profile — the card, the carousel and the leaderboard all open it.
+  const [reporting, setReporting] = useState(false)
+
   const share = totalPool > 0 && profile ? Math.round((profile.votes / totalPool) * 100) : 0
   return (
     <Modal visible={!!profile} animationType="slide" onRequestClose={onClose}>
@@ -62,9 +67,20 @@ export function ProfileDetail({
               <Text style={st.voteTxt}>Vote $TTS on {profile?.display_name || 'this profile'}</Text>
             </Pressable>
             <Text style={st.foot}>Winning profile earns 35% of the round pool · min 5 $TTS · votes are final</Text>
+
+            {/* Guideline 1.2: a way to report offensive content, on every profile. */}
+            <Pressable style={st.report} onPress={() => setReporting(true)} hitSlop={8}>
+              <Text style={st.reportTxt}>⚑ Report this entry</Text>
+            </Pressable>
           </View>
         </ScrollView>
       </View>
+      <ReportSheet
+        visible={reporting}
+        profileId={profile?.profileId ?? null}
+        profileName={profile?.display_name}
+        onClose={() => setReporting(false)}
+      />
     </Modal>
   )
 }
@@ -77,6 +93,8 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
   },
   closeTxt: { color: colors.text, fontSize: 16 },
+  report: { marginTop: 18, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  reportTxt: { fontFamily: sans, fontSize: 12.5, color: colors.muted, textDecorationLine: 'underline' },
   img: { width: '100%', aspectRatio: 3 / 4, backgroundColor: colors.surface2 },
   imgEmpty: { alignItems: 'center', justifyContent: 'center' },
   imgEmptyTxt: { fontSize: 64, opacity: 0.3 },

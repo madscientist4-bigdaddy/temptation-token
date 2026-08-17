@@ -97,6 +97,26 @@ export const api = {
   submitProfile: (payload: SubmitPayload) => post<{ ok: boolean }>('/api/submit-profile', payload),
 
   // ── Referral ──────────────────────────────────────────────────────────────
+  // ── Content report (App Store Guideline 1.2) ──────────────────────────────
+  /** Reason list comes from the server so the two can never disagree. */
+  reportReasons: () => j<{ reasons: Record<string, string>; contact: string }>('/api/profiles?action=report'),
+  reportProfile: (p: {
+    profileId: string; reason: string; details?: string; reporterWallet?: string; roundId?: number
+  }) => post<{ ok: boolean; alreadyReported?: boolean }>('/api/profiles?action=report', { ...p, source: 'mobile' }),
+
+  // ── Account deletion (App Store Guideline 5.1.1(v)) ───────────────────────
+  /** What would be deleted/kept, plus the exact message the wallet must sign. */
+  deletionPreview: (wallet: string) =>
+    j<{
+      wallet: string; issuedAt: string; message: string
+      willDelete: string[]; willKeep: { what: string; why: string }[]; contact: string
+    }>(`/api/kyc?action=delete-account&wallet=${wallet}`),
+  deleteAccount: (p: { walletAddress: string; signature: string; issuedAt: string }) =>
+    post<{
+      ok: boolean; partial?: boolean; message: string
+      deleted?: Record<string, number>; failed?: string[]; contact?: string
+    }>('/api/kyc?action=delete-account', p),
+
   referCapture: (referrerWallet: string, refereeWallet: string) =>
     post<{ ok: boolean }>('/api/bonus?action=refer-capture', { referrerWallet, refereeWallet, source: 'mobile' }),
   signupBonus: (walletAddress: string) =>

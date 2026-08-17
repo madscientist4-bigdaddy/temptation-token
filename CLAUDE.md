@@ -42,6 +42,18 @@ on them — facts here reflect the last verification, not real-time state.
 - Don't ask "should I proceed / commit / deploy?" — just do it if non-destructive and
   the build passes. Pick the better option when one is clearly better; the simpler one
   when equivalent.
+- **"This session is READ-ONLY for mainnet" means exactly one thing: no chain
+  transactions.** No writes from any wallet, no upkeep changes, no contract calls that
+  cost gas. On-chain READS are always fine and expected.
+  It does **not** restrict anything off-chain: **Vercel deploys, WordPress writes,
+  Supabase writes, git push and Railway deploys all remain permitted** under the normal
+  autonomous policy above. Ask only if an off-chain action is itself destructive or
+  irreversible.
+  Precedent (2026-08-16): with the session marked read-only for mainnet, the live WP
+  `/buy` page was already promising `?buy=1` while the app dropped the param, so shipping
+  the Vercel fix repaired a live broken promise. Deploying was the correct call — waiting
+  would have left users staring at a dead CTA to protect a rule that was never about
+  Vercel.
 - Note: pushing to `main` triggers Railway (bot) auto-deploy; Vercel deploys via
   `vercel --prod`. Treat a push/deploy as outward-facing — fine under autonomous policy,
   but be deliberate.

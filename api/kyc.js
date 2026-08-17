@@ -513,5 +513,139 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── ?action=delete-account — user-initiated deletion ───────────────────────
+  //
+  // App Store Guideline 5.1.1(v): an app with account creation must let the user
+  // initiate deletion from inside the app. Wallet address is the account identity here.
+  //
+  // OWNERSHIP MUST BE PROVEN. Without a signature this endpoint would let anyone delete
+  // any wallet's profile and ID documents by typing an address — the address is public
+  // information, so it authenticates nothing. The caller signs a dated message and we
+  // recover it; a 15-minute freshness window stops a captured signature being replayed
+  // later.
+  //
+  // WHAT IS AND IS NOT DELETED is dictated by the published retention policy
+  // (outputs/legal/privacy_policy.md §6), not by convenience:
+  //   deleted — profile submissions, the verification row, the government ID + selfie
+  //             objects, the 18+ acknowledgement, linked-wallet records
+  //   KEPT    — bonus claims ("retained indefinitely for fraud prevention"), and the
+  //             on-chain votes/payouts, which are public blockchain facts we cannot erase
+  //             and must not pretend to. The receipt says so explicitly, because a
+  //             deletion flow that implies it erased the chain is a lie.
+  if (action === 'delete-account') {
+    const KEPT = [
+      { what: 'On-chain votes, payouts and trophies', why: 'Public blockchain records — permanent and outside our control. Cannot be deleted by anyone.' },
+      { what: 'Bonus claim records', why: 'Retained indefinitely for fraud prevention, per our published retention policy.' },
+    ]
+    const DELETED = [
+      'Your profile submissions (photo, display name, links)',
+      'Your identity verification record',
+      'Your government ID and selfie images',
+      'Your 18+ acknowledgement',
+      'Any linked-wallet records',
+    ]
+    const messageFor = (wallet, issuedAt) =>
+      `Temptation Token — delete my account\n\nWallet: ${wallet}\nIssued: ${issuedAt}\n\n` +
+      `I confirm I control this wallet and I am asking Temptation Token to delete my ` +
+      `off-chain profile and identity data. On-chain records cannot be deleted.`
+
+    if (req.method === 'GET') {
+      const wallet = String(req.query.wallet || '').toLowerCase()
+      if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) return res.status(400).json({ error: 'Invalid wallet' })
+      const issuedAt = new Date().toISOString()
+      return res.status(200).json({
+        wallet, issuedAt, message: messageFor(wallet, issuedAt),
+        willDelete: DELETED, willKeep: KEPT,
+        contact: 'support@temptationtoken.io',
+      })
+    }
+    if (req.method !== 'POST') return res.status(405).end()
+
+    const { walletAddress, signature, issuedAt } = body
+    const wallet = String(walletAddress || '').toLowerCase()
+    if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) return res.status(400).json({ error: 'Invalid wallet address' })
+    if (!signature || !issuedAt) return res.status(400).json({ error: 'signature and issuedAt are required' })
+
+    const age = Date.now() - Date.parse(issuedAt)
+    if (!Number.isFinite(age) || age < -60_000 || age > 15 * 60_000) {
+      return res.status(400).json({ error: 'Request expired — start the deletion again.' })
+    }
+
+    try {
+      const { verifyMessage } = await import('viem')
+      const ok = await verifyMessage({
+        address: wallet,
+        message: messageFor(wallet, issuedAt),
+        signature,
+      })
+      if (!ok) return res.status(401).json({ error: 'Signature does not match this wallet.' })
+    } catch (e) {
+      console.error('delete-account signature check failed:', e.message)
+      return res.status(401).json({ error: 'Could not verify the signature.' })
+    }
+
+    const deleted = {}
+    const failures = []
+
+    // Row deletes. Each is independent: a missing table must not abort the rest, or a
+    // user's ID images would survive because some unrelated table was renamed.
+    const tables = [
+      ['submissions', `wallet_address=eq.${wallet}`],
+      ['verified_submitters', `wallet_address=eq.${wallet}`],
+      ['age_acknowledgments', `wallet_address=eq.${wallet}`],
+      ['verified_wallet_links', `linked_wallet=eq.${wallet}`],
+    ]
+    for (const [table, filter] of tables) {
+      try {
+        const r = await sbFetch(`/${table}?${filter}`, {
+          method: 'DELETE',
+          headers: { Prefer: 'return=representation' },
+        })
+        if (!r.ok) { failures.push(`${table} (${r.status})`); continue }
+        const rows = await r.json().catch(() => [])
+        deleted[table] = Array.isArray(rows) ? rows.length : 0
+      } catch (e) { failures.push(`${table} (${e.message})`) }
+    }
+
+    // ID + selfie objects live under `<wallet>/` in a private bucket. List then delete —
+    // the filenames contain a random uuid, so they cannot be reconstructed.
+    try {
+      const listRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${ID_BUCKET}`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefix: `${wallet}/`, limit: 200 }),
+      })
+      const objects = listRes.ok ? await listRes.json().catch(() => []) : []
+      const names = (Array.isArray(objects) ? objects : []).map(o => `${wallet}/${o.name}`)
+      if (names.length) {
+        const delRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${ID_BUCKET}`, {
+          method: 'DELETE',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prefixes: names }),
+        })
+        if (!delRes.ok) failures.push(`id-images (${delRes.status})`)
+        else deleted.id_images = names.length
+      } else {
+        deleted.id_images = 0
+      }
+    } catch (e) { failures.push(`id-images (${e.message})`) }
+
+    if (failures.length) {
+      // Partial deletion is a real outcome and must not be reported as success — the user
+      // needs to know something of theirs may remain, and who to chase.
+      console.error('delete-account partial failure', wallet, failures)
+      return res.status(207).json({
+        ok: false, partial: true, wallet, deleted, failed: failures, kept: KEPT,
+        message: 'Some data could not be deleted. Email support@temptationtoken.io and we will finish it manually.',
+        contact: 'support@temptationtoken.io',
+      })
+    }
+
+    return res.status(200).json({
+      ok: true, wallet, deleted, kept: KEPT,
+      message: 'Your off-chain profile and identity data have been deleted.',
+    })
+  }
+
   return res.status(400).json({ error: 'Missing or unknown action' })
 }

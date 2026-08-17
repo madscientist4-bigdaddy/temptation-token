@@ -12,12 +12,16 @@ import { WALLET_ENABLED, FULL_APP_URL } from '../config/features'
 import { useWallet } from '../lib/wallet'
 import { isAddress } from '../lib/chain'
 import { useConnectWallet } from '../wallet/appkit'
+import { DeleteAccountSheet } from './DeleteAccountSheet'
 
 export function WalletSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { address, setAddress } = useWallet()
   const connect = useConnectWallet()
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  // Guideline 5.1.1(v): deletion must be reachable in-app. The wallet sheet is where a
+  // user already manages their identity, so it is where they will look for it.
+  const [deleting, setDeleting] = useState(false)
 
   const save = async () => {
     const a = draft.trim()
@@ -97,8 +101,15 @@ export function WalletSheet({ visible, onClose }: { visible: boolean; onClose: (
           <Pressable style={st.cancel} onPress={onClose}>
             <Text style={st.cancelTxt}>Not now</Text>
           </Pressable>
+
+          {address ? (
+            <Pressable style={st.cancel} onPress={() => setDeleting(true)}>
+              <Text style={[st.cancelTxt, { color: colors.rose }]}>Delete my account and data</Text>
+            </Pressable>
+          ) : null}
         </Pressable>
       </Pressable>
+      <DeleteAccountSheet visible={deleting} onClose={() => { setDeleting(false); onClose() }} />
     </Modal>
   )
 }
