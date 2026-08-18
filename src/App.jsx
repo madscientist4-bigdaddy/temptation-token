@@ -1311,11 +1311,22 @@ const NFT_ABI_READ = [
 ]
 const NFT_ABI_PARSED = parseAbi(NFT_ABI_READ)
 
-function parseTokenMeta(uri) {
+// Trophy's tokenURI is an HTTP metadata URL (https://app.temptationtoken.io/api/nft/<id>),
+// NOT an inline data: URI — the round-7 mints proved it. Without the http branch every
+// real trophy fell through to the generic card: no name, no description, no artwork.
+async function parseTokenMeta(uri) {
   if (!uri) return {}
   try {
     if (uri.startsWith('data:application/json;base64,')) return JSON.parse(atob(uri.slice(29)))
     if (uri.startsWith('{')) return JSON.parse(uri)
+    if (/^https?:\/\//i.test(uri)) {
+      const r = await fetch(uri, { headers: { accept: 'application/json' } })
+      if (r.ok) return await r.json()
+    }
+    if (uri.startsWith('ipfs://')) {
+      const r = await fetch(`https://ipfs.io/ipfs/${uri.slice(7)}`)
+      if (r.ok) return await r.json()
+    }
   } catch { /* fall through to the generic trophy card */ }
   return {}
 }
@@ -1346,8 +1357,8 @@ async function fetchTrophies(contract, owner) {
     contracts: mine.map(id => ({ address: contract, abi: NFT_ABI_PARSED, functionName: 'tokenURI', args: [id] })),
     allowFailure: true,
   })
-  return mine.map((id, i) => {
-    const meta = parseTokenMeta(uris[i]?.status === 'success' ? uris[i].result : null)
+  return Promise.all(mine.map(async (id, i) => {
+    const meta = await parseTokenMeta(uris[i]?.status === 'success' ? uris[i].result : null)
     return {
       key: `${contract}-${id}`,
       id: Number(id),
@@ -1356,7 +1367,7 @@ async function fetchTrophies(contract, owner) {
       image: meta.image || null,
       description: meta.description || '',
     }
-  })
+  }))
 }
 
 function NFTScreen({ address, connected }) {
