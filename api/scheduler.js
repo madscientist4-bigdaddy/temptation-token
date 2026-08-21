@@ -1218,6 +1218,32 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── CRON PATH AUTH ──────────────────────────────────────────────────────────
+  // Everything below is the unrouted cron body, and it was reachable by anyone: a bare
+  // GET https://app.temptationtoken.io/api/scheduler ran runAutoFunder() (Marketing
+  // send), runVrfAutoFunder() (Bank → LINK transferAndCall), runKeeperAutopilot()
+  // (Bank → manualExecute) and fired scheduled posts. The ?action= handlers above were
+  // correctly fail-CLOSED behind CRON_SECRET; this path had no guard at all, so the
+  // secret protected the front door while the side door stood open onto the same rooms.
+  //
+  // Funds were never redirectable — every destination in those jobs is hard-coded — but
+  // an anonymous caller could burn Bank gas, exhaust the keeper's 24h cap, and fire
+  // posts off-schedule.
+  //
+  // Accepts EITHER signal so a scheduled run cannot be locked out: Vercel stamps
+  // `x-vercel-cron` on cron invocations, and additionally sends
+  // `Authorization: Bearer $CRON_SECRET` when that variable is set (it is, in
+  // Production). Fail-closed: with CRON_SECRET unset, only the Vercel cron header works.
+  {
+    const secret = process.env.CRON_SECRET || ''
+    const auth = req.headers.authorization || ''
+    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    const isVercelCron = !!req.headers['x-vercel-cron']
+    if (!isVercelCron && !(secret && bearer === secret)) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+  }
+
   const nowISO   = new Date().toISOString()
   const nowHour  = new Date().getUTCHours()
   const results  = { fired: [], roundStatus: null }
