@@ -455,7 +455,10 @@ const V3D_ROUND_ABI = parseAbi([
 async function readKeeperArmed() {
   try {
     const d = await (await sbService('/admin_config?key=eq.keeper_autopilot_enabled&select=value&limit=1')).json()
-    return Array.isArray(d) && d[0] && (d[0].value === 'true' || d[0].value === true)
+    // Coerce: `arr && arr[0] && …` yields undefined when the row is absent, and
+    // JSON.stringify DROPS undefined — which silently deleted `enabled` from the
+    // status payload, the one field an operator reads it for.
+    return !!(Array.isArray(d) && d[0] && (d[0].value === 'true' || d[0].value === true))
   } catch { return false }
 }
 
