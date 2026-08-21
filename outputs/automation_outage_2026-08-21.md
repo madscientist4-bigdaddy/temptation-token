@@ -128,6 +128,30 @@ why an early run of the audit in this session printed "all good" and later runs 
 
 ---
 
+## Second-order finding: `admin_audit_log` writes were failing silently (2026-08-21)
+
+Chasing the runaway guard's inputs turned up a schema mismatch worth recording on its own.
+`admin_audit_log` is `(id, created_at, changed_by, config_key NOT NULL, old_value,
+new_value)`. Three writers in `api/scheduler.js` were posting `{action, source, detail}` —
+rejected on both the unknown columns and the NOT NULL `config_key` — and every one swallowed
+the failure with `.catch(() => {})`. The table held exactly one row, from the KYC path.
+
+**Blast radius beyond the keeper:** `runVrfAutoFunder()` reads that same table to enforce its
+**rolling 7-day LINK spend cap**. The cap read 0 unconditionally, so it has never been
+enforced — on a job that spends from the Bank wallet and, unlike the keeper autopilot, is
+**armed by default**. No overspend has been observed; the limiter simply was not there.
+
+Two general lessons, both the same shape as the outage above:
+- **A swallowed write is an unmonitored write.** `.catch(() => {})` on an audit insert turns
+  a guard's data source into a constant.
+- **A guard that reads its own writes needs its read tested against a real table**, not just
+  its logic. The decision core here was correct in isolation and fed a hardcoded 0.
+
+Fixed in `f872764` (single `auditLog()`/`auditQuery()` writer, correct shape, all three call
+sites migrated). Recorded in CLAUDE.md under the `admin_audit_log` schema landmine section.
+
+---
+
 ## What needs Jim (all chain transactions)
 
 1. **Before Monday 2026-08-24 04:59 UTC** — round 8 will not settle itself:
