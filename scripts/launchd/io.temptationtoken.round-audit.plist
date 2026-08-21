@@ -21,9 +21,32 @@
   <key>WorkingDirectory</key><string>/Users/functionisedproductions/Projects/temptation-token</string>
   <key>StandardOutPath</key><string>/Users/functionisedproductions/Projects/temptation-token/logs/round-audit.log</string>
   <key>StandardErrorPath</key><string>/Users/functionisedproductions/Projects/temptation-token/logs/round-audit.err</string>
-  <key>StartCalendarInterval</key><dict>
-    <key>Weekday</key><integer>1</integer>
-    <key>Hour</key><integer>6</integer>
-    <key>Minute</key><integer>0</integer>
-  </dict>
+  <!-- THREE fire times, not one. The original Monday 06:00 slot only ever asked
+       "did last night's settlement work?" — a post-mortem. Chainlink's Base
+       Automation registry went dark on 2026-08-05 and rounds 6 and 7 each closed
+       unsettled for ~18 hours before a human noticed, so the useful alert is the
+       one that arrives BEFORE the close, while there is still time to be ready.
+
+         Sun 20:00 ET — ~5h before close. Pre-flight: is automation alive at all?
+         Mon 02:00 ET — ~1h after the 00:59 ET close. Catches a stall same night.
+         Mon 06:00 ET — backstop, and the catch-up run if the Mac was asleep.
+
+       Still READ-ONLY at every fire time; recovery needs a Bank transaction. -->
+  <key>StartCalendarInterval</key><array>
+    <dict>
+      <key>Weekday</key><integer>0</integer>
+      <key>Hour</key><integer>20</integer>
+      <key>Minute</key><integer>0</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>2</integer>
+      <key>Minute</key><integer>0</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>6</integer>
+      <key>Minute</key><integer>0</integer>
+    </dict>
+  </array>
 </dict></plist>
