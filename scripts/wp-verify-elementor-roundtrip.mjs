@@ -72,5 +72,10 @@ try {
 }
 
 if (exitCode === 0) console.log(`\nPASS  plugin ${version} preserves backslashes — _elementor_data writes are safe.`)
-else console.error(`\nFAIL  plugin ${version} strips backslashes — it WILL corrupt _elementor_data. Deploy v1.1.0.`)
+else console.error(`\nFAIL  plugin ${version} did not round-trip backslashes — it WILL corrupt _elementor_data.`
+  + (version.startsWith('1.0')
+      ? ' This build predates the wp_slash() fix; install wp-plugins/tts-api-auth-1.1.0.zip.'
+      : ` This build already claims the fix, so do NOT just reinstall ${version}. Read the value back directly first`
+        + ' — GET /meta/{id} with no ?key= and a cache-buster — because LiteSpeed serves stale REST GETs on this host'
+        + ' and a cached empty read looks exactly like a stripped backslash.'))
 process.exit(exitCode)

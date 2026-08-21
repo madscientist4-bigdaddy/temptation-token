@@ -92,7 +92,25 @@ export class WPClient {
   plugin (path, init = {}) {
     const headers = { ...(init.headers || {}) }
     if (this.hasApiKey) headers['X-TTS-API-Key'] = this.apiKey
-    return this.#fetch(`${this.base}/wp-json/tts/v1${path}`, { ...init, headers })
+    // LiteSpeed caches REST GETs on this host — observed `x-litespeed-cache: hit,private`
+    // on /tts/v1/meta/{id}?key=… returning a STALE EMPTY value while the freshly written
+    // meta was present and byte-correct. That is CLAUDE.md WordPress rule #7, and it made
+    // the slash round-trip verifier report a false FAIL and blame the plugin. Every read
+    // through this client is busted; POSTs are not cached, so only GETs need it.
+    // A body without Content-Type: application/json makes WP's get_json_params() return
+    // nothing, so the handler loops over an empty array, writes NOTHING, and still replies
+    // {ok:true}. A silent no-op that reports success is worse than an error — it made the
+    // slash verifier "prove" a bug in the plugin that was never there. Default it here so
+    // no caller can omit it.
+    if (init.body && !Object.keys(headers).some(h => h.toLowerCase() === 'content-type')) {
+      headers['Content-Type'] = 'application/json'
+    }
+    let url = `${this.base}/wp-json/tts/v1${path}`
+    const method = (init.method || 'GET').toUpperCase()
+    if (method === 'GET') {
+      url += `${url.includes('?') ? '&' : '?'}cb=${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    }
+    return this.#fetch(url, { ...init, headers })
   }
 
   /**
