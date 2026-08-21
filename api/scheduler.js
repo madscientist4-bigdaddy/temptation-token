@@ -693,24 +693,28 @@ async function runKeeperAutopilot() {
 
   // manualExecute wraps the call in try/catch and reports success in the event, so a
   // mined transaction is NOT proof the round moved. Re-read the chain instead.
-  const after = await computeKeeperStatus()
-  const moved = after.roundId !== status.roundId || after.settled !== status.settled || after.vrfPending !== status.vrfPending
-  await sendTelegram(adminChatId,
-    `${moved ? '🤖' : '⚠️'} <b>Keeper autopilot — ${ACTION_NAME[decision.action]}</b>\n${decision.reason}\nround ${status.roundId} → ${after.roundId} · settled ${status.settled}→${after.settled} · vrfPending ${status.vrfPending}→${after.vrfPending}\n${moved ? '' : 'NO STATE CHANGE — the keeper swallowed a revert. Investigate.\n'}tx <code>${txHash.slice(0, 16)}…</code>`,
-    token).catch(() => {})
-  // Reconcile the reservation in place — never insert a second row, or one action
-  // would consume two slots of the 24h cap.
-  const outcome = JSON.stringify({ status: moved ? 'done' : 'no_state_change', keeperAction: ACTION_NAME[decision.action], reason: decision.reason, moved, before: { round: status.roundId, settled: status.settled, vrfPending: status.vrfPending }, after: { round: after.roundId, settled: after.settled, vrfPending: after.vrfPending }, tx_hash: txHash, block: Number(receipt.blockNumber) })
-  // Reconcile the reserved row in place — a second insert would spend two slots of the
-  // 24h cap on one action. Only ever by primary key; never a fuzzy match.
-  if (typeof reserved === 'number') {
-    await sbService(`/admin_audit_log?id=eq.${reserved}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ new_value: outcome }) }).catch(() => {})
+  // The transaction is mined; from here every path must free the lock, including a
+  // throw out of the post-send re-read (an RPC hiccup would otherwise hold the signer
+  // for the full TTL while the round still needs its second action).
+  try {
+    // manualExecute wraps the call in try/catch, so a mined transaction is NOT proof
+    // the round moved. Ask the chain, don't trust the receipt.
+    const after = await computeKeeperStatus()
+    const moved = after.roundId !== status.roundId || after.settled !== status.settled || after.vrfPending !== status.vrfPending
+    await sendTelegram(adminChatId,
+      `${moved ? '🤖' : '⚠️'} <b>Keeper autopilot — ${ACTION_NAME[decision.action]}</b>\n${decision.reason}\nround ${status.roundId} → ${after.roundId} · settled ${status.settled}→${after.settled} · vrfPending ${status.vrfPending}→${after.vrfPending}\n${moved ? '' : 'NO STATE CHANGE — the keeper swallowed a revert. Investigate.\n'}tx <code>${txHash.slice(0, 16)}…</code>`,
+      token).catch(() => {})
+    // Reconcile the reserved row in place — a second insert would spend two slots of
+    // the 24h cap on one action. Only ever by primary key; never a fuzzy match.
+    const outcome = JSON.stringify({ status: moved ? 'done' : 'no_state_change', keeperAction: ACTION_NAME[decision.action], reason: decision.reason, moved, before: { round: status.roundId, settled: status.settled, vrfPending: status.vrfPending }, after: { round: after.roundId, settled: after.settled, vrfPending: after.vrfPending }, tx_hash: txHash, block: Number(receipt.blockNumber) })
+    if (typeof reserved === 'number') {
+      await sbService(`/admin_audit_log?id=eq.${reserved}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ new_value: outcome }) }).catch(() => {})
+    }
+    await persistStatus({ lastActionAt: new Date().toISOString(), lastAction: ACTION_NAME[decision.action], lastTx: txHash, lastMoved: moved })
+    return { acted: true, action: ACTION_NAME[decision.action], moved, txHash, before: status, after }
+  } finally {
+    await releaseKeeperLock()
   }
-  await releaseKeeperLock()
-  await releaseKeeperLock()
-  await persistStatus({ lastActionAt: new Date().toISOString(), lastAction: ACTION_NAME[decision.action], lastTx: txHash, lastMoved: moved })
-
-  return { acted: true, action: ACTION_NAME[decision.action], moved, txHash, before: status, after }
 }
 
 function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret, token) {
