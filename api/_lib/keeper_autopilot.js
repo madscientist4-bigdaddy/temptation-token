@@ -22,7 +22,11 @@ export const KEEPER_AUTOPILOT = {
   // startRound() would burn gas and muddy the audit trail.
   GRACE_SEC: 900,            // 15 min past the calendar pin before we act
   MIN_INTERVAL_SEC: 300,     // ≥5 min between our own actions (VRF needs a moment)
-  MAX_ACTIONS_24H: 4,        // runaway guard: settle + start = 2; 4 leaves slack
+  MAX_ACTIONS_24H: 6,        // runaway guard. A clean rollover is 2 (settle + start),
+                             // but slots are now reserved BEFORE the send, so failed
+                             // attempts consume them too — a week with one retried
+                             // settle legitimately reaches 3-4. 6 keeps the loop
+                             // bounded without tripping on an honest retry.
 }
 const C = KEEPER_AUTOPILOT
 

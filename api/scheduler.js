@@ -33,6 +33,23 @@ function sbService(path, opts = {}) {
   })
 }
 
+// ── admin_audit_log writer ───────────────────────────────────────────────────
+// The real schema is (id, created_at, changed_by, config_key NOT NULL, old_value,
+// new_value) — see api/admin.js:164 and TTAdminDashboard's Audit Log view. Three
+// callers here were posting {action, source, detail} instead, which PostgREST rejects
+// (unknown columns + NOT NULL config_key), and every one swallowed the failure with
+// `.catch(() => {})`. Result: not one auto-funder row was ever written, and the VRF
+// funder's rolling 7-day LINK cap has been reading an empty table — i.e. not enforced.
+// One writer, one shape, so the next caller cannot get it wrong.
+function auditLog(job, wallet, detail, opts = {}) {
+  return sbService('/admin_audit_log', {
+    method: 'POST', headers: { Prefer: opts.representation ? 'return=representation' : 'return=minimal' },
+    body: JSON.stringify({ config_key: job, changed_by: wallet, new_value: JSON.stringify(detail), created_at: new Date().toISOString() }),
+  })
+}
+const auditQuery = (job, sinceISO, select = 'new_value') =>
+  `/admin_audit_log?config_key=eq.${job}&created_at=gte.${sinceISO}&select=${select}`
+
 // Runs daily. Disabled by default (auto_fund_enabled=false) and REFUSES without
 // MARKETING_WALLET_PRIVATE_KEY. All clamps/solvency live in evaluateAutoFund().
 async function runAutoFunder() {
@@ -79,15 +96,7 @@ async function runAutoFunder() {
   const newBalance = refWalletBalance + decision.amount
 
   // audit log (amount, source, trigger, new balance)
-  await sbService('/admin_audit_log', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      action: 'referral_auto_fund',
-      source: 'marketing_wallet',
-      detail: JSON.stringify({ amount: decision.amount, target: decision.target, trigger: 'below_half_target', new_balance: newBalance, tx_hash: txHash }),
-      created_at: new Date().toISOString(),
-    }),
-  }).catch(() => {})
+  await auditLog('referral_auto_fund', 'marketing_wallet', { amount: decision.amount, target: decision.target, trigger: 'below_half_target', new_balance: newBalance, tx_hash: txHash }).catch(() => {})
 
   return { topUp: true, amount: decision.amount, target: decision.target, txHash, newBalance }
 }
@@ -378,8 +387,8 @@ async function runVrfAutoFunder() {
   let sevenDayTopupTotal = 0
   try {
     const ago = new Date(Date.now() - 7 * 864e5).toISOString()
-    const rows = await (await sbService(`/admin_audit_log?action=eq.vrf_auto_fund&created_at=gte.${ago}&select=detail`)).json()
-    if (Array.isArray(rows)) for (const r of rows) { try { sevenDayTopupTotal += Number(JSON.parse(r.detail)?.amount) || 0 } catch {} }
+    const rows = await (await sbService(auditQuery('vrf_auto_fund', ago))).json()
+    if (Array.isArray(rows)) for (const r of rows) { try { sevenDayTopupTotal += Number(JSON.parse(r.new_value)?.amount) || 0 } catch {} }
   } catch {}
 
   const reserveLink = await computeReserveLink() // price-aware (Chainlink ETH/USD ÷ LINK/USD)
@@ -421,10 +430,7 @@ async function runVrfAutoFunder() {
   await sendTelegram(adminChatId,
     `⛽ <b>VRF sub auto-funded</b>\n+${decision.amount} LINK → subscription (destination hard-coded to our subId — cannot be redirected)\nBalance ${subBalance.toFixed(2)} → ${newSub.toFixed(2)} LINK · live reserve ~${Math.round(reserveLink * 10) / 10}\ntx <code>${txHash.slice(0, 16)}…</code>`,
     token).catch(() => {})
-  await sbService('/admin_audit_log', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ action: 'vrf_auto_fund', source: 'bank_wallet', detail: JSON.stringify({ amount: decision.amount, old: subBalance, new: newSub, target: decision.target, tx_hash: txHash }), created_at: new Date().toISOString() }),
-  }).catch(() => {})
+  await auditLog('vrf_auto_fund', 'bank_wallet', { amount: decision.amount, old: subBalance, new: newSub, target: decision.target, tx_hash: txHash }).catch(() => {})
 
   await persistStatus({ lastTopupAt: new Date().toISOString(), lastTopupAmount: decision.amount, lastTopupTx: txHash })
   return { topUp: true, amount: decision.amount, old: subBalance, new: newSub, txHash }
@@ -466,12 +472,73 @@ async function readKeeperArmed() {
 async function readKeeperHistory() {
   try {
     const ago = new Date(Date.now() - 864e5).toISOString()
-    const rows = await (await sbService(`/admin_audit_log?action=eq.keeper_autopilot&created_at=gte.${ago}&select=created_at`)).json()
+    const rows = await (await sbService(auditQuery('keeper_autopilot', ago, 'created_at'))).json()
     if (!Array.isArray(rows)) return { actionsLast24h: 0, lastActionAtSec: 0 }
     let lastActionAtSec = 0
     for (const r of rows) { const t = Math.floor(new Date(r.created_at).getTime() / 1000); if (t > lastActionAtSec) lastActionAtSec = t }
     return { actionsLast24h: rows.length, lastActionAtSec }
   } catch { return { actionsLast24h: 0, lastActionAtSec: 0 } }
+}
+
+// ── Bank-signer mutex ────────────────────────────────────────────────────────
+// runKeeperAutopilot() has TWO drivers (the 10-min Railway ping and every Vercel cron
+// tick), and runVrfAutoFunder() sends from the SAME Bank key immediately before it on
+// the cron path. Neither sets an explicit nonce, so viem reads pending count per call:
+// two concurrent Bank sends can draw the same nonce and one dies "nonce too low".
+// Invisible in normal operation — the cron hours never coincide with the few minutes
+// upkeepNeeded is true — but the whole point of this autopilot is the case where a
+// swallowed revert keeps upkeepNeeded true for HOURS, and then a 12:00 UTC cron is
+// GUARANTEED to overlap a bot tick.
+//
+// PostgREST executes UPDATE … WHERE atomically, so a conditional update on an expiry
+// timestamp is a real compare-and-set. Epoch-ms as text compares correctly with `lt.`
+// (13 digits until year 2286), so no schema change is needed.
+const KEEPER_LOCK_KEY = 'keeper_autopilot_lock'
+const KEEPER_LOCK_TTL_MS = 180000   // > worst-case send + receipt wait
+
+async function acquireKeeperLock() {
+  const now = Date.now()
+  const expiry = String(now + KEEPER_LOCK_TTL_MS)
+  try {
+    // CAS: only succeeds if the stored expiry is in the past (or we seed it).
+    const res = await sbService(`/admin_config?key=eq.${KEEPER_LOCK_KEY}&value=lt.${String(now)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ value: expiry }),
+    })
+    if (res.ok) {
+      const rows = await res.json()
+      if (Array.isArray(rows) && rows.length > 0) return true
+    }
+    // No row updated: either someone holds it, or the row has never existed. Seeding
+    // must not clobber a live holder, so insert-if-absent only.
+    const seed = await sbService('/admin_config', {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ key: KEEPER_LOCK_KEY, value: expiry }),
+    })
+    return seed.ok && seed.status !== 409
+  } catch { return false }
+}
+
+async function releaseKeeperLock() {
+  try { await sbService(`/admin_config?key=eq.${KEEPER_LOCK_KEY}`, { method: 'PATCH', body: JSON.stringify({ value: '0' }) }) } catch {}
+}
+
+// ── Fail-closed slot reservation ─────────────────────────────────────────────
+// The 24h runaway cap reads admin_audit_log, which was only written AFTER a send and
+// with the failure swallowed. A successful action is self-limiting (chain state flips
+// checkUpkeep to false) — but the loop the cap exists to stop is the swallowed-revert
+// one, where it does NOT flip. Flaky DB + swallowed revert used to mean unbounded
+// 10-min gas burn. Reserve the slot BEFORE sending and refuse to send if the reserve
+// fails, so a broken audit trail fails CLOSED.
+async function reserveKeeperSlot(actionName, reason) {
+  try {
+    const res = await auditLog('keeper_autopilot', 'bank_wallet', { status: 'pending', keeperAction: actionName, reason }, { representation: true })
+    if (!res.ok) return null
+    const rows = await res.json()
+    // Return the row id so the outcome can be reconciled by primary key. A successful
+    // insert with no id still counts as a reservation (the slot IS booked).
+    return Array.isArray(rows) && rows[0] && typeof rows[0].id === 'number' ? rows[0].id : true
+  } catch { return null }
 }
 
 // Read-only snapshot of everything the decision needs. No writes, no alerts.
@@ -574,6 +641,22 @@ async function runKeeperAutopilot() {
 
   if (!decision.act) { await persistStatus(); return { acted: false, reason: decision.reason, status } }
 
+  // MUTEX — only one Bank send at a time across both drivers.
+  if (!(await acquireKeeperLock())) {
+    await persistStatus({ lastSkip: 'lock held by another tick' })
+    return { acted: false, reason: 'another tick holds the Bank signer lock', status }
+  }
+
+  // RESERVE — book the slot against the 24h cap before spending gas, so a DB outage
+  // cannot silently uncap the runaway guard.
+  const reserved = await reserveKeeperSlot(ACTION_NAME[decision.action], decision.reason)
+  if (!reserved) {
+    await releaseKeeperLock()
+    await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: could not record the action in admin_audit_log, and the 24h runaway guard reads that table. Failing closed rather than acting uncapped. Round ${status.roundId} still needs ${ACTION_NAME[decision.action]}.`, token).catch(() => {})
+    await persistStatus({ lastError: 'audit reservation failed — failed closed' })
+    return { acted: false, reason: 'audit reservation failed — failing closed', status }
+  }
+
   // SEND — manualExecute(action) from the Bank. The action came from the keeper's own
   // checkUpkeep, and manualExecute can only ever call startRound/settleRound/rollover
   // on the wired voting contract; there is no value transfer and no attacker-controlled
@@ -587,6 +670,7 @@ async function runKeeperAutopilot() {
   // driven by a stale assumption.
   const keeperOwner = await pub.readContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'owner' })
   if (keeperOwner.toLowerCase() !== account.address.toLowerCase()) {
+    await releaseKeeperLock()
     await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: Keeper3.owner() is ${keeperOwner} but the configured signer is ${account.address}.`, token).catch(() => {})
     await persistStatus({ lastError: 'signer is not Keeper3.owner()' })
     return { acted: false, reason: 'signer is not Keeper3.owner()', status }
@@ -598,7 +682,10 @@ async function runKeeperAutopilot() {
     txHash = await wallet.writeContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'manualExecute', args: [BigInt(decision.action)] })
     receipt = await pub.waitForTransactionReceipt({ hash: txHash })
   } catch (e) {
+    await releaseKeeperLock()
     const msg = String(e.message || e).slice(0, 180)
+    // The reservation is deliberately NOT rolled back: a failed attempt still consumed
+    // gas and still counts against the 24h cap. That is what bounds a revert loop.
     await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot FAILED</b>\n${ACTION_NAME[decision.action]} reverted: ${msg}`, token).catch(() => {})
     await persistStatus({ lastError: msg })
     return { acted: false, error: msg, status }
@@ -611,10 +698,16 @@ async function runKeeperAutopilot() {
   await sendTelegram(adminChatId,
     `${moved ? '🤖' : '⚠️'} <b>Keeper autopilot — ${ACTION_NAME[decision.action]}</b>\n${decision.reason}\nround ${status.roundId} → ${after.roundId} · settled ${status.settled}→${after.settled} · vrfPending ${status.vrfPending}→${after.vrfPending}\n${moved ? '' : 'NO STATE CHANGE — the keeper swallowed a revert. Investigate.\n'}tx <code>${txHash.slice(0, 16)}…</code>`,
     token).catch(() => {})
-  await sbService('/admin_audit_log', {
-    method: 'POST', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ action: 'keeper_autopilot', source: 'bank_wallet', detail: JSON.stringify({ keeperAction: ACTION_NAME[decision.action], reason: decision.reason, moved, before: { round: status.roundId, settled: status.settled, vrfPending: status.vrfPending }, after: { round: after.roundId, settled: after.settled, vrfPending: after.vrfPending }, tx_hash: txHash, block: Number(receipt.blockNumber) }), created_at: new Date().toISOString() }),
-  }).catch(() => {})
+  // Reconcile the reservation in place — never insert a second row, or one action
+  // would consume two slots of the 24h cap.
+  const outcome = JSON.stringify({ status: moved ? 'done' : 'no_state_change', keeperAction: ACTION_NAME[decision.action], reason: decision.reason, moved, before: { round: status.roundId, settled: status.settled, vrfPending: status.vrfPending }, after: { round: after.roundId, settled: after.settled, vrfPending: after.vrfPending }, tx_hash: txHash, block: Number(receipt.blockNumber) })
+  // Reconcile the reserved row in place — a second insert would spend two slots of the
+  // 24h cap on one action. Only ever by primary key; never a fuzzy match.
+  if (typeof reserved === 'number') {
+    await sbService(`/admin_audit_log?id=eq.${reserved}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ new_value: outcome }) }).catch(() => {})
+  }
+  await releaseKeeperLock()
+  await releaseKeeperLock()
   await persistStatus({ lastActionAt: new Date().toISOString(), lastAction: ACTION_NAME[decision.action], lastTx: txHash, lastMoved: moved })
 
   return { acted: true, action: ACTION_NAME[decision.action], moved, txHash, before: status, after }
