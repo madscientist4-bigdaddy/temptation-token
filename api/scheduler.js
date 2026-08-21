@@ -488,8 +488,22 @@ async function computeKeeperStatus() {
   const r = await pub.readContract({ address: VOTING_ADDRESS, abi: V3D_ROUND_ABI, functionName: 'getRound', args: [roundId] })
   const enabled = await readKeeperArmed()
   const hist = await readKeeperHistory()
+  // Last tick — is anything actually DRIVING this? A keeper nobody calls is exactly the
+  // failure we just spent two weeks not noticing with Chainlink. Every tick (armed or
+  // not) writes keeper_autopilot_status.checkedAt, so a stale value here means the
+  // 10-min Railway ping has stopped, whatever the rest of the payload says.
+  let lastTickAt = null
+  try {
+    const d = await (await sbService('/admin_config?key=eq.keeper_autopilot_status&select=value&limit=1')).json()
+    if (Array.isArray(d) && d[0]) lastTickAt = JSON.parse(d[0].value)?.checkedAt ?? null
+  } catch {}
+  const tickAgeSec = lastTickAt ? Math.floor((Date.now() - new Date(lastTickAt).getTime()) / 1000) : null
   return {
     enabled,
+    lastTickAt,
+    tickAgeSec,
+    // The ping is every 10 min; 30 min of silence means the driver is down.
+    driverAlive: tickAgeSec != null && tickAgeSec < 1800,
     armedHint: enabled ? 'ARMED — closes the round automatically' : "DISARMED — set admin_config.keeper_autopilot_enabled='true' to arm",
     hasBankKey: !!process.env.DEPLOYER_PRIVATE_KEY,
     actionsLast24h: hist.actionsLast24h,
