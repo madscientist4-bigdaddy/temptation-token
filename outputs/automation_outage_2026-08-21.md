@@ -107,6 +107,27 @@ through sixteen days of doing nothing.
 against an 8-day threshold and probes registry-wide liveness, and it correctly reported
 `🚨 ACTION NEEDED` with exit 1 on every run.
 
+## Reconciliation — a parallel session shipped the replacement (2026-08-21)
+
+This report was written read-only. While it was being written, a parallel session working
+the same repo reached the same diagnosis independently and built the fix: a **keeper
+autopilot** (`api/_lib/keeper_autopilot.js`, `api/scheduler.js?action=keeper`, pinged every
+10 min by `tts_bot.py`) that calls `Keeper3.manualExecute()` with the action read from
+`checkUpkeep()` — the Bank doing exactly what the dead Chainlink forwarder would have done.
+Commits `7dadd61`, `de3825a`, `e000f60`.
+
+It is **deployed and prod-verified but DISARMED**, because it spends Bank gas. Arming is one
+Supabase row: `admin_config.keeper_autopilot_enabled = 'true'`.
+
+So item 1 below is now a *fallback*, not the only path. Read the numbered list as: arm the
+autopilot (one row, no chain tx) **or** run the manual command; the CRE migration remains the
+long-term answer either way. That session also independently hardened
+`verify-round-settlement.mjs` and widened the launchd schedule mid-investigation — which is
+why an early run of the audit in this session printed "all good" and later runs printed
+"ACTION NEEDED": the script changed underneath, it was not flaky.
+
+---
+
 ## What needs Jim (all chain transactions)
 
 1. **Before Monday 2026-08-24 04:59 UTC** — round 8 will not settle itself:
