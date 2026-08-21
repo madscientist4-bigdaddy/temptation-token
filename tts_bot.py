@@ -354,11 +354,43 @@ def heartbeat():
             print(f"Heartbeat failed: {e}")
         time.sleep(300)
 
+def keeper_ping():
+    """Drive the round keeper every 10 minutes.
+
+    Chainlink Automation's Base registry (2.3.0) has performed no upkeep for ANY of its
+    upkeeps since 2026-08-05 — ours included, despite being funded and unpaused. Vercel
+    Hobby cron cannot run intraday, but this worker is already up 24/7, so it is what
+    keeps the weekly round closing on the calendar pin instead of whenever someone
+    notices. The Bank key never leaves Vercel: we only ring the doorbell.
+
+    Inert without CRON_SECRET, and inert server-side unless
+    admin_config.keeper_autopilot_enabled = true.
+    """
+    secret = os.environ.get("CRON_SECRET", "")
+    if not secret:
+        print("CRON_SECRET not set — keeper autopilot ping disabled")
+        return
+    url = APP + "/api/scheduler?action=keeper"
+    while True:
+        try:
+            req = urllib.request.Request(url, data=b'{}', method="POST",
+                                         headers={"Content-Type": "application/json",
+                                                  "Authorization": f"Bearer {secret}"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                body = json.loads(r.read().decode() or "{}")
+            if body.get("acted"):
+                print(f"Keeper autopilot acted: {body.get('action')} moved={body.get('moved')} tx={body.get('txHash')}")
+        except Exception as e:
+            print(f"Keeper ping failed: {e}")
+        time.sleep(600)
+
+
 def run():
     init_db()
     print(f"TTS Bot v2 starting... token={TOKEN[:8]}...")
     threading.Thread(target=broadcaster, daemon=True).start()
     threading.Thread(target=heartbeat, daemon=True).start()
+    threading.Thread(target=keeper_ping, daemon=True).start()
     offset = 0
     while True:
         try:

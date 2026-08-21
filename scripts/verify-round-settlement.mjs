@@ -11,7 +11,7 @@
 //   node scripts/verify-round-settlement.mjs            # audit + Telegram
 //   node scripts/verify-round-settlement.mjs --round 7  # pin a round
 //   node scripts/verify-round-settlement.mjs --no-telegram
-import { createPublicClient, http, parseAbi } from 'viem'
+import { createPublicClient, http, parseAbi, parseAbiItem } from 'viem'
 import { base } from 'viem/chains'
 
 const RPC = process.env.BASE_RPC_URL || 'https://mainnet.base.org'
@@ -131,6 +131,37 @@ try {
   say(`upkeep: ${(Number(u.balance) / 1e18).toFixed(2)} LINK · paused=${u.paused} · last perform ${behind} blocks ago (~${(behind * 2 / 86400).toFixed(1)}d)`)
   if (needed && !u.paused) {
     problem('checkUpkeep says work is DUE and the upkeep is funded and unpaused, yet Chainlink is not performing it — automation side stall')
+  }
+  // Automation liveness is NOT the same question as "is work due right now". This audit
+  // once reported "all good" while the Base registry had performed nothing for 18.6
+  // days, because it only looked at the upkeep when a settle happened to be pending.
+  // A round rolls over weekly, so a healthy upkeep can never be more than ~8 days idle.
+  const STALE_DAYS = 8
+  const idleDays = behind * 2 / 86400
+  if (idleDays > STALE_DAYS) {
+    problem(`Chainlink has not performed this upkeep in ${idleDays.toFixed(1)} days (>${STALE_DAYS}d). A weekly round cannot roll over without a perform — automation is DEAD and rounds are being closed by hand or not at all.`)
+    // Registry-wide vs upkeep-specific changes the fix entirely: one is Chainlink's
+    // outage, the other is ours. Ask the registry directly.
+    try {
+      const head = await c.getBlockNumber()
+      // Alchemy's free tier caps eth_getLogs at 10 blocks; the public Base RPC allows
+      // 10k. Use the public endpoint for this one wide query.
+      const wide = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+      const logs = await wide.getLogs({
+        address: REGISTRY,
+        event: parseAbiItem('event UpkeepPerformed(uint256 indexed id, bool indexed success, uint96 totalPayment, uint256 gasUsed, uint256 gasOverhead, bytes trigger)'),
+        fromBlock: head - 9000n, toBlock: head,
+      })
+      if (logs.length === 0) say('   ↳ registry-wide: NO upkeep performed for ANY consumer in the last ~5h — this is a Chainlink outage, not a TTS misconfiguration')
+      else say(`   ↳ registry-wide: ${logs.length} performs in the last ~5h — the registry is alive and it is OUR upkeep that is being skipped`)
+    } catch { say('   ↳ registry-wide liveness check unavailable (RPC log range limit)') }
+  }
+  // Whoever closed the last round, say so plainly: a manual close is not automation.
+  if (current > 1n) {
+    const cur = await c.readContract({ address: V3D, abi: V, functionName: 'getRound', args: [current] })
+    const startedAt = Number(cur[0])
+    const performedRecently = behind * 2 < (Math.floor(Date.now() / 1000) - startedAt) + 3600
+    if (!performedRecently) say(`ℹ️  round ${current} started ${iso(startedAt)} but the upkeep has not performed since — that rollover was done by hand, not by Chainlink`)
   }
 } catch (e) { say(`keeper/upkeep read failed: ${(e.shortMessage || e.message).slice(0, 90)}`) }
 

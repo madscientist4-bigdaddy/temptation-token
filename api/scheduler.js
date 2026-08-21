@@ -9,6 +9,7 @@ import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 import { evaluateAutoFund } from './_lib/autofund.js'
 import { evaluateVrfAutoFund } from './_lib/vrf_autofund.js'
+import { evaluateKeeperAutopilot, ACTION as ACTION_NAME } from './_lib/keeper_autopilot.js'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
@@ -429,6 +430,163 @@ async function runVrfAutoFunder() {
   return { topUp: true, amount: decision.amount, old: subBalance, new: newSub, txHash }
 }
 
+// ── Keeper autopilot (Chainlink Automation replacement) ──────────────────────
+// Chainlink Automation registry 2.3.0 on Base has performed NO upkeep for ANY of its
+// ~191 upkeeps since 2026-08-05. Ours is funded, unpaused and correctly wired; the DON
+// simply stopped. Rounds 6→7 and 7→8 were closed by hand from the Bank ~17.7h late.
+// This closes them on time instead. Decision core: api/_lib/keeper_autopilot.js.
+// DISARMED unless admin_config.keeper_autopilot_enabled = true.
+const KEEPER3_ADDRESS = '0x363Ce4960E3B459f5892587A37Ae1fF2ED04442C'
+const KEEPER3_ABI = parseAbi([
+  'function checkUpkeep(bytes) view returns (bool upkeepNeeded, bytes performData)',
+  'function manualExecute(uint256 action)',
+  'function owner() view returns (address)',
+])
+// The public Base RPC rate-limits; settlement must not hinge on that. Prefer the
+// project's Alchemy endpoint and fall back to public only if it is unset.
+const KEEPER_RPC = process.env.BASE_RPC_URL || 'https://mainnet.base.org'
+const V3D_ROUND_ABI = parseAbi([
+  'function currentRoundId() view returns (uint256)',
+  'function getRound(uint256) view returns (uint256 startTime,uint256 endTime,uint256 totalTickets,uint256 totalRawVotes,bool settled,bool vrfPending,uint256 profileCount)',
+])
+
+// Read-only snapshot of everything the decision needs. No writes, no alerts.
+async function computeKeeperStatus() {
+  const pub = createPublicClient({ chain: base, transport: http(KEEPER_RPC) })
+  const [needed, performData] = await pub.readContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'checkUpkeep', args: ['0x'] })
+  let action = null
+  if (needed && performData && performData !== '0x') {
+    try { action = Number(decodeAbiParameters([{ type: 'uint256' }], performData)[0]) } catch {}
+  }
+  const roundId = await pub.readContract({ address: VOTING_ADDRESS, abi: V3D_ROUND_ABI, functionName: 'currentRoundId' })
+  const r = await pub.readContract({ address: VOTING_ADDRESS, abi: V3D_ROUND_ABI, functionName: 'getRound', args: [roundId] })
+  return {
+    roundId: Number(roundId),
+    endTime: Number(r[1]),
+    settled: r[4],
+    vrfPending: r[5],
+    profileCount: Number(r[6]),
+    upkeepNeeded: needed,
+    action,
+    actionName: ACTION_NAME[action] || null,
+    nowSec: Math.floor(Date.now() / 1000),
+  }
+}
+
+async function runKeeperAutopilot() {
+  // Kill switch (default FALSE — this spends Bank gas, so it stays inert until armed).
+  let enabled = false
+  try {
+    const d = await (await sbService('/admin_config?key=eq.keeper_autopilot_enabled&select=value&limit=1')).json()
+    if (Array.isArray(d) && d[0] && (d[0].value === 'true' || d[0].value === true)) enabled = true
+  } catch {}
+
+  const status = await computeKeeperStatus()
+
+  // Trailing-24h action history — feeds the runaway guard and the min-interval rule.
+  let actionsLast24h = 0, lastActionAtSec = 0
+  try {
+    const ago = new Date(Date.now() - 864e5).toISOString()
+    const rows = await (await sbService(`/admin_audit_log?action=eq.keeper_autopilot&created_at=gte.${ago}&select=created_at`)).json()
+    if (Array.isArray(rows)) {
+      actionsLast24h = rows.length
+      for (const r of rows) { const t = Math.floor(new Date(r.created_at).getTime() / 1000); if (t > lastActionAtSec) lastActionAtSec = t }
+    }
+  } catch {}
+
+  const decision = evaluateKeeperAutopilot({
+    enabled,
+    hasBankKey: !!process.env.DEPLOYER_PRIVATE_KEY,
+    upkeepNeeded: status.upkeepNeeded,
+    action: status.action,
+    nowSec: status.nowSec,
+    endTime: status.endTime,
+    vrfPending: status.vrfPending,
+    actionsLast24h,
+    lastActionAtSec,
+  })
+
+  const token = process.env.BROADCAST_BOT_TOKEN
+  const adminChatId = process.env.ADMIN_CHAT_ID || '-5273368658'
+
+  const persistStatus = async (extra = {}) => {
+    try {
+      await sbService('/admin_config', {
+        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ key: 'keeper_autopilot_status', value: JSON.stringify({
+          checkedAt: new Date().toISOString(), enabled, round: status.roundId,
+          endTime: new Date(status.endTime * 1000).toISOString(),
+          upkeepNeeded: status.upkeepNeeded, action: status.actionName,
+          vrfPending: status.vrfPending, actionsLast24h,
+          lastDecision: decision.act ? `execute ${ACTION_NAME[decision.action]}` : decision.reason,
+          ...extra,
+        }) }),
+      })
+    } catch {}
+  }
+
+  // An alert can fire whether or not we act (VRF stall, runaway cap, unknown action).
+  // Cooldown so a stuck state pings once every 6h, not every tick.
+  if (decision.alert) {
+    let last = 0
+    try {
+      const d = await (await sbService('/admin_config?key=eq.keeper_autopilot_alert_at&select=value&limit=1')).json()
+      if (Array.isArray(d) && d[0]) last = Number(d[0].value) || 0
+    } catch {}
+    if (Date.now() - last > 6 * 3600 * 1000) {
+      await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\n${decision.alert}`, token).catch(() => {})
+      try { await sbService('/admin_config', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key: 'keeper_autopilot_alert_at', value: String(Date.now()) }) }) } catch {}
+    }
+  }
+
+  if (!decision.act) { await persistStatus(); return { acted: false, reason: decision.reason, status } }
+
+  // SEND — manualExecute(action) from the Bank. The action came from the keeper's own
+  // checkUpkeep, and manualExecute can only ever call startRound/settleRound/rollover
+  // on the wired voting contract; there is no value transfer and no attacker-controlled
+  // parameter anywhere in this path.
+  const pk = process.env.DEPLOYER_PRIVATE_KEY
+  const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
+  const account = privateKeyToAccount(pkHex)
+  const pub = createPublicClient({ chain: base, transport: http(KEEPER_RPC) })
+
+  // Refuse if we are not actually the keeper owner — a rewired keeper must not be
+  // driven by a stale assumption.
+  const keeperOwner = await pub.readContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'owner' })
+  if (keeperOwner.toLowerCase() !== account.address.toLowerCase()) {
+    await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: Keeper3.owner() is ${keeperOwner} but the configured signer is ${account.address}.`, token).catch(() => {})
+    await persistStatus({ lastError: 'signer is not Keeper3.owner()' })
+    return { acted: false, reason: 'signer is not Keeper3.owner()', status }
+  }
+
+  const wallet = createWalletClient({ account, chain: base, transport: http(KEEPER_RPC) })
+  let txHash, receipt
+  try {
+    txHash = await wallet.writeContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'manualExecute', args: [BigInt(decision.action)] })
+    receipt = await pub.waitForTransactionReceipt({ hash: txHash })
+  } catch (e) {
+    const msg = String(e.message || e).slice(0, 180)
+    await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot FAILED</b>\n${ACTION_NAME[decision.action]} reverted: ${msg}`, token).catch(() => {})
+    await persistStatus({ lastError: msg })
+    return { acted: false, error: msg, status }
+  }
+
+  // manualExecute wraps the call in try/catch and reports success in the event, so a
+  // mined transaction is NOT proof the round moved. Re-read the chain instead.
+  const after = await computeKeeperStatus()
+  const moved = after.roundId !== status.roundId || after.settled !== status.settled || after.vrfPending !== status.vrfPending
+  await sendTelegram(adminChatId,
+    `${moved ? '🤖' : '⚠️'} <b>Keeper autopilot — ${ACTION_NAME[decision.action]}</b>\n${decision.reason}\nround ${status.roundId} → ${after.roundId} · settled ${status.settled}→${after.settled} · vrfPending ${status.vrfPending}→${after.vrfPending}\n${moved ? '' : 'NO STATE CHANGE — the keeper swallowed a revert. Investigate.\n'}tx <code>${txHash.slice(0, 16)}…</code>`,
+    token).catch(() => {})
+  await sbService('/admin_audit_log', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ action: 'keeper_autopilot', source: 'bank_wallet', detail: JSON.stringify({ keeperAction: ACTION_NAME[decision.action], reason: decision.reason, moved, before: { round: status.roundId, settled: status.settled, vrfPending: status.vrfPending }, after: { round: after.roundId, settled: after.settled, vrfPending: after.vrfPending }, tx_hash: txHash, block: Number(receipt.blockNumber) }), created_at: new Date().toISOString() }),
+  }).catch(() => {})
+  await persistStatus({ lastActionAt: new Date().toISOString(), lastAction: ACTION_NAME[decision.action], lastTx: txHash, lastMoved: moved })
+
+  return { acted: true, action: ACTION_NAME[decision.action], moved, txHash, before: status, after }
+}
+
 function oauthSign(method, url, params, consumerKey, consumerSecret, tokenSecret, token) {
   const oauthParams = {
     oauth_consumer_key: consumerKey,
@@ -839,6 +997,25 @@ export default async function handler(req, res) {
     catch (e) { return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) }) }
   }
 
+  // ── /api/scheduler?action=keeper — keeper autopilot tick ────────────────────
+  // Called every ~10 min by the Railway bot with the CRON_SECRET bearer. Chainlink
+  // Automation on Base has been dead registry-wide since 2026-08-05; this is what
+  // closes the round now. Inert unless admin_config.keeper_autopilot_enabled = true.
+  if (req.query?.action === 'keeper') {
+    const secret = process.env.CRON_SECRET || ''
+    const auth = req.headers.authorization || ''
+    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    if (!secret || bearer !== secret) return res.status(401).json({ error: 'Unauthorized' })
+    try { return res.status(200).json(await runKeeperAutopilot()) }
+    catch (e) { return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) }) }
+  }
+
+  // ── GET /api/scheduler?action=keeper-status — read-only, no writes, no alerts ─
+  if (req.query?.action === 'keeper-status') {
+    try { return res.status(200).json(await computeKeeperStatus()) }
+    catch (e) { return res.status(200).json({ error: String(e.message || e).slice(0, 200) }) }
+  }
+
   // ── GET /api/scheduler?action=vrf-status — read-only VRF health (no alert) ──
   // For monitoring/testing: returns the current stall + sub-funding computation
   // without sending Telegram or writing state.
@@ -1092,6 +1269,11 @@ export default async function handler(req, res) {
   // Tops up OUR sub from Bank if it dips below the reserve. Hard caps + solvency
   // floor + kill switch in evaluateVrfAutoFund(); destination is our subId only.
   try { results.vrfAutoFund = await runVrfAutoFunder() } catch (e) { results.vrfAutoFund_error = e.message }
+
+  // ── JOB: keeper autopilot (every cron tick — backstop for the 10-min Railway ping)
+  // Grace + min-interval + 24h cap live in the decision core, so running this on every
+  // tick is safe; it is a no-op whenever checkUpkeep says nothing is due.
+  try { results.keeper = await runKeeperAutopilot() } catch (e) { results.keeper_error = e.message }
 
   // ── JOB 4c: first-trophy-mint verifier (one-shot, every run until it fires) ──
   // When the new trophy contract mints its first token (Round 6 settlement, ~Aug 10),
