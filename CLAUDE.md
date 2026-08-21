@@ -28,12 +28,12 @@ Trophy ✓.
 
 **⚠️ ROUND 8 CLOSES 2026-08-24 04:59 UTC.** Two ways to close it:
 
-1. **Keeper autopilot — SHIPPED 2026-08-21, currently DISARMED.** Deployed and proven
-   end-to-end in prod (auth, chain read, decision, disarmed no-op). Arming is **one
-   Supabase row**: `admin_config.keeper_autopilot_enabled = 'true'`. Once armed it closes
-   the round ~15 min after the pin, every week, with no human in the loop. It stays inert
-   until then because it spends Bank gas and that needs Jim's go-ahead.
-2. **By hand**, one command with the Bank key: `node --env-file=.env
+1. **Keeper autopilot — SHIPPED AND ✅ ARMED 2026-08-21** (Jim's explicit go-ahead).
+   `admin_config.keeper_autopilot_enabled = 'true'`. Round 8 and every round after closes
+   ~15 min after the calendar pin with no human in the loop. Verified live: `enabled=true`,
+   `driverAlive=true`, Bank holds 0.0316 ETH ≈ 2,250 settles at ~0.000014 ETH each.
+   **To disarm:** set that row to anything else.
+2. **By hand** (fallback), one command with the Bank key: `node --env-file=.env
    outputs/manual_settle_fallback.mjs --execute --wait` (read-only pre-flight re-verified
    2026-08-21: correctly reports "nothing due" mid-round).
 
@@ -237,7 +237,7 @@ history.
   `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` · sub
   `58222014484560539249027457203866883376041731162442592604288474822166186263722`
 
-### Keeper autopilot — the Automation replacement (shipped 2026-08-21, DISARMED)
+### Keeper autopilot — the Automation replacement (shipped + ARMED 2026-08-21)
 - **What:** `api/_lib/keeper_autopilot.js` (pure decision core) + `runKeeperAutopilot()` in
   `api/scheduler.js`. Reads `Keeper3.checkUpkeep()` and, when work is due, sends
   `Keeper3.manualExecute(action)` from the **Bank** (Bank is `Keeper3.owner()` and
@@ -249,7 +249,15 @@ history.
   cron cannot run intraday; the bot is already up 24/7. **The Bank key never leaves Vercel —
   the bot only rings the doorbell.** Every Vercel cron tick also runs it as a backstop.
 - **ARM / DISARM:** `admin_config.keeper_autopilot_enabled` — `'true'` arms; anything else
-  (including missing, the default) is fully inert: no writes, no gas.
+  (including missing, the default) is fully inert: no writes, no gas. **Currently `'true'`.**
+- **Concurrency:** `runKeeperAutopilot()` has two drivers (bot ping + every Vercel cron)
+  and shares the Bank key with `runVrfAutoFunder()`, which sends immediately before it on
+  the cron path. Neither sets an explicit nonce, so concurrent sends could draw the same
+  one. Guarded by a compare-and-set mutex on `admin_config.keeper_autopilot_lock` (epoch-ms
+  expiry as text; PostgREST `UPDATE … WHERE` is atomic). Value `'0'` = free.
+- **Fail-closed:** the 24h cap's slot is reserved in `admin_audit_log` **before** the send;
+  if that write fails the autopilot refuses to send rather than act uncapped. A failed
+  attempt keeps its slot — that is what bounds a revert loop.
 - **Safety rails** (all in the pure core, unit-covered): 15-min grace so a recovered
   Chainlink DON gets first refusal and can never race us · 5-min min-interval · **4
   actions/24h** runaway cap (a normal rollover is exactly 2) · hard refusal to re-settle
@@ -356,6 +364,17 @@ Consolidated; `vercel.json` rewrites preserve old URLs. Each `api/*.js` = 1 func
 | `social-post.js` | X/Telegram posting (`/api/notify` rewrite) |
 | `chat.js` | Claude support chatbot (Haiku + web_search) |
 | `rpc.js` | cached Base RPC proxy for the frontend |
+
+### ⚠️ `admin_audit_log` schema landmine (fixed 2026-08-21 — do not regress)
+Real columns: **`id, created_at, changed_by, config_key (NOT NULL), old_value, new_value`**.
+There is **no `action`, `source` or `detail` column.** Three writers in `api/scheduler.js`
+used those names and every one swallowed the rejection with `.catch(() => {})`, so nothing
+was ever logged and **the VRF auto-funder's rolling 7-day LINK cap silently read an empty
+table — i.e. was never enforced** on a job that spends from Bank. Always write through
+`auditLog(job, wallet, detail)` / read through `auditQuery(job, sinceISO)` in
+`api/scheduler.js`; never hand-roll the row. Convention: `config_key` = job name,
+`changed_by` = wallet, `new_value` = JSON detail. `src/TTAdminDashboard.jsx` renders this
+table, so the shape is load-bearing in the UI too.
 
 ### Security model (post-RLS-lockdown)
 - Supabase **anon key is NOT in the frontend bundle**. All PII tables (`users`,
@@ -468,14 +487,12 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
 - **NFT (watch): CLOSED 2026-08-21.** Round 7's first Trophy mint landed —
   `Trophy.totalSupply()` 0 → **3**, token #1 owner `0xE15D7231…`, `tokenURI` resolves
   HTTP 200. Nothing further to watch here.
-- **🚨 AUTOMATION (TOP PENDING — needs ONE decision from Jim)**: Chainlink stopped
-  performing on Base 2026-08-05. **Round 8 closes 2026-08-24 04:59 UTC.** The replacement
-  is already built, deployed and prod-verified — the **keeper autopilot** (see its section
-  above) — and it is **DISARMED**, because it spends Bank gas. **Arming it is one Supabase
-  row: `admin_config.keeper_autopilot_enabled = 'true'`.** Armed, it closes every round
-  ~15 min after the pin with no human in the loop; disarmed, settlement stays a manual
-  weekly Bank transaction. Fallback either way: Jim runs
-  `node --env-file=.env outputs/manual_settle_fallback.mjs --execute --wait`. Long-term:
+- **AUTOMATION — MITIGATED 2026-08-21.** Chainlink stopped performing on Base 2026-08-05;
+  the **keeper autopilot** (see its section above) replaced it and is **ARMED** with Jim's
+  go-ahead. Round 8 (closes 2026-08-24 04:59 UTC) is the **first unattended close** —
+  worth confirming afterwards that `Trophy.totalSupply()` goes 3 → 6 and round 9 pins to
+  2026-08-31 04:59 UTC. Fallback if it ever fails: `node --env-file=.env
+  outputs/manual_settle_fallback.mjs --execute --wait`. Still open long-term:
   the CRE migration in `outputs/cre_migration_plan.md` (Priority 2 — the decision gate
   that used to say "probably don't migrate" now resolves to MIGRATE), then reclaim the
   43.97 LINK (Priority 3). Both need Jim: CRE access is gated, and cutover ends in a
