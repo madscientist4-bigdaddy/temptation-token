@@ -1,5 +1,54 @@
 # Chainlink Automation → CRE — research + migration plan (2026-07-28)
 
+---
+
+## 🚨 SUPERSEDED 2026-08-21 — the "no migration needed" conclusion below is WRONG
+
+The July-28 analysis was right about the *version* and wrong about the *consequence*.
+`typeAndVersion()` still returns **`AutomationRegistry 2.3.0`** (re-verified 2026-08-21), and
+the docs still publish sunsets only for v1.x and v2.1. None of that mattered: **the registry
+stopped performing upkeeps for everyone.**
+
+Measured on-chain 2026-08-21, contiguous `UpkeepPerformed` scan of registry
+`0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743`:
+
+| Window | Result |
+|---|---|
+| 49,460,000 → 49,700,000 (to ~2026-08-05) | 278 performs across **32 distinct upkeeps** |
+| 49,700,000 → 50,274,317 (2026-08-05 → 2026-08-21) | **0 performs, 58/58 windows scanned, 0 RPC gaps** |
+
+Last perform registry-wide: **2026-08-05 13:35 UTC**. Sixteen days of total silence across
+all 191 registered upkeeps. The only registry activity since is `UpkeepCanceled` + fund
+withdrawals — other teams evacuating.
+
+Our upkeep is not misconfigured. Re-verified healthy on 2026-08-21: 43.97 LINK (min 2.17),
+`paused=false`, not cancelled, `performGas` 500k against a 132k real settle, registry
+forwarder == `Keeper3.s_forwarder`, target == Keeper3, `checkUpkeep()` returned true for
+~18h while nothing happened. **The service is gone, not the config.**
+
+**What that cost us.** Every round since has closed by hand from the Bank wallet:
+
+| Round | Closed | Settled by | Late |
+|---|---|---|---|
+| 5 | 2026-08-03 04:59 UTC | Chainlink `UpkeepPerformed` ✅ | — |
+| 6 | 2026-08-10 04:59 UTC | Bank `manualExecute(3)`+`(1)` 22:43 UTC | **17.7h** |
+| 7 | 2026-08-17 04:59 UTC | Bank `manualExecute(3)`+`(1)` 23:33 UTC | **18.5h** |
+| 8 | 2026-08-24 04:59 UTC | **nothing is scheduled to do it** | — |
+
+**Therefore Priority 1 below (the "resolve the Deprecated-badge discrepancy, then probably
+stop" decision gate) is closed: the gate resolves to MIGRATE.** Priority 2 (CRE) is no longer
+"not urgent" — it is the only path back to unattended settlement. Priority 3 (reclaim the
+43.97 LINK) now has a second reason: that LINK is buying nothing.
+
+Until CRE is live, round settlement is a **manual weekly Bank transaction**:
+`node --env-file=.env outputs/manual_settle_fallback.mjs --execute --wait`
+(pre-flight verified read-only 2026-08-21 — correctly reports "nothing due" mid-round).
+
+The rest of this document is preserved as written on 2026-07-28 for the audit trail. Read the
+Priority 2 CRE steps as live work; ignore its "no deadline" framing.
+
+---
+
 **Research + plan only. No mainnet writes were made.** The one deliverable built this
 round is `outputs/manual_settle_fallback.mjs` (tested read-only against mainnet).
 
