@@ -450,7 +450,30 @@ const V3D_ROUND_ABI = parseAbi([
   'function getRound(uint256) view returns (uint256 startTime,uint256 endTime,uint256 totalTickets,uint256 totalRawVotes,bool settled,bool vrfPending,uint256 profileCount)',
 ])
 
+// Is the autopilot armed? Default FALSE — it spends Bank gas, so it stays inert until
+// someone deliberately flips the row.
+async function readKeeperArmed() {
+  try {
+    const d = await (await sbService('/admin_config?key=eq.keeper_autopilot_enabled&select=value&limit=1')).json()
+    return Array.isArray(d) && d[0] && (d[0].value === 'true' || d[0].value === true)
+  } catch { return false }
+}
+
+// Trailing-24h action history — feeds the runaway guard and the min-interval rule.
+async function readKeeperHistory() {
+  try {
+    const ago = new Date(Date.now() - 864e5).toISOString()
+    const rows = await (await sbService(`/admin_audit_log?action=eq.keeper_autopilot&created_at=gte.${ago}&select=created_at`)).json()
+    if (!Array.isArray(rows)) return { actionsLast24h: 0, lastActionAtSec: 0 }
+    let lastActionAtSec = 0
+    for (const r of rows) { const t = Math.floor(new Date(r.created_at).getTime() / 1000); if (t > lastActionAtSec) lastActionAtSec = t }
+    return { actionsLast24h: rows.length, lastActionAtSec }
+  } catch { return { actionsLast24h: 0, lastActionAtSec: 0 } }
+}
+
 // Read-only snapshot of everything the decision needs. No writes, no alerts.
+// `enabled` is included deliberately: armed-vs-disarmed is the single most important
+// thing an operator needs to see, and without it here the only way to know is DB access.
 async function computeKeeperStatus() {
   const pub = createPublicClient({ chain: base, transport: http(KEEPER_RPC) })
   const [needed, performData] = await pub.readContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'checkUpkeep', args: ['0x'] })
@@ -460,7 +483,15 @@ async function computeKeeperStatus() {
   }
   const roundId = await pub.readContract({ address: VOTING_ADDRESS, abi: V3D_ROUND_ABI, functionName: 'currentRoundId' })
   const r = await pub.readContract({ address: VOTING_ADDRESS, abi: V3D_ROUND_ABI, functionName: 'getRound', args: [roundId] })
+  const enabled = await readKeeperArmed()
+  const hist = await readKeeperHistory()
   return {
+    enabled,
+    armedHint: enabled ? 'ARMED — closes the round automatically' : "DISARMED — set admin_config.keeper_autopilot_enabled='true' to arm",
+    hasBankKey: !!process.env.DEPLOYER_PRIVATE_KEY,
+    actionsLast24h: hist.actionsLast24h,
+    lastActionAt: hist.lastActionAtSec ? new Date(hist.lastActionAtSec * 1000).toISOString() : null,
+    lastActionAtSec: hist.lastActionAtSec,
     roundId: Number(roundId),
     endTime: Number(r[1]),
     settled: r[4],
@@ -474,29 +505,14 @@ async function computeKeeperStatus() {
 }
 
 async function runKeeperAutopilot() {
-  // Kill switch (default FALSE — this spends Bank gas, so it stays inert until armed).
-  let enabled = false
-  try {
-    const d = await (await sbService('/admin_config?key=eq.keeper_autopilot_enabled&select=value&limit=1')).json()
-    if (Array.isArray(d) && d[0] && (d[0].value === 'true' || d[0].value === true)) enabled = true
-  } catch {}
-
+  // One snapshot feeds both the decision and ?action=keeper-status, so what an operator
+  // reads is exactly what the autopilot acted on.
   const status = await computeKeeperStatus()
-
-  // Trailing-24h action history — feeds the runaway guard and the min-interval rule.
-  let actionsLast24h = 0, lastActionAtSec = 0
-  try {
-    const ago = new Date(Date.now() - 864e5).toISOString()
-    const rows = await (await sbService(`/admin_audit_log?action=eq.keeper_autopilot&created_at=gte.${ago}&select=created_at`)).json()
-    if (Array.isArray(rows)) {
-      actionsLast24h = rows.length
-      for (const r of rows) { const t = Math.floor(new Date(r.created_at).getTime() / 1000); if (t > lastActionAtSec) lastActionAtSec = t }
-    }
-  } catch {}
+  const { enabled, actionsLast24h, lastActionAtSec } = status
 
   const decision = evaluateKeeperAutopilot({
     enabled,
-    hasBankKey: !!process.env.DEPLOYER_PRIVATE_KEY,
+    hasBankKey: status.hasBankKey,
     upkeepNeeded: status.upkeepNeeded,
     action: status.action,
     nowSec: status.nowSec,
