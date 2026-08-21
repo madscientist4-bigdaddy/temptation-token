@@ -4,16 +4,43 @@ Guidance for Claude Code working in this repo. **Canonical CURRENT-STATE only.**
 Resolved sagas, dated audits, and superseded-contract narrative live in
 [CLAUDE_HISTORY.md](./CLAUDE_HISTORY.md).
 
-**Last verified: 2026-08-16.** On-chain re-read: V3d `currentRoundId` = **7**
-(`endTime` 2026-08-17 04:59 UTC, `settled=false`, `vrfPending=false`), `owner` =
-Keeper3, `nftContract` = Trophy. Rounds 4-6 settled (round 6 had **zero votes** → no
-winner, no mint, by design). Trophy `totalSupply()=0` and the old TTSRoundNFT is at
-**6** — the pointer flipped to Trophy *after* round 5, so rounds 4-5 minted into the
-retired contract and **round 7 is the first mint into Trophy**. Mint path proven
-healthy: `Trophy.minter()` = V3d and a mint estimates **142k gas** against V3d's 200k
-per-mint cap. Frontend NFT screen rewritten + deployed (it had never been able to
-render a trophy — see the NFT row below); `?buy=1` from the live WP /buy page now
-lands on the top-up modal.
+**Last verified: 2026-08-21.** 🚨 **CHAINLINK AUTOMATION IS DEAD ON BASE — settlement is
+now a MANUAL weekly Bank transaction.** The Automation registry
+`0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743` performed its last upkeep **for anyone** on
+**2026-08-05 13:35 UTC**; a contiguous, gap-free `UpkeepPerformed` scan of blocks
+49,700,000 → 50,274,317 found **0 performs across all 191 registered upkeeps** (the prior
+window had 278 across 32 upkeeps). Our upkeep is *not* the problem — 43.97 LINK vs a 2.17
+minimum, `paused=false`, uncancelled, forwarder matched, `performGas` 500k vs a 132k real
+settle, and `checkUpkeep()` returned **true** for ~18h while nothing happened. Note
+`typeAndVersion()` is **`AutomationRegistry 2.3.0`** — the current version with no published
+sunset — so version checks will *not* warn you; only the empty perform log tells the truth.
+The only registry traffic since is other teams cancelling upkeeps and withdrawing LINK.
+**Rounds 6 and 7 both closed unsettled for ~18h** and were rescued by hand from the Bank
+wallet (`manualExecute(3)` then `(1)`). See the Automation row below and the superseded-header
+correction at the top of `outputs/cre_migration_plan.md`.
+
+**Round 7 settled and the first Trophy mint landed.** `Trophy.totalSupply()` **0 → 3** as
+designed; token #1 owner `0xE15D7231…`, and its `tokenURI` resolves HTTP 200 (verified — a
+trophy that renders blank is not a delivered prize). Round 7 took 5 TTS of votes across 18
+profiles. V3d `currentRoundId` = **8**, `endTime` 2026-08-24 04:59 UTC, `settled=false`,
+`vrfPending=false`, 18 profiles, **0 votes so far**. `owner` = Keeper3 ✓, `nftContract` =
+Trophy ✓.
+
+**⚠️ ROUND 8 CLOSES 2026-08-24 04:59 UTC.** Two ways to close it:
+
+1. **Keeper autopilot — SHIPPED 2026-08-21, currently DISARMED.** Deployed and proven
+   end-to-end in prod (auth, chain read, decision, disarmed no-op). Arming is **one
+   Supabase row**: `admin_config.keeper_autopilot_enabled = 'true'`. Once armed it closes
+   the round ~15 min after the pin, every week, with no human in the loop. It stays inert
+   until then because it spends Bank gas and that needs Jim's go-ahead.
+2. **By hand**, one command with the Bank key: `node --env-file=.env
+   outputs/manual_settle_fallback.mjs --execute --wait` (read-only pre-flight re-verified
+   2026-08-21: correctly reports "nothing due" mid-round).
+
+**Prior anchor — 2026-08-16.** Frontend NFT screen rewritten + deployed (it had never been
+able to render a trophy — see the NFT row below); `?buy=1` from the live WP /buy page now
+lands on the top-up modal; mint path proven healthy (`Trophy.minter()` = V3d, 142k gas vs
+V3d's 200k per-mint cap).
 
 **Prior anchor — 2026-07-05.** User-journey fixes deployed & prod-verified: play
 screen renders all approved profiles round-agnostic + `profiles?action=sync` carries
@@ -127,12 +154,12 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 
 | Feature | State | Notes |
 |---|---|---|
-| Voting (V3d) | ✅ LIVE | Round **7** in flight (ends 2026-08-17 04:59 UTC), calendar-pinned, Chainlink-automated. Rounds 1-6 settled |
+| Voting (V3d) | ⚠️ LIVE, **settled by hand** | Round **8** in flight (ends 2026-08-24 04:59 UTC), calendar-pinned. Rounds 1-7 settled. **Chainlink Automation is dead since 2026-08-05** — rounds 6 and 7 each sat unsettled ~18h until a manual Bank `manualExecute`. Round 8 needs the same unless CRE lands first |
 | Prize split 35/35/10/20 | ✅ LIVE | hardcoded in V3d; CI-guarded |
 | Frontend (prod) | ✅ LIVE | `app.temptationtoken.io`, 12 functions |
 | Admin dashboard | ✅ LIVE | server-side auth, gated data proxy, anon key purged |
 | Club referral codes | ✅ LIVE | user enters club code on submit → auto-linked on-chain at admin approval. Club registration is admin-only |
-| NFT auto-mint | ✅ EXERCISED (old contract) / Trophy pending round 7 | V3d mints 3 NFTs on settlement (winner / top voter / house). `V3d.nftContract()` = **Trophy `0x02DDd0e6…`**. Rounds 4-5 minted **6 tokens into the retired TTSRoundNFT** (pointer flipped after round 5); round 6 had zero votes; **round 7 is the first Trophy mint**. Verified 2026-08-16: `Trophy.minter()`=V3d, mint estimates 142k gas vs the 200k `try/catch` cap → will not silently no-op. `src/App.jsx` now reads **both** contracts |
+| NFT auto-mint | ✅ LIVE on Trophy (round 7 minted 3, verified 2026-08-21) | V3d mints 3 NFTs on settlement (winner / top voter / house). `V3d.nftContract()` = **Trophy `0x02DDd0e6…`**. Rounds 4-5 minted **6 tokens into the retired TTSRoundNFT** (pointer flipped after round 5); round 6 had zero votes; **round 7 was the first Trophy mint — `totalSupply()` 0 → 3, token #1 `tokenURI` resolves 200**. Verified 2026-08-16: `Trophy.minter()`=V3d, mint estimates 142k gas vs the 200k `try/catch` cap → will not silently no-op. `src/App.jsx` now reads **both** contracts |
 | Telegram bot | ✅ LIVE + honest | running on Railway; staking/referral/VIP copy says "coming soon" — no undeliverable promises |
 | **Staking** | 🟢 ON-CHAIN LIVE / UI gated | Contracts deployed+verified on Base; **10B reward pool migrated 2026-08-07** into proxy `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` (old `0xaA12B889…` drained to 0, impl now RescueUUPS). V3d wired to it; mainnet E2E stake/unstake proven tax-free. Thresholds (TTS): 6k/12k/30k/120k/600k · APR 8/12/18/32/45% · **no lock-up** · 7-day multiplier clock. Frontend/bot still show "Coming Soon" — go-live is env-only (`VITE_STAKING_ENABLED` + `STAKING_LIVE`). See `staking/PHASE2_RUNBOOK.md` |
 | **User referral payouts** | ✅ LIVE (E2E-verified in prod 2026-07-01) | Web `?ref=` capture → `/api/bonus?action=refer-capture` (unique referee). Qualifying-vote payout via `?action=referral`, paid ONLY from `REFERRAL_WALLET_PRIVATE_KEY` (never Bank). `referral_enabled=true`. Anti-sybil all verified rejecting in prod: self-referral, double-capture, referrer-hijack, kill-switch, funding-source (Alchemy `getAssetTransfers`, bounded at TTS deploy block), fail-closed; ≥500 TTS threshold gates payout. Auto-funder (Marketing→referral wallet, never Bank) armed & correctly idle. Bot referral still coming-soon (no telegram→wallet bridge). |
@@ -166,25 +193,79 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 `107234397534438678…823641`. Several orphaned V3d duplicate deploys (2026-06-12) — see
 history.
 
-### V3d / Keeper3 — verified on-chain (round state 2026-08-16; wiring 2026-06-24/28)
+### V3d / Keeper3 — verified on-chain (round state 2026-08-21; wiring 2026-06-24/28)
 - V3d `owner` = Keeper3 ✓ (re-verified 2026-08-16 — returned after the round-4 VRF-stall
   recovery, automation intact) · `admin` = Bank ✓ · `nftContract` = **Trophy `0x02DDd0e6…`** ✓
 - V3d `houseWallet` = Marketing `0x7a9ff2f5…` ✓ · `charityWallet` = Polaris `0xf7dd429d…` ✓
 - V3d is a **VRF consumer** on sub `58222014…263722` ✓ · **`isTaxExempt(V3d)=true`** ✓
-- V3d `currentRoundId` = **7** · Round 7 `endTime` = `1786942740` (Mon 2026-08-17 04:59
-  UTC = Sun 23:59 EST), `settled=false`, `vrfPending=false`
+- V3d `currentRoundId` = **8** · Round 8 `endTime` = `1787547540` (Mon 2026-08-24 04:59
+  UTC = Sun 23:59 EST), `settled=false`, `vrfPending=false`, 18 profiles, **0 votes**
 - Settled history: round 4 end 2026-07-20 (10 TTS, VRF-stall recovered manually — see
-  `outputs/recover_round4_report.txt`) · round 5 end 2026-08-03 (5 TTS) · round 6 end
-  2026-08-10 (**0 votes** → no winner, no payout, no mint, as designed)
-- Keeper3 `votingContract`=V3d ✓ · `owner`=Bank ✓ · `s_forwarder`=`0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82` ✓ · `s_nextSettleTarget`=`1783313940` (advances +604800/round)
+  `outputs/recover_round4_report.txt`) · round 5 end 2026-08-03 (5 TTS, **last round
+  Chainlink ever settled by itself**) · round 6 end 2026-08-10 (**0 votes** → no winner,
+  no payout, no mint, as designed; closed by hand 22:43 UTC, 17.7h late) · round 7 end
+  2026-08-17 (5 TTS, 18 profiles, **first Trophy mint: totalSupply 0 → 3**; closed by hand
+  23:33 UTC, 18.5h late)
+- Keeper3 `votingContract`=V3d ✓ · `owner`=Bank ✓ · `s_forwarder`=`0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82` ✓ · `s_nextSettleTarget`=`1788152340` (2026-08-31 04:59 UTC; advances +604800 per round start)
 
-### Chainlink Automation (V3d) — LIVE
+### Chainlink Automation (V3d) — ☠️ DEAD SINCE 2026-08-05 (verified 2026-08-21)
 - **Upkeep ID:** `113446314522587151772280129999432062856069985411437977877707978564657748455208`
-- Registry `0xf4bAb6A129164aBa9B113cb96BA4266dF49f8743` · target Keeper3 · ~10 LINK ·
-  not paused/cancelled · `getForwarder` = `0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82`
+- Registry `0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743` (`typeAndVersion()` =
+  **`AutomationRegistry 2.3.0`**) · registrar `0xE28Adc50c7551CFf69FCF32D45d037e5F6554264` ·
+  target Keeper3 · **43.97 LINK** (min 2.17) · not paused/cancelled ·
+  `getForwarder` = `0x1aF4b2284bda534a54B6e9979dCA250Fe05Ddd82` = `Keeper3.s_forwarder` ✓
+- **Every health signal reads green and it still does not fire.** Last perform on OUR upkeep:
+  2026-08-03 04:59 UTC. Last perform on the registry **for any of its 191 upkeeps**:
+  2026-08-05 13:35 UTC. Contiguous gap-free scan of blocks 49,700,000 → 50,274,317 (58/58
+  windows, 0 RPC failures): **zero `UpkeepPerformed` events**. Prior window: 278 across 32
+  upkeeps. Only traffic since = `UpkeepCanceled` + withdrawals (other teams leaving).
+- **Do not debug our config — it is fine.** `checkUpkeep()` returned true for ~18h with
+  nothing happening; the real settle costs 132k gas against a 500k `performGas` cap. The
+  docs publish sunsets only for v1.x (2026-06-30) and v2.1 (2026-07-31), and ours is v2.3,
+  so **no version check will warn you**. The banner now reads "Migrate to the Chainlink
+  Runtime Environment (CRE)". Migration plan + corrected headline:
+  `outputs/cre_migration_plan.md`.
+- **Until CRE is live, settlement is manual and weekly** (Bank tx → needs Jim):
+  `node --env-file=.env outputs/manual_settle_fallback.mjs --execute --wait`
+- Watchdog: `scripts/verify-round-settlement.mjs` (read-only) now fails on a stale perform
+  and probes registry-wide liveness, so this class of outage cannot read as health again.
+  Scheduled by `scripts/launchd/io.temptationtoken.round-audit.plist` at **Sun 20:00 ET
+  (pre-close), Mon 02:00 ET (~1h after close), Mon 06:00 ET (backstop)** — installed and
+  loaded 2026-08-21; it had never actually run before that (single Mon-06:00 fire, added
+  after that week's fire time had already passed).
 - **VRF:** coordinator `0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634` · keyHash
   `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` · sub
   `58222014484560539249027457203866883376041731162442592604288474822166186263722`
+
+### Keeper autopilot — the Automation replacement (shipped 2026-08-21, DISARMED)
+- **What:** `api/_lib/keeper_autopilot.js` (pure decision core) + `runKeeperAutopilot()` in
+  `api/scheduler.js`. Reads `Keeper3.checkUpkeep()` and, when work is due, sends
+  `Keeper3.manualExecute(action)` from the **Bank** (Bank is `Keeper3.owner()` and
+  `manualExecute` is `onlyOwner`, so this does exactly what the Chainlink forwarder would
+  have done and nothing else). The action comes from the keeper itself — the weekly
+  calendar is never reimplemented off-chain.
+- **Cadence:** the Railway bot (`tts_bot.py` → `keeper_ping()`) POSTs
+  `/api/scheduler?action=keeper` every **10 min** with a `CRON_SECRET` bearer. Vercel Hobby
+  cron cannot run intraday; the bot is already up 24/7. **The Bank key never leaves Vercel —
+  the bot only rings the doorbell.** Every Vercel cron tick also runs it as a backstop.
+- **ARM / DISARM:** `admin_config.keeper_autopilot_enabled` — `'true'` arms; anything else
+  (including missing, the default) is fully inert: no writes, no gas.
+- **Safety rails** (all in the pure core, unit-covered): 15-min grace so a recovered
+  Chainlink DON gets first refusal and can never race us · 5-min min-interval · **4
+  actions/24h** runaway cap (a normal rollover is exactly 2) · hard refusal to re-settle
+  while `vrfPending` (that is the VRF-stall runbook, not this) · refuses if the signer is
+  not `Keeper3.owner()`.
+- **Verification, not optimism:** `manualExecute` wraps the call in `try/catch`, so a mined
+  transaction is **not** proof the round moved. The runner re-reads chain state afterwards
+  and alerts `⚠️ NO STATE CHANGE` if round/settled/vrfPending are unchanged.
+- **Observability:** Telegram receipt on every action, `admin_audit_log` row
+  (`action='keeper_autopilot'`), `admin_config.keeper_autopilot_status` blob, and
+  `GET /api/scheduler?action=keeper-status` (read-only, no auth, no writes).
+- **Watchdog:** `scripts/launchd/io.temptationtoken.round-audit.plist` is **installed and
+  loaded** in `~/Library/LaunchAgents` (fires Sun 20:00 / Mon 02:00 / Mon 06:00 ET,
+  read-only, Telegram-reported). `scripts/verify-round-settlement.mjs` now also flags
+  automation idle >8d and asks the registry whether the outage is Chainlink-wide or ours —
+  it previously reported "all good" through 18.6 days of dead automation.
 
 ### TTSVotingV3d source / behavior
 - Source: `contracts/TTSVotingV3d.sol` (= V3c + `adminTransferOwnership`). Flattened:
@@ -271,7 +352,7 @@ Consolidated; `vercel.json` rewrites preserve old URLs. Each `api/*.js` = 1 func
 | `set-club-wallet.js` | register/deregister club → `setClubWallet` on V3d |
 | `community-stats.js` | community stats + bot heartbeat (`/api/bot-health`) |
 | `content-generator.js` | weekly @temptationtoken post generation (cron) |
-| `scheduler.js` | daily social/status crons |
+| `scheduler.js` | daily social/status crons · `?action=keeper` (CRON_SECRET — keeper autopilot tick, every 10 min from the Railway bot) · `?action=keeper-status` (read-only) · `?action=dispatch` (CRON_SECRET) · `?action=vrf-status` · `?action=listings-watch` · `?action=ig_confirm` |
 | `social-post.js` | X/Telegram posting (`/api/notify` rewrite) |
 | `chat.js` | Claude support chatbot (Haiku + web_search) |
 | `rpc.js` | cached Base RPC proxy for the frontend |
@@ -292,7 +373,10 @@ Consolidated; `vercel.json` rewrites preserve old URLs. Each `api/*.js` = 1 func
 
 **Required (deploy-blocking):** `ADMIN_PASSWORD` (server-side admin login),
 `SUPABASE_SERVICE_KEY` (service_role — entire data layer + admin proxy + writes depend
-on it). **Strongly set:** `ADMIN_SESSION_SECRET` (HMAC token secret; falls back to
+on it). `CRON_SECRET` (**set 2026-08-21 on BOTH Vercel prod and Railway** — gates
+`/api/scheduler?action=keeper` and `?action=dispatch`; without it the keeper autopilot
+never gets a tick and the marketing dispatcher stays dead, which is exactly why it had
+never run). **Strongly set:** `ADMIN_SESSION_SECRET` (HMAC token secret; falls back to
 ADMIN_PASSWORD). Already set: `DEPLOYER_PRIVATE_KEY`, `MARKETING_WALLET_PRIVATE_KEY`,
 `ANTHROPIC_API_KEY`, `BROADCAST_BOT_TOKEN`, `X_API_KEY`/`X_API_SECRET`,
 `TTS_X_ACCESS_TOKEN`/`TTS_X_ACCESS_SECRET`, `SUPABASE_URL`. Optional/has-fallback:
@@ -302,7 +386,8 @@ ADMIN_PASSWORD). Already set: `DEPLOYER_PRIVATE_KEY`, `MARKETING_WALLET_PRIVATE_
 `VERCEL_*`. (Reminder: old admin password `TTS2026Admin!` shipped publicly — rotate.)
 
 ## Admin Config (Supabase `admin_config`)
-Keys: `signup_bonus_tts` (500), `vote_match_cap_tts` (1000),
+Keys: `keeper_autopilot_enabled` (**'true' arms weekly settlement — default off**),
+`keeper_autopilot_status` (read-only status blob), `signup_bonus_tts` (500), `vote_match_cap_tts` (1000),
 `vote_match_ratio_numerator`/`_denominator` (1/1), `bot_last_heartbeat`. Dashboard →
 Settings → Bonus Configuration.
 
@@ -380,8 +465,21 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
   the retired TTSRoundNFT as *the* NFT contract, including the **"NFT Minter" write
   control** — a `setMinter` from that panel would target the dead contract. Fix before
   anyone uses it.
-- **NFT (watch)**: round 7 settles 2026-08-17 04:59 UTC and is the **first Trophy mint**.
-  Confirm `Trophy.totalSupply()` goes 0 → 3 afterwards; `api/scheduler.js` announces it.
+- **NFT (watch): CLOSED 2026-08-21.** Round 7's first Trophy mint landed —
+  `Trophy.totalSupply()` 0 → **3**, token #1 owner `0xE15D7231…`, `tokenURI` resolves
+  HTTP 200. Nothing further to watch here.
+- **🚨 AUTOMATION (TOP PENDING — needs ONE decision from Jim)**: Chainlink stopped
+  performing on Base 2026-08-05. **Round 8 closes 2026-08-24 04:59 UTC.** The replacement
+  is already built, deployed and prod-verified — the **keeper autopilot** (see its section
+  above) — and it is **DISARMED**, because it spends Bank gas. **Arming it is one Supabase
+  row: `admin_config.keeper_autopilot_enabled = 'true'`.** Armed, it closes every round
+  ~15 min after the pin with no human in the loop; disarmed, settlement stays a manual
+  weekly Bank transaction. Fallback either way: Jim runs
+  `node --env-file=.env outputs/manual_settle_fallback.mjs --execute --wait`. Long-term:
+  the CRE migration in `outputs/cre_migration_plan.md` (Priority 2 — the decision gate
+  that used to say "probably don't migrate" now resolves to MIGRATE), then reclaim the
+  43.97 LINK (Priority 3). Both need Jim: CRE access is gated, and cutover ends in a
+  `Keeper3.setForwarder` from Bank.
 - **Trust/scanners**: SolidProof portal access + KYC ($600); GoPlus appeal
   (`service@gopluslabs.io`); Blockaid #1263614; CoinGecko/DexScreener resubmission.
   Detail + templates in history / `outputs/`.
