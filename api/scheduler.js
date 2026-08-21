@@ -647,70 +647,77 @@ async function runKeeperAutopilot() {
     return { acted: false, reason: 'another tick holds the Bank signer lock', status }
   }
 
-  // RESERVE — book the slot against the 24h cap before spending gas, so a DB outage
-  // cannot silently uncap the runaway guard.
-  const reserved = await reserveKeeperSlot(ACTION_NAME[decision.action], decision.reason)
-  if (!reserved) {
-    await releaseKeeperLock()
-    await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: could not record the action in admin_audit_log, and the 24h runaway guard reads that table. Failing closed rather than acting uncapped. Round ${status.roundId} still needs ${ACTION_NAME[decision.action]}.`, token).catch(() => {})
-    await persistStatus({ lastError: 'audit reservation failed — failed closed' })
-    return { acted: false, reason: 'audit reservation failed — failing closed', status }
-  }
-
-  // SEND — manualExecute(action) from the Bank. The action came from the keeper's own
-  // checkUpkeep, and manualExecute can only ever call startRound/settleRound/rollover
-  // on the wired voting contract; there is no value transfer and no attacker-controlled
-  // parameter anywhere in this path.
-  const pk = process.env.DEPLOYER_PRIVATE_KEY
-  const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
-  const account = privateKeyToAccount(pkHex)
-  const pub = createPublicClient({ chain: base, transport: http(KEEPER_RPC) })
-
-  // Refuse if we are not actually the keeper owner — a rewired keeper must not be
-  // driven by a stale assumption.
-  const keeperOwner = await pub.readContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'owner' })
-  if (keeperOwner.toLowerCase() !== account.address.toLowerCase()) {
-    await releaseKeeperLock()
-    await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: Keeper3.owner() is ${keeperOwner} but the configured signer is ${account.address}.`, token).catch(() => {})
-    await persistStatus({ lastError: 'signer is not Keeper3.owner()' })
-    return { acted: false, reason: 'signer is not Keeper3.owner()', status }
-  }
-
-  const wallet = createWalletClient({ account, chain: base, transport: http(KEEPER_RPC) })
-  let txHash, receipt
+  // Everything from here runs under one finally, so the lock is freed no matter how we
+  // leave — including a throw out of an unguarded RPC read. Structure, not a small TTL,
+  // is what guarantees the signer is never stranded.
   try {
-    txHash = await wallet.writeContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'manualExecute', args: [BigInt(decision.action)] })
-    receipt = await pub.waitForTransactionReceipt({ hash: txHash })
-  } catch (e) {
-    await releaseKeeperLock()
-    const msg = String(e.message || e).slice(0, 180)
-    // The reservation is deliberately NOT rolled back: a failed attempt still consumed
-    // gas and still counts against the 24h cap. That is what bounds a revert loop.
-    await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot FAILED</b>\n${ACTION_NAME[decision.action]} reverted: ${msg}`, token).catch(() => {})
-    await persistStatus({ lastError: msg })
-    return { acted: false, error: msg, status }
-  }
+    // Refuse if we are not actually the keeper owner — a rewired keeper or a wrong key
+    // on Vercel must not be driven by a stale assumption. This runs BEFORE the slot
+    // reservation on purpose: a persistent owner mismatch would otherwise book a cap
+    // slot every tick without ever sending, and trip a runaway alert that says
+    // "something is looping" when nothing looped and the signer was simply wrong.
+    const pk = process.env.DEPLOYER_PRIVATE_KEY
+    const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
+    const account = privateKeyToAccount(pkHex)
+    const pub = createPublicClient({ chain: base, transport: http(KEEPER_RPC) })
+    const keeperOwner = await pub.readContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'owner' })
+    if (keeperOwner.toLowerCase() !== account.address.toLowerCase()) {
+      await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: Keeper3.owner() is ${keeperOwner} but the configured signer is ${account.address}.`, token).catch(() => {})
+      await persistStatus({ lastError: 'signer is not Keeper3.owner()' })
+      return { acted: false, reason: 'signer is not Keeper3.owner()', status }
+    }
 
-  // manualExecute wraps the call in try/catch and reports success in the event, so a
-  // mined transaction is NOT proof the round moved. Re-read the chain instead.
-  // The transaction is mined; from here every path must free the lock, including a
-  // throw out of the post-send re-read (an RPC hiccup would otherwise hold the signer
-  // for the full TTL while the round still needs its second action).
-  try {
-    // manualExecute wraps the call in try/catch, so a mined transaction is NOT proof
-    // the round moved. Ask the chain, don't trust the receipt.
+    // RESERVE — book the slot against the 24h cap before spending gas, so a DB outage
+    // cannot silently uncap the runaway guard.
+    const reserved = await reserveKeeperSlot(ACTION_NAME[decision.action], decision.reason)
+    if (!reserved) {
+      await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot</b>\nRefusing to act: could not record the action in admin_audit_log, and the 24h runaway guard reads that table. Failing closed rather than acting uncapped. Round ${status.roundId} still needs ${ACTION_NAME[decision.action]}.`, token).catch(() => {})
+      await persistStatus({ lastError: 'audit reservation failed — failed closed' })
+      return { acted: false, reason: 'audit reservation failed — failing closed', status }
+    }
+
+    // SEND — manualExecute(action) from the Bank. The action came from the keeper's own
+    // checkUpkeep, and manualExecute can only ever call startRound/settleRound/rollover
+    // on the wired voting contract; there is no value transfer and no attacker-controlled
+    // parameter anywhere in this path.
+    const wallet = createWalletClient({ account, chain: base, transport: http(KEEPER_RPC) })
+    let txHash, receipt
+    try {
+      txHash = await wallet.writeContract({ address: KEEPER3_ADDRESS, abi: KEEPER3_ABI, functionName: 'manualExecute', args: [BigInt(decision.action)] })
+      receipt = await pub.waitForTransactionReceipt({ hash: txHash })
+    } catch (e) {
+      const msg = String(e.message || e).slice(0, 180)
+      // The reservation is deliberately NOT rolled back: a failed attempt still consumed
+      // gas and still counts against the 24h cap. That is what bounds a revert loop.
+      await sendTelegram(adminChatId, `🚨 <b>Keeper autopilot FAILED</b>\n${ACTION_NAME[decision.action]} reverted: ${msg}`, token).catch(() => {})
+      await persistStatus({ lastError: msg })
+      return { acted: false, error: msg, status }
+    }
+
+    // manualExecute wraps the call in try/catch, so a mined transaction is NOT proof the
+    // round moved. Ask the chain, don't trust the receipt.
     const after = await computeKeeperStatus()
     const moved = after.roundId !== status.roundId || after.settled !== status.settled || after.vrfPending !== status.vrfPending
     await sendTelegram(adminChatId,
       `${moved ? '🤖' : '⚠️'} <b>Keeper autopilot — ${ACTION_NAME[decision.action]}</b>\n${decision.reason}\nround ${status.roundId} → ${after.roundId} · settled ${status.settled}→${after.settled} · vrfPending ${status.vrfPending}→${after.vrfPending}\n${moved ? '' : 'NO STATE CHANGE — the keeper swallowed a revert. Investigate.\n'}tx <code>${txHash.slice(0, 16)}…</code>`,
       token).catch(() => {})
-    // Reconcile the reserved row in place — a second insert would spend two slots of
-    // the 24h cap on one action. Only ever by primary key; never a fuzzy match.
+
+    // Reconcile the reserved row in place — a second insert would spend two slots of the
+    // 24h cap on one action. Only ever by primary key; never a fuzzy match.
     const outcome = JSON.stringify({ status: moved ? 'done' : 'no_state_change', keeperAction: ACTION_NAME[decision.action], reason: decision.reason, moved, before: { round: status.roundId, settled: status.settled, vrfPending: status.vrfPending }, after: { round: after.roundId, settled: after.settled, vrfPending: after.vrfPending }, tx_hash: txHash, block: Number(receipt.blockNumber) })
-    if (typeof reserved === 'number') {
-      await sbService(`/admin_audit_log?id=eq.${reserved}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ new_value: outcome }) }).catch(() => {})
+    let rowId = typeof reserved === 'number' ? reserved : null
+    if (rowId == null) {
+      // The insert succeeded but returned no id. Recover it, so a completed action is
+      // never left reading `pending` in the audit trail.
+      try {
+        const rows = await (await sbService('/admin_audit_log?config_key=eq.keeper_autopilot&order=id.desc&limit=1&select=id')).json()
+        if (Array.isArray(rows) && typeof rows[0]?.id === 'number') rowId = rows[0].id
+      } catch {}
     }
-    await persistStatus({ lastActionAt: new Date().toISOString(), lastAction: ACTION_NAME[decision.action], lastTx: txHash, lastMoved: moved })
+    if (rowId != null) {
+      await sbService(`/admin_audit_log?id=eq.${rowId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ new_value: outcome }) }).catch(() => {})
+    }
+    await persistStatus({ lastActionAt: new Date().toISOString(), lastAction: ACTION_NAME[decision.action], lastTx: txHash, lastMoved: moved, reconciled: rowId != null })
     return { acted: true, action: ACTION_NAME[decision.action], moved, txHash, before: status, after }
   } finally {
     await releaseKeeperLock()
