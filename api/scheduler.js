@@ -1143,7 +1143,18 @@ export default async function handler(req, res) {
     const auth = req.headers.authorization || ''
     const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : ''
     if (!secret || bearer !== secret) return res.status(401).json({ error: 'Unauthorized' })
-    try { return res.status(200).json(await runKeeperAutopilot()) }
+    try {
+      const keeper = await runKeeperAutopilot()
+      // The VRF auto-funder rides the same tick. It used to run only on the Vercel cron
+      // path, and vrf_autofund_status stopped advancing on 2026-08-12 — the crons are not
+      // firing, so the sub-balance monitor and its top-up rule were silently dead while
+      // the dashboard card showed a 10-day-old snapshot as if it were current. This ping
+      // is the one driver we can prove is alive (the bot has a 10-min loop on Railway).
+      // Sequential in one request, so it cannot race the keeper for the Bank nonce.
+      let vrfAutoFund = null
+      try { vrfAutoFund = await runVrfAutoFunder() } catch (e) { vrfAutoFund = { error: String(e.message || e).slice(0, 160) } }
+      return res.status(200).json({ ...keeper, vrfAutoFund })
+    }
     catch (e) { return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) }) }
   }
 

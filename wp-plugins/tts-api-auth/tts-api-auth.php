@@ -3,7 +3,7 @@
  * Plugin Name: TTS API Auth
  * Plugin URI:  https://temptationtoken.io
  * Description: Programmatic REST API access for Temptation Token automation. Bypasses Hostinger's Application Password block via custom X-TTS-API-Key header. Auto-patches homepage logo on activation.
- * Version:     1.1.0
+ * Version:     1.1.1
  * Author:      Temptation Token
  * Requires at least: 5.8
  * Tested up to: 6.7
@@ -17,10 +17,34 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 register_activation_hook( __FILE__, 'tts_api_activate' );
 function tts_api_activate() {
-    if ( ! get_option( 'tts_api_setup_token' ) ) {
+    // Only mint a setup token when there is nothing to protect yet. Minting one while a
+    // key already exists hands out a free, unauthenticated key-overwrite.
+    if ( ! get_option( 'tts_api_key' ) && ! get_option( 'tts_api_setup_token' ) ) {
         update_option( 'tts_api_setup_token', bin2hex( random_bytes( 16 ) ) );
     }
     tts_api_apply_logo_fix();
+    tts_api_retire_stale_setup_token();
+}
+
+// ──────────────────────────────────────────────────────────────
+// 1.1.1 SECURITY: a setup token must not outlive setup
+//
+// The token is printed in a wp-admin notice and accepted by the PUBLIC /setup route,
+// which used to update_option('tts_api_key', …) unconditionally — so a token that
+// survived setup was a standing, unauthenticated takeover of every authed route
+// (elementor, meta, css). On this install the token was still live with api_key_set
+// = true, weeks after setup, and it had been pasted into a chat log.
+//
+// Setup being complete is provable from state: an api_key exists. When that is true the
+// token has no remaining purpose, so retire it on every load rather than trusting the
+// one code path that was supposed to delete it.
+// ──────────────────────────────────────────────────────────────
+add_action( 'plugins_loaded', 'tts_api_retire_stale_setup_token' );
+function tts_api_retire_stale_setup_token() {
+    if ( get_option( 'tts_api_key' ) && get_option( 'tts_api_setup_token' ) ) {
+        delete_option( 'tts_api_setup_token' );
+        update_option( 'tts_api_setup_token_retired', current_time( 'Y-m-d H:i:s' ) );
+    }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -194,6 +218,15 @@ function tts_api_register_routes() {
         'permission_callback' => '__return_true',
     ] );
 
+    // Rotate the API key (auth required — proves possession of the CURRENT key).
+    // Without this, a leaked key could only be replaced from wp-admin, which is exactly
+    // the dependency that left a live setup token lying around for weeks.
+    register_rest_route( 'tts/v1', '/rotate-key', [
+        'methods'             => 'POST',
+        'callback'            => 'tts_api_route_rotate_key',
+        'permission_callback' => 'tts_api_can_manage',
+    ] );
+
     // Status (auth required)
     register_rest_route( 'tts/v1', '/status', [
         'methods'             => 'GET',
@@ -238,6 +271,21 @@ function tts_api_can_manage() {
 
 // ── /setup ──────────────────────────────────────────────────
 
+function tts_api_route_rotate_key( WP_REST_Request $req ) {
+    $body    = $req->get_json_params() ?: [];
+    $new_key = $req->get_param( 'api_key' ) ?: ( $body['api_key'] ?? '' );
+    if ( ! $new_key || strlen( $new_key ) < 16 ) {
+        return new WP_Error( 'key_too_short', 'api_key must be ≥ 16 characters.', [ 'status' => 400 ] );
+    }
+    if ( hash_equals( (string) get_option( 'tts_api_key' ), (string) $new_key ) ) {
+        return new WP_Error( 'same_key', 'New key is identical to the current key.', [ 'status' => 400 ] );
+    }
+    update_option( 'tts_api_key', $new_key );
+    delete_option( 'tts_api_setup_token' );
+    update_option( 'tts_api_key_rotated', current_time( 'Y-m-d H:i:s' ) );
+    return [ 'ok' => true, 'message' => 'API key rotated. Old key is now invalid.' ];
+}
+
 function tts_api_route_setup( WP_REST_Request $req ) {
     $setup_token = get_option( 'tts_api_setup_token' );
 
@@ -252,6 +300,13 @@ function tts_api_route_setup( WP_REST_Request $req ) {
     // POST
     if ( ! $setup_token ) {
         return new WP_Error( 'already_setup', 'Setup already complete.', [ 'status' => 409 ] );
+    }
+    // Defence in depth: even holding a valid token, this route may not replace a key that
+    // already exists. Setup registers a first key; it is not an unauthenticated rotate.
+    // Rotation is /rotate-key, which requires the CURRENT key.
+    if ( get_option( 'tts_api_key' ) ) {
+        delete_option( 'tts_api_setup_token' );
+        return new WP_Error( 'already_setup', 'An API key is already registered; setup token retired. Use /rotate-key with the current key.', [ 'status' => 409 ] );
     }
     $body     = $req->get_json_params() ?: [];
     $provided = $req->get_param( 'setup_token' ) ?: ( $body['setup_token'] ?? '' );

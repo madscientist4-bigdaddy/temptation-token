@@ -243,7 +243,7 @@ async function generateAllPosts(ctx) {
     `CANONICAL ROUND SCHEDULE (use ONLY these — never invent other times):`,
     `  Round opens: Monday 12:00 AM EDT (every week)`,
     `  Round closes: ${roundCloseStr}`,
-    `  Settlement: fires automatically via Chainlink within minutes of round close`,
+    `  Settlement: triggered automatically by our own keeper shortly after close, then Chainlink VRF selects the winner on-chain`,
     ctx.lastTopVoterPayoutTTS      ? `Last round — top voter won: ${ctx.lastTopVoterPayoutTTS.toLocaleString()} $TTS` : null,
     ctx.lastWinnerProfilePayoutTTS ? `Last round — winning profile won: ${ctx.lastWinnerProfilePayoutTTS.toLocaleString()} $TTS` : null,
     `Active profiles competing: ${ctx.approvedProfiles}`,
@@ -275,8 +275,22 @@ CRITICAL RULES — NEVER VIOLATE THESE:
 1. ROUND SCHEDULE — use ONLY the canonical values provided in LIVE PROJECT STATE above:
    - Round opens: Monday 12:00 AM EDT
    - Round closes: the specific date/time in "Round closes:" above (e.g. "Sunday, May 10, 11:59 PM EDT")
-   - Settlement fires automatically via Chainlink within minutes of round close
+   - Settlement is triggered automatically by our OWN keeper shortly after close. Chainlink VRF then picks the winner on-chain.
    - NEVER invent or approximate settlement times. NEVER write "closes Wed", "closes at 11:23 PM", or any other time not in the canonical schedule. If a post references round timing, use ONLY the exact close date/time from the live context.
+
+2b. CHAINLINK ATTRIBUTION — Chainlink runs TWO products and only ONE of them is ours anymore.
+   - Chainlink VRF: LIVE and TRUE. It selects the round winner on-chain. Saying "Chainlink VRF
+     picks the winner", "verifiable randomness", "no admin can influence the result" is CORRECT.
+   - Chainlink Automation: DEAD. Its Base registry stopped performing for every one of its
+     upkeeps on 2026-08-05. It no longer triggers our settlement; our own keeper autopilot does.
+   - Therefore any claim that CHAINLINK TRIGGERS, FIRES or SCHEDULES SETTLEMENT is FORBIDDEN.
+     Banned phrasings: "Chainlink fires settlement" / "...within minutes".
+     Banned phrasings: "Chainlink settles the round", "Chainlink Automation".
+     Banned phrasings: "settlement fires automatically via Chainlink".
+     Banned phrasings: "Chainlink VRF settlement fires automatically at close" (conflates
+     the two products). Settlement IS still automatic — say "settlement
+     runs automatically shortly after close" and attribute the WINNER SELECTION, not the
+     trigger, to Chainlink VRF.
 
 3. STAKING LOCK — staking is NOT tied to round open/close windows. Use the "Staking lock behavior" field above verbatim. NEVER say "staking closes with the round", "stake before the round ends", or imply any staking deadline tied to the round schedule. Staking can happen any day of the week.
 
@@ -390,10 +404,10 @@ const FALLBACK_TEMPLATES = [
     telegram_content: '<b>Gold tier: $250+, 18% APR, 1.5x vote multiplier.</b>\n\nYour votes count 50% more than unstaked wallets.\n\n<a href="https://app.temptationtoken.io">Stake at app.temptationtoken.io</a>' },
   { day:'wednesday', slot:'evening',
     x_content: 'Round closes Sunday. Window to influence the leaderboard is narrowing. app.temptationtoken.io $TTS',
-    telegram_content: '<b>The window is closing on this round.</b>\n\nRound closes Sunday 11:59 PM EDT. Chainlink VRF settlement fires automatically at close.\n\n<a href="https://app.temptationtoken.io">Vote now at app.temptationtoken.io</a>' },
+    telegram_content: '<b>The window is closing on this round.</b>\n\nRound closes Sunday 11:59 PM EDT. Settlement runs automatically right after close.\n\n<a href="https://app.temptationtoken.io">Vote now at app.temptationtoken.io</a>' },
   { day:'thursday', slot:'morning',
     x_content: 'Every payout fires automatically on Base mainnet. No claim form. No delay. No admin discretion. $TTS app.temptationtoken.io',
-    telegram_content: '<b>On Temptation Token, payouts are automatic.</b>\n\nTop voter, winning profile, charity — all receive funds when Chainlink VRF settles. No waiting.\n\n<a href="https://app.temptationtoken.io">app.temptationtoken.io</a>' },
+    telegram_content: '<b>On Temptation Token, payouts are automatic.</b>\n\nTop voter, winning profile, charity — all receive funds the moment the round settles. No waiting.\n\n<a href="https://app.temptationtoken.io">app.temptationtoken.io</a>' },
   { day:'thursday', slot:'afternoon',
     x_content: 'Chainlink VRF determines the winner. No admin can influence the result. Verifiable on-chain. $TTS app.temptationtoken.io',
     telegram_content: '<b>Chainlink VRF picks the round winner — not us.</b>\n\nVerifiable random function. On-chain proof. No admin key can change the outcome.\n\n<a href="https://app.temptationtoken.io">Verify at app.temptationtoken.io</a>' },
@@ -411,13 +425,13 @@ const FALLBACK_TEMPLATES = [
     telegram_content: '<b>Silver tier: $100+, 12% APR, 1.25x vote multiplier.</b>\n\nYour $TTS earns while you vote. Your votes count more than unstaked wallets.\n\n<a href="https://app.temptationtoken.io">Stake at app.temptationtoken.io</a>' },
   { day:'saturday', slot:'morning',
     x_content: 'Solidproof audit complete. LP locked. Chainlink VRF. Automatic payouts. Proof is public. $TTS app.temptationtoken.io',
-    telegram_content: '<b>Everything about $TTS is verifiable:</b>\n\n• Solidproof audit: complete\n• LP: locked until May 2027\n• Settlement: Chainlink VRF\n• Payouts: automatic on Base\n\n<a href="https://app.temptationtoken.io">app.temptationtoken.io</a>' },
+    telegram_content: '<b>Everything about $TTS is verifiable:</b>\n\n• Solidproof audit: complete\n• LP: locked until May 2027\n• Winner selection: Chainlink VRF\n• Payouts: automatic on Base\n\n<a href="https://app.temptationtoken.io">app.temptationtoken.io</a>' },
   { day:'saturday', slot:'afternoon',
     x_content: 'VIP tier: $5,000 minimum, 45% APR, 3x vote weight. $TTS app.temptationtoken.io',
     telegram_content: '<b>VIP tier: $5,000+, 45% APR, 3x vote weight.</b>\n\nYour votes count three times as much as unstaked wallets.\n\n<a href="https://app.temptationtoken.io">app.temptationtoken.io</a>' },
   { day:'saturday', slot:'evening',
-    x_content: 'Every round: profiles compete, votes decide, Chainlink VRF settles, payouts fire. $TTS app.temptationtoken.io',
-    telegram_content: '<b>How Temptation Token works:</b>\n\n1. Profiles compete 2. Voters cast $TTS 3. Round closes Sunday 11:59 PM EDT 4. Chainlink VRF settles 5. Payouts fire automatically\n\n<a href="https://app.temptationtoken.io">Vote at app.temptationtoken.io</a>' },
+    x_content: 'Every round: profiles compete, votes decide, Chainlink VRF picks the winner, payouts fire. $TTS app.temptationtoken.io',
+    telegram_content: '<b>How Temptation Token works:</b>\n\n1. Profiles compete 2. Voters cast $TTS 3. Round closes Sunday 11:59 PM EDT 4. Settlement runs and Chainlink VRF picks the winner 5. Payouts fire automatically\n\n<a href="https://app.temptationtoken.io">Vote at app.temptationtoken.io</a>' },
   { day:'sunday', slot:'morning',
     x_content: 'New round opens Monday 12:00 AM EDT. Staking is available anytime — your multiplier is active from when you stake. app.temptationtoken.io $TTS',
     telegram_content: '<b>New round opens Monday 12:00 AM EDT.</b>\n\nStaking is not tied to round timing — you can stake any day and your vote multiplier is active immediately.\n\n<a href="https://app.temptationtoken.io">Stake at app.temptationtoken.io</a>' },
@@ -426,7 +440,7 @@ const FALLBACK_TEMPLATES = [
     telegram_content: '<b>Voters earn as much as winners on Temptation Token.</b>\n\nTop voter: 35%. Winning profile: 35%. Pick correctly and vote heavy.\n\n<a href="https://app.temptationtoken.io">Vote at app.temptationtoken.io</a>' },
   { day:'sunday', slot:'evening',
     x_content: 'Round closes tonight — Sunday 11:59 PM EDT. Last chance. $TTS app.temptationtoken.io',
-    telegram_content: '<b>Round closes TONIGHT — Sunday 11:59 PM EDT.</b>\n\nAfter close: voting locks, Chainlink VRF fires, payouts distribute automatically.\n\n<a href="https://app.temptationtoken.io">Vote now at app.temptationtoken.io</a>' },
+    telegram_content: '<b>Round closes TONIGHT — Sunday 11:59 PM EDT.</b>\n\nAfter close: voting locks, settlement runs, Chainlink VRF picks the winner, payouts distribute automatically.\n\n<a href="https://app.temptationtoken.io">Vote now at app.temptationtoken.io</a>' },
 ]
 
 const FALLBACK_IG_TEMPLATES = [

@@ -65,7 +65,7 @@ const TTS_MORNING = {
   thursday:  d => `⏰ 3 days left in Round ${d.roundId}. Prize pool sitting at ${d.pool} $TTS. Top voter takes 35% AUTOMATICALLY. No middleman. No delays. Just code. $TTS`,
   friday:    d => `🚨 WEEKEND PUSH. Round ${d.roundId} ends Sunday night. Last chance to build your vote stack. Don't finish 2nd. → app.temptationtoken.io $TTS #Crypto`,
   saturday:  _d => `💎 Staking $TTS = bigger votes. Up to 3x multiplier for VIP stakers. Play smarter, not just harder → app.temptationtoken.io $TTS #DeFi #Staking`,
-  sunday:    d => `🏁 FINAL HOURS. Round ${d.roundId} closes TONIGHT. Prize pool: ${d.pool} $TTS. Settlement is automatic via Chainlink VRF. Watch live → app.temptationtoken.io $TTS`,
+  sunday:    d => `🏁 FINAL HOURS. Round ${d.roundId} closes TONIGHT. Prize pool: ${d.pool} $TTS. Settlement is automatic; Chainlink VRF picks the winner. Watch live → app.temptationtoken.io $TTS`,
 }
 
 const TTS_AFTERNOON = {
@@ -75,7 +75,7 @@ const TTS_AFTERNOON = {
   thursday:  _d => `We partner with @PolarisProject — 10% of EVERY prize pool funds the fight against human trafficking. Vote and do good. 💙 $TTS`,
   friday:    _d => `No signup. No email. No KYC. Just connect your wallet and vote. Web3 at its finest. app.temptationtoken.io $TTS #Base`,
   saturday:  _d => `Audited by @solidproof_io ✅ Liquidity locked 12 months ✅ Chainlink VRF ✅ This is what a legit crypto project looks like. $TTS`,
-  sunday:    _d => `Settlement happens automatically in minutes. Smart contract → Chainlink VRF → winners paid. Zero humans involved. That's the beauty of DeFi. $TTS`,
+  sunday:    _d => `Settlement happens automatically in minutes. Smart contract → Chainlink VRF picks the winner → winners paid. Zero humans involved. That's the beauty of DeFi. $TTS`,
 }
 
 const TTS_EVENING = {

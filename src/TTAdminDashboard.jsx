@@ -2253,7 +2253,7 @@ function PayoutsScreen({ showToast }) {
             No rounds settled yet on TTSVotingV3.<br />
             {roundInfo && !roundInfo.error
               ? `Round ${roundInfo.roundId} ends ${new Date(roundInfo.endTime * 1000).toLocaleDateString()}.`
-              : 'The next round settles automatically via Chainlink.'
+              : 'The next round settles automatically via the keeper autopilot.'
             }
           </div>
         ) : (
@@ -2326,7 +2326,7 @@ function PayoutsScreen({ showToast }) {
       </div>
 
       <div style={{ background:'rgba(46,204,113,0.06)', border:'1px solid rgba(46,204,113,0.2)', borderRadius:10, padding:'14px 18px', fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8 }}>
-        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles via Chainlink VRF, the smart contract distributes funds instantly: 35% to top voter, 35% to winning profile, 20% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.<br /><br />
+        ✅ <strong style={{ color:'var(--green)' }}>Payouts are fully automatic.</strong> When each round settles, Chainlink VRF picks the winner and the smart contract distributes funds instantly: 35% to top voter, 35% to winning profile, 20% to Blockchain Entertainment LLC, 10% to Polaris Project. No manual action required.<br /><br />
         {roundInfo && !roundInfo.error ? (() => {
           const endDate = new Date(roundInfo.endTime * 1000)
           const endStr = endDate.toLocaleString('en-US', { timeZone:'America/New_York', weekday:'long', month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short' })
@@ -2334,7 +2334,7 @@ function PayoutsScreen({ showToast }) {
           const offSchedule = !(endDate.getUTCDay() === 1 && endDate.getUTCHours() < 4)
           return (<>
             🏆 <strong style={{ color:'var(--gold)' }}>Round {roundInfo.roundId} status:</strong> Active — closes <strong>{endStr}</strong>.
-            {offSchedule && <span style={{ marginLeft:6, color:'#f39c12', fontWeight:700 }}>⚠ Off canonical schedule — expected Sunday 11:59 PM EDT. Round may have started mid-week instead of via Monday Chainlink keeper.</span>}
+            {offSchedule && <span style={{ marginLeft:6, color:'#f39c12', fontWeight:700 }}>⚠ Off canonical schedule — expected Sunday 11:59 PM EDT. Round may have started mid-week instead of on the Monday calendar pin.</span>}
             {' '}NFT Champion Trophy mints automatically at settlement (winner, top voter, house) once a round settles with at least one vote.
           </>)
         })() : <span>🏆 <strong style={{ color:'var(--gold)' }}>Round status:</strong> {roundInfo?.error ? `Error reading chain: ${roundInfo.error}` : 'Loading from chain…'}</span>}
@@ -3418,6 +3418,7 @@ function SystemScreen() {
   const [lastRefresh, setLastRefresh] = React.useState(null);
   const [referralStats, setReferralStats] = React.useState(null);
   const [autofund, setAutofund] = React.useState(null);
+  const [keeper, setKeeper] = React.useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -3446,6 +3447,12 @@ function SystemScreen() {
     try {
       const cfg = await sb.get('admin_config', 'key=eq.vrf_autofund_status&select=value');
       if (Array.isArray(cfg) && cfg[0]?.value) setAutofund(JSON.parse(cfg[0].value));
+    } catch {}
+    // Keeper autopilot — read live, not from a cached blob. This is the thing that now
+    // closes the round, so it gets the freshest possible source.
+    try {
+      const r = await fetch(`/api/scheduler?action=keeper-status&cb=${Date.now()}`);
+      if (r.ok) setKeeper(await r.json());
     } catch {}
     setLoading(false);
   };
@@ -3620,46 +3627,62 @@ function SystemScreen() {
         ) : <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading referral data…</div>}
       </div>
 
-      {/* ROUND SCHEDULE */}
+      {/* KEEPER AUTOPILOT — this is what closes the round now. Primary card. */}
       <div className="table-card" style={{ marginTop: 20 }}>
         <div className="table-head">
-          <div className="table-head-title">📅 Round Schedule (Chainlink Automation)</div>
-          <StatusBadge status="ok" />
+          <div className="table-head-title">🤖 Keeper Autopilot (settlement driver)</div>
+          <StatusBadge status={keeper == null ? 'unknown' : !keeper.enabled ? 'critical' : !keeper.driverAlive ? 'critical' : 'ok'} />
         </div>
-        <table className="adm-table">
-          <thead><tr><th>Upkeep</th><th>Cron</th><th>When</th><th>Duration</th></tr></thead>
-          <tbody>
-            <tr>
-              <td style={{fontSize:'.75rem'}}>TTS Start Round</td>
-              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--rose)'}}>0 4 * * 1</code> <span style={{fontSize:'.55rem',color:'var(--rose)'}}>UPDATE</span></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Monday 04:00 UTC = Monday 12:00 AM EDT</td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>604800s (7 days)</td>
-            </tr>
-            <tr>
-              <td style={{fontSize:'.75rem'}}>TTS Settle Or Rollover</td>
-              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--rose)'}}>59 3 * * 1</code> <span style={{fontSize:'.55rem',color:'var(--rose)'}}>UPDATE</span></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Monday 03:59 UTC = Sunday 11:59 PM EDT</td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
-            </tr>
-            <tr>
-              <td style={{fontSize:'.75rem'}}>TTS Midpoint Snapshot</td>
-              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 12 * * 3</code></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every Wednesday 12:00 UTC</td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
-            </tr>
-            <tr>
-              <td style={{fontSize:'.75rem'}}>TTS Link Reserve Monitor</td>
-              <td><code style={{fontFamily:'monospace',fontSize:'.7rem',color:'var(--gold-dim)'}}>0 * * * *</code></td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>Every hour</td>
-              <td style={{fontSize:'.72rem',color:'var(--muted)'}}>—</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style={{padding:'10px 16px',fontSize:'.62rem',color:'var(--muted)',lineHeight:1.7}}>
-          ✅ <strong style={{color:'var(--green)'}}>Chainlink crons confirmed</strong> — Round starts Monday 12:00 AM EDT, settles Sunday 11:59 PM EDT automatically.
-          {' '}TTSVotingV3d uses calendar-pinned automation — TTSKeeper3 auto-starts the next round and settles each Monday 04:59 UTC (Sunday 11:59 PM EST) with no drift. Manual Round Control below is only a fallback if a keeper run is ever missed.
-          {' '}<a href="https://automation.chain.link/base" target="_blank" rel="noopener noreferrer" style={{color:'var(--gold-dim)'}}>Verify at automation.chain.link →</a>
+        {keeper == null ? (
+          <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading keeper status…</div>
+        ) : (
+        <table className="adm-table"><tbody>
+          <tr><td style={{ color:'var(--muted)' }}>Armed</td><td>{keeper.enabled
+            ? <span style={{ color:'#2ecc71' }}>✅ ARMED — closes the round automatically</span>
+            : <span style={{ color:'#e84040' }}>⛔ DISARMED — nothing will settle the round. Set admin_config.keeper_autopilot_enabled = 'true'</span>}</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Driver alive</td><td>{keeper.driverAlive
+            ? <span style={{ color:'#2ecc71' }}>✅ ticking — last {keeper.tickAgeSec}s ago</span>
+            : <span style={{ color:'#e84040' }}>⛔ NO TICK for {keeper.tickAgeSec == null ? '—' : Math.round(keeper.tickAgeSec / 60) + ' min'} — the Railway bot ping is down. An armed keeper nobody calls settles nothing.</span>}
+            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>(bot pings /api/scheduler?action=keeper every 10 min)</span></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Actions (24h)</td><td><strong>{keeper.actionsLast24h}</strong> / 6 cap
+            {keeper.actionsLast24h >= 6 && <span style={{ color:'#e84040', marginLeft:6 }}>⛔ cap reached — autopilot has stopped acting</span>}
+            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>a clean weekly rollover is 2 (settle + start)</span></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Last action</td><td style={{ fontSize:'.75rem' }}>{keeper.lastActionAt || <span style={{ color:'var(--muted)' }}>none in 24h</span>}</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Next expected close</td><td>
+            <strong>{keeper.endTime ? new Date(keeper.endTime * 1000).toUTCString() : '—'}</strong>
+            <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>round {keeper.roundId} · settles ~15 min after the pin (grace window lets a revived Chainlink go first)</div></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Work due now</td><td>{keeper.upkeepNeeded
+            ? <span style={{ color:'#f39c12' }}>⏳ {keeper.actionName || 'action'} pending</span>
+            : <span style={{ color:'var(--muted)' }}>nothing due — round still open</span>}
+            {keeper.vrfPending && <span style={{ color:'#f39c12', marginLeft:6 }}>· VRF in flight</span>}</td></tr>
+        </tbody></table>
+        )}
+        <div style={{ padding:'10px 16px', fontSize:'.62rem', color:'var(--muted)', lineHeight:1.7 }}>
+          Bank is <code>Keeper3.owner()</code> and <code>manualExecute</code> is <code>onlyOwner</code>, so the autopilot does exactly what the
+          Chainlink forwarder used to and nothing else. The action is read from <code>Keeper3.checkUpkeep()</code>, never recomputed off-chain.
+          Rails: 15-min grace · 5-min min interval · 6 actions/24h · refuses to re-settle while VRF is pending · refuses if the signer is not the keeper owner.
         </div>
+      </div>
+
+      {/* Chainlink upkeep — OUTAGE since 2026-08-05, kept visible so the failure is on the record */}
+      <div className="table-card" style={{ marginTop: 20 }}>
+        <div className="table-head">
+          <div className="table-head-title">⛓️ Chainlink Automation upkeep</div>
+          <StatusBadge status="critical" />
+        </div>
+        <table className="adm-table"><tbody>
+          <tr><td style={{ color:'var(--muted)' }}>Status</td><td><span style={{ color:'#e84040', fontWeight:700 }}>⛔ OUTAGE since 2026-08-05 — replaced by the keeper autopilot</span></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>What happened</td><td style={{ fontSize:'.72rem' }}>
+            Registry <code>0xf4bAb6A1…</code> (AutomationRegistry 2.3.0) stopped performing for <strong>every one</strong> of its ~191 upkeeps, not just ours.
+            Our upkeep reads entirely healthy — funded, unpaused, uncancelled, forwarder matched, <code>checkUpkeep()</code> returning true on schedule — and still nothing fires.
+            Nothing to fix on our side; this is Chainlink&rsquo;s outage. Rounds 6→7 and 7→8 were closed by hand from the Bank ~17.7h late before the autopilot took over.
+          </td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>LINK</td><td><strong>43.97 LINK recoverable later</strong>
+            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>cancel the upkeep, wait the post-cancel block delay, then withdraw. Not urgent, and not while it is the only fallback on paper.</span></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Verify</td><td style={{ fontSize:'.72rem' }}>
+            <code>node scripts/verify-round-settlement.mjs</code> reports registry-wide liveness and distinguishes a Chainlink outage from our upkeep being skipped.
+          </td></tr>
+        </tbody></table>
       </div>
 
       {/* MANUAL ROUND CONTROL */}
@@ -4556,7 +4579,12 @@ function CommandScreen({ setActive }) {
 
   const health = [
     { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending && !roundOverdue, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
-    { label: 'Chainlink Crons', ok: true, warn: false, text: '✅ Confirmed — starts Mon 12AM EDT · settles Sun 11:59PM EDT', href: null, nav: null },
+    { label: 'Keeper Autopilot', ok: keeper?.enabled === true && keeper?.driverAlive === true, warn: keeper == null,
+      text: keeper == null ? 'Loading…'
+        : !keeper.enabled ? '⛔ DISARMED — nothing will settle the round'
+        : !keeper.driverAlive ? '⛔ ARMED but no tick — the driver is down'
+        : `✅ Armed · ticking ${keeper.tickAgeSec}s ago · ${keeper.actionsLast24h}/6 actions 24h`, href: null, nav: null },
+    { label: 'Chainlink Automation', ok: false, warn: true, text: '⛔ OUTAGE since Aug 5 — replaced by autopilot · 43.97 LINK recoverable later', href: null, nav: null },
     { label: 'Railway Bot', ok: true, warn: false, text: `${RAILWAY_PLAN} Plan · Online`, href: 'https://railway.app', nav: null },
     { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting`, href: null, nav: 'review' },
     { label: 'Content Queue', ok: pendingContent === 0, warn: pendingContent > 0, text: pendingContent === 0 ? 'All approved' : `${pendingContent} to approve`, href: null, nav: 'content' },
@@ -4858,7 +4886,7 @@ const OPS_MANUAL = [
   {
     title: 'Round Start Checklist', emoji: '🚀',
     steps: [
-      'TTSKeeper2 fires automatically at Monday 04:00 UTC (12:00 AM EDT) via Chainlink Automation (cron: 0 4 * * 1 ✅ confirmed) — verify on BaseScan if round does not start.',
+      'TTSKeeper3 is driven by our keeper autopilot (Railway ping → /api/scheduler?action=keeper, every 10 min). Chainlink Automation has been dark registry-wide since 2026-08-05 and is NOT a fallback. If the round does not start, check the Keeper Autopilot card first, then run scripts/verify-round-settlement.mjs.',
       'If automation fails: BaseScan → TTSKeeper2 (0xB17b…C61A48) → Write → manualExecute(1)',
       'Approve pending profiles: Photo Review tab → Approve (updates Supabase; on-chain approval requires batchApproveProfiles via BaseScan)',
       'Generate + approve content calendar: Content Calendar tab → Generate This Week → approve posts',
@@ -4892,7 +4920,7 @@ const OPS_MANUAL = [
       'Vercel: cryptofitjims-projects · Project: temptation-token · Auto-deploys on git push to main',
       'Railway: proud-unity · Bot: @TTSGameBot · Broadcaster: @TTSBroadcastBot · Trial exp Apr 27 2026',
       'Supabase: gmlikdxykgviyprqtqwz (Pro plan) · Tables: users, submissions, votes, staking_positions, scheduled_posts',
-      'Chainlink Automation Registry: 0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743 · 4 upkeeps',
+      'Chainlink Automation Registry: 0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743 — OUTAGE since 2026-08-05, registry-wide (all ~191 upkeeps). Superseded by the keeper autopilot; 43.97 LINK recoverable later.',
       'VRF Sub ID: 58222014484560539249027457203866883376041731162442592604288474822166186263722',
       'Gnosis Safe: 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86 · 2/2 multisig (deployer + partner)',
     ]

@@ -20,7 +20,12 @@ const WHITELIST_FILES = new Set([
 ])
 
 // Lines that explicitly describe what is forbidden (not an actual violation)
-const EXEMPT_PHRASES = ['FORBIDDEN', 'previously used', 'wrong and has been removed', 'never use', 'NEVER write']
+const EXEMPT_PHRASES = ['FORBIDDEN', 'previously used', 'wrong and has been removed', 'never use', 'NEVER write',
+  'Banned phrasings', 'is DEAD', 'Automation is dead', 'no longer triggers', 'stopped performing',
+  // Accurately DESCRIBING the dead product is the opposite of claiming it works.
+  'performed NO upkeep', 'performed no upkeep', 'Automation replacement', 'OUTAGE',
+  'AutomationReceiver', 'Keeper / Automation', 'DEAD SINCE', 'replaced by autopilot',
+  'Automation upkeep', 'is NOT a fallback', 'dark registry-wide', 'OUTAGE since']
 
 // Rule definitions: { name, test(line) => bool }
 const RULES = [
@@ -36,6 +41,30 @@ const RULES = [
                   /sign.?up|new.?user|welcome|registration/i.test(line) &&
                   !/referral/i.test(line),
     note: 'Canonical signup bonus is 500 TTS',
+  },
+  {
+    name: 'Chainlink triggers settlement (Automation is DEAD since 2026-08-05)',
+    // Chainlink runs two products for us and only VRF survives. VRF still picks the winner
+    // on-chain — that is TRUE and must stay sayable. Chainlink AUTOMATION, which used to
+    // trigger settleRound(), stopped performing for every upkeep on its Base registry on
+    // 2026-08-05; our own keeper autopilot triggers settlement now. So flag any line that
+    // makes Chainlink the thing that FIRES/SETTLES/SCHEDULES, and leave "VRF picks the
+    // winner" alone. An automated poster claiming "Chainlink fires settlement within
+    // minutes" was live on @temptationtoken while settlement was actually being done by
+    // hand ~17.7h late.
+    // Targets the false CLAIM SHAPES specifically. A broad "chainlink near settlement"
+    // heuristic also condemns true sentences like "the winner is being selected on-chain
+    // via Chainlink VRF", and a guard that cries wolf on correct copy gets switched off.
+    test: line => [
+      /chainlink[^.]{0,40}\b(fires?|triggers?|schedules?|kicks off)\b[^.]{0,20}settl/i,
+      /settl[^.]{0,40}\b(fires?|triggered|happens|runs)\b[^.]{0,30}via chainlink/i,
+      /settlement[^.]{0,25}automatic[^.]{0,25}via chainlink/i,
+      /chainlink\s+vrf\s+settl/i,
+      /chainlink[^.]{0,20}\bsettles\b/i,
+      /chainlink\s+(automation|crons?|keeper)/i,
+      /\bsettlement:\s*chainlink/i,
+    ].some(re => re.test(line)),
+    note: 'Chainlink Automation is dead. Settlement is triggered by our keeper autopilot; attribute only WINNER SELECTION to Chainlink VRF.',
   },
   {
     name: '"all votes" prize pool contamination (Mechanic B)',
