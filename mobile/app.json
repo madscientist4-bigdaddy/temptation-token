@@ -2,6 +2,7 @@
   "expo": {
     "name": "Temptation Token",
     "slug": "temptation-token",
+    "owner": "madscientist4",
     "scheme": "temptationtoken",
     "version": "0.1.0",
     "orientation": "portrait",
