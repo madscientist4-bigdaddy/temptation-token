@@ -6,63 +6,57 @@ Resolved sagas, dated audits, and superseded-contract narrative live in
 
 **Last verified: 2026-08-25** (block 50,445,515, 17:52 UTC).
 
-🚨 **ROUND 8 IS STILL OPEN AND UNSETTLED — 37h past its calendar pin. The first
-unattended close FAILED, and the cause was ours, not Chainlink's.**
-`currentRoundId` = **8**, `settled=false`, `vrfPending=false`, `endTime` 2026-08-24
-04:59 UTC. `Keeper3.checkUpkeep()` returns **true** with performData `…03` (SETTLE).
-Round 8 took **0 votes**, so no prize, payout or mint is at stake — but **round 9 never
-started, so nobody can vote right now.** The game has been shut to new votes since
-2026-08-24. That is the actual damage.
+✅ **ROUND 8 SETTLED AND ROUND 9 IS LIVE — the keeper autopilot's first-ever action,
+2026-08-25 18:10 / 18:20 UTC.** It had been armed since 2026-08-21 and had never once
+fired; round 8 sat unsettled for 37h and round 9 never opened, so the game was shut to new
+votes from 2026-08-24 until 2026-08-25 18:20 UTC.
+
+**Verified on-chain after the fact** (not from the API): `currentRoundId` = **9** · round 8
+`settled=true` · round 9 start 2026-08-25 18:20:25 UTC, `endTime` **1788152340** =
+2026-08-31 04:59 UTC (the correct calendar pin, no drift) · **18 profiles** ·
+`Trophy.totalSupply()` = **3**, unchanged and correct — round 8 took **0 votes**, so no
+winner, no payout and no mint is the designed outcome. `actionsLast24h` = **2**, exactly a
+clean rollover (SETTLE + START_ROUND). Bank ETH 0.0316, essentially unmoved.
 
 **Root cause — a one-word import bug, hidden by a bare `catch {}`.**
 `api/scheduler.js` imported `encodeAbiParameters` but called **`decodeAbiParameters`**
 (line 552) to turn `checkUpkeep`'s performData into an action. The undefined name threw
 `ReferenceError` on every tick, `catch {}` swallowed it, and `action` stayed `null`.
 `evaluateKeeperAutopilot()` then correctly refused to act on an action it did not
-recognise. Everything else was healthy the whole time: `enabled=true`, `driverAlive=true`,
-`tickAgeSec=17`, `hasBankKey=true`, Bank holds 0.0316 ETH. `actionsLast24h=0` and
-`lastActionAt=null` — **the autopilot has never taken a single action in its life.**
-The tell was on the public status endpoint all along: `upkeepNeeded:true` next to
-`action:null` is a contradiction that can only mean the decode failed.
+recognise — **the guard worked; the input was poisoned.** Every other signal was green
+throughout: `enabled=true`, `driverAlive=true`, `hasBankKey=true`, `upkeepNeeded=true`.
+The tell was public and unauthenticated for 37 hours: `upkeepNeeded:true` beside
+`action:null` is a contradiction that can only mean the decode failed. Fixed and deployed
+2026-08-25; verify with `grep -c decodeAbiParameters api/scheduler.js` (expect 2).
 
-**Fix applied 2026-08-25** (`decodeAbiParameters` added to the viem import). Unit-proven:
-with `action:3` the core returns `act:true, SETTLE due, 37h past the pin`. **⚠️ NOT YET
-DEPLOYED — deploying it settles round 8 from the Bank within ~10 minutes, unattended.**
-See "Keeper autopilot" below before shipping.
+⚠️ **A fresh round starts with `profileCount = 0` and is unvotable until something calls
+`POST /api/profiles?action=sync`.** Round 9 opened with 0 profiles; the sync carried all 18
+across (tx `0x402a9e87…`), confirmed on-chain and via `/api/public-profiles`. PlayScreen
+fires this on load, so in practice the first visitor repairs it — but that means **the
+round is dead until a human happens to open the app.** The autopilot should call sync
+itself after START_ROUND. Until it does, run the sync by hand after every rollover.
 
-**This is the third instance of the same bug class in this file.** `admin_audit_log`
-writes failed silently (`f872764`), `enabled` was undefined so `JSON.stringify` dropped it
-(`73b50a0`), and now the performData decode. **A bare `catch {}` around anything
-load-bearing is a latent outage** — see the rule in "Keeper autopilot".
+**This is the third outage in this one file from a swallowed error.** `admin_audit_log`
+writes failed silently (`f872764`, which disabled the VRF funder's 7-day LINK cap),
+`enabled` was undefined so `JSON.stringify` dropped it (`73b50a0`), and now the performData
+decode. **A bare `catch {}` around anything load-bearing is a latent outage.**
 
-**Chainlink Automation remains dead on Base** (unchanged since 2026-08-05, still true).
-The registry `0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743` performed its last upkeep **for
-anyone** on **2026-08-05 13:35 UTC**; a contiguous, gap-free `UpkeepPerformed` scan of
-blocks 49,700,000 → 50,274,317 found **0 performs across all 191 registered upkeeps**.
-Our upkeep is *not* the problem — 43.97 LINK vs a 2.17 minimum, `paused=false`,
-uncancelled, forwarder matched, `performGas` 500k vs a 132k real settle. Note
-`typeAndVersion()` is **`AutomationRegistry 2.3.0`** — current, no published sunset — so
-version checks will *not* warn you; only the empty perform log tells the truth.
+**Chainlink Automation remains dead on Base** (unchanged since 2026-08-05). The registry
+`0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743` performed its last upkeep **for anyone** on
+**2026-08-05 13:35 UTC**; a contiguous, gap-free `UpkeepPerformed` scan of blocks
+49,700,000 → 50,274,317 found **0 performs across all 191 registered upkeeps**. Our upkeep
+is *not* the problem — 43.97 LINK vs a 2.17 minimum, `paused=false`, uncancelled, forwarder
+matched, `performGas` 500k vs a 132k real settle. `typeAndVersion()` is
+**`AutomationRegistry 2.3.0`** — current, no published sunset — so version checks will
+*not* warn you; only the empty perform log tells the truth. **The autopilot, not Chainlink,
+is now the settlement mechanism.**
 
-**Rounds 6, 7 and now 8 have all closed unsettled.** 6 and 7 were rescued by hand from the
-Bank wallet (`manualExecute(3)` then `(1)`), ~18h late each. 8 is the one the autopilot was
-supposed to catch and did not.
+**Next rollover: round 9 closes 2026-08-31 04:59 UTC.** That is the first close where the
+autopilot has a working decode going in. Watch `?action=keeper-status` for
+`actionsLast24h` reaching 2, then run the profile sync.
 
-**Two ways to close round 8:**
-
-1. **Deploy the autopilot fix** — `npm run build && node scripts/check-prize-split.mjs &&
-   npm run deploy`. The Railway bot pings `/api/scheduler?action=keeper` every 10 min, so
-   settlement follows within ~10 minutes with no human in the loop, then round 9 starts on
-   the next tick (5-min min-interval). **This spends Bank gas unattended** — arming the
-   autopilot was Jim's standing go-ahead for exactly this, but the fix has never actually
-   fired, so treat the first one as supervised.
-2. **By hand** (fallback), one command with the Bank key: `node --env-file=.env
-   outputs/manual_settle_fallback.mjs --execute --wait` (read-only pre-flight is safe to
-   run any time; mid-round it correctly reports "nothing due").
-
-After either, confirm: `currentRoundId` → **9**, round 9 `endTime` = **1788152340**
-(2026-08-31 04:59 UTC), and `Trophy.totalSupply()` stays **3** (round 8 had no votes, so
-no mint is correct — do not read an unchanged supply as a failure here).
+**Fallback** if it ever fails again (Bank tx → needs Jim): `node --env-file=.env
+outputs/manual_settle_fallback.mjs --execute --wait`.
 
 **Prior anchor — 2026-08-21.** Keeper autopilot shipped and armed; `admin_audit_log`
 schema landmine found and fixed; round-audit launchd watchdog installed.
@@ -191,7 +185,7 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 
 | Feature | State | Notes |
 |---|---|---|
-| Voting (V3d) | 🔴 **STALLED — round 8 unsettled, round 9 never opened** | Round 8 closed 2026-08-24 04:59 UTC with **0 votes** and is still `settled=false` 37h later. Rounds 1-7 settled. **Chainlink Automation dead since 2026-08-05**; rounds 6-7 rescued by hand ~18h late. The keeper autopilot that was meant to close round 8 **never fired** — `decodeAbiParameters` was never imported, so it read `action:null` forever. Fix in the tree, undeployed. **No votes are possible until round 9 starts.** |
+| Voting (V3d) | ✅ LIVE, **self-closing since 2026-08-25** | Round **9** in flight (opened 2026-08-25 18:20 UTC, ends 2026-08-31 04:59 UTC, 18 profiles). Rounds 1-8 settled. Chainlink Automation dead since 2026-08-05; rounds 6-7 rescued by hand ~18h late, round 8 sat 37h until the **keeper autopilot's first-ever action** closed it. ⚠️ A new round opens with `profileCount=0` — run `POST /api/profiles?action=sync` after every rollover |
 | Prize split 35/35/10/20 | ✅ LIVE | hardcoded in V3d; CI-guarded |
 | Frontend (prod) | ✅ LIVE | `app.temptationtoken.io`, 12 functions |
 | Admin dashboard | ✅ LIVE | server-side auth, gated data proxy, anon key purged |
@@ -236,13 +230,13 @@ history.
   recovery, automation intact) · `admin` = Bank ✓ · `nftContract` = **Trophy `0x02DDd0e6…`** ✓
 - V3d `houseWallet` = Marketing `0x7a9ff2f5…` ✓ · `charityWallet` = Polaris `0xf7dd429d…` ✓
 - V3d is a **VRF consumer** on sub `58222014…263722` ✓ · **`isTaxExempt(V3d)=true`** ✓
-- V3d `currentRoundId` = **8** (2026-08-25 17:52 UTC) · Round 8: start 2026-08-17
-  23:33:33 UTC, `endTime` `1787547540` (Mon 2026-08-24 04:59 UTC = Sun 23:59 EST),
-  `totalTickets=0`, `totalRawVotes=0`, `settled=false`, `vrfPending=false`, 18 profiles.
-  **Closed 37h ago and never settled** — see the headline. `checkUpkeep()` = `true`,
-  performData `…03` (SETTLE). Because the round took **0 votes**, settling it produces no
-  winner, no payout and no mint by design; the cost of the delay is that **round 9 has not
-  started**, so the game is shut to new votes
+- V3d `currentRoundId` = **9** (verified 2026-08-25 18:22 UTC) · Round 9: start
+  2026-08-25 18:20:25 UTC, `endTime` `1788152340` (Mon 2026-08-31 04:59 UTC = Sun 23:59
+  EST), `settled=false`, `vrfPending=false`, **18 profiles** (0 at open; carried on by
+  `profiles?action=sync`, tx `0x402a9e87…`)
+- Round 8 (settled ✓, 37h late): start 2026-08-17 23:33:33 UTC, end 2026-08-24 04:59 UTC,
+  `totalTickets=0`, `totalRawVotes=0`, **0 votes** → no winner, payout or mint by design.
+  Closed by the keeper autopilot's first-ever action 2026-08-25 18:10:20 UTC
 - Round 7 (settled ✓): start 2026-08-10 22:43:49 UTC, end 2026-08-17 04:59 UTC,
   `totalRawVotes` 5 TTS, 18 profiles, `settled=true`, `vrfPending=false`
 - Settled history: round 4 end 2026-07-20 (10 TTS, VRF-stall recovered manually — see
@@ -284,11 +278,16 @@ history.
   `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` · sub
   `58222014484560539249027457203866883376041731162442592604288474822166186263722`
 
-### Keeper autopilot — the Automation replacement (ARMED 2026-08-21 · 🔴 NEVER FIRED — fix undeployed 2026-08-25)
-- 🔴 **STATUS 2026-08-25: armed, driven, funded — and it has never acted.** Live
-  `?action=keeper-status`: `enabled=true`, `driverAlive=true`, `tickAgeSec=17`,
-  `hasBankKey=true`, `upkeepNeeded=true`, **`action:null`**, `actionsLast24h=0`,
-  `lastActionAt=null`. Round 8 sat unsettled 37h with every green light lit.
+### Keeper autopilot — the Automation replacement (ARMED 2026-08-21 · ✅ FIRST SUCCESSFUL ROLLOVER 2026-08-25)
+- ✅ **STATUS 2026-08-25: working, proven end-to-end once.** It settled round 8
+  (18:10:20 UTC) and started round 9 (18:20:24 UTC) — `actionsLast24h` = 2, exactly a clean
+  rollover. Verified on-chain, not just via the API: `currentRoundId` 8 → 9, round 8
+  `settled=true`, round 9 pinned to 1788152340 with no drift.
+- 🔴 **It was armed for 4 days and never acted.** Before the fix, live `?action=keeper-status`
+  read `enabled=true`, `driverAlive=true`, `hasBankKey=true`, `upkeepNeeded=true`,
+  **`action:null`**, `actionsLast24h=0`, `lastActionAt=null`. Round 8 sat unsettled 37h with
+  every green light lit. **Trust `actionsLast24h`, not `armedHint`** — armed is not the same
+  as working, and only an action count proves the difference.
 - **Why:** `api/scheduler.js` line 552 calls `decodeAbiParameters(...)` to turn
   `checkUpkeep`'s performData into an action, but the viem import on line 7 only brought in
   `encodeAbiParameters`. Every tick threw `ReferenceError: decodeAbiParameters is not
@@ -297,9 +296,13 @@ history.
   `{act:false, reason:'unknown action null'}`. **The guard worked; the input was poisoned.**
   Fixed 2026-08-25 by adding the name to the import — verify with
   `grep -c 'decodeAbiParameters' api/scheduler.js` (expect 2: import + call).
-- ⚠️ **The fix is committed but the settle it enables has not happened.** Deploying to
-  Vercel arms a real Bank transaction on the next 10-min bot ping. `git push` alone is
-  safe — it only redeploys the Railway bot, which just rings the doorbell.
+- ⚠️ **Deploying this code arms a real Bank transaction on the next 10-min bot ping.**
+  `git push` alone is safe — it only redeploys the Railway bot, which just rings the
+  doorbell. Vercel is where the Bank key lives.
+- 🕳 **It does not sync profiles.** After START_ROUND the new round has `profileCount=0` and
+  cannot be voted on until `POST /api/profiles?action=sync` runs. PlayScreen fires it on
+  load, so the first visitor repairs it — but the round is dead until someone opens the app.
+  **Fold the sync into the autopilot's post-START_ROUND path.**
 - 📏 **RULE — no bare `catch {}` around anything load-bearing.** Three outages in this one
   file now trace to a swallowed error: silent `admin_audit_log` writes (`f872764`, which
   disabled the VRF funder's 7-day LINK cap), a dropped `enabled` key (`73b50a0`), and this
@@ -612,13 +615,12 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
 - **NFT (watch): CLOSED 2026-08-21.** Round 7's first Trophy mint landed —
   `Trophy.totalSupply()` 0 → **3**, token #1 owner `0xE15D7231…`, `tokenURI` resolves
   HTTP 200. Nothing further to watch here.
-- 🔴 **P0 — ROUND 8 UNSETTLED, ROUND 9 NOT STARTED (live since 2026-08-24 04:59 UTC).**
-  The autopilot's first unattended close failed on a missing `decodeAbiParameters` import;
-  the fix is in the tree and **undeployed**. Deploy (`npm run deploy`) and the next 10-min
-  bot ping settles it, or run `node --env-file=.env
-  outputs/manual_settle_fallback.mjs --execute --wait`. Either way it is a **Bank
-  transaction → needs Jim**. Verify after: `currentRoundId` → 9, round 9 `endTime` =
-  1788152340, `Trophy.totalSupply()` stays 3 (round 8 had 0 votes — no mint is correct).
+- ✅ **CLOSED 2026-08-25 — round 8 settled, round 9 live.** The autopilot's decode fix
+  shipped and it completed its first rollover unaided. Nothing outstanding here.
+- **P1 — make the autopilot sync profiles after START_ROUND.** Round 9 opened with
+  `profileCount=0` and was unvotable until `POST /api/profiles?action=sync` ran by hand.
+  Every future rollover has the same hole; PlayScreen's on-load sync only saves it if a
+  human opens the app.
 - **P1 — teach the watchdog about the autopilot.** `scripts/verify-round-settlement.mjs`
   audits Chainlink only and is blind to `keeper_autopilot_status`. Add: assert `action`
   is non-null whenever `upkeepNeeded` is true, and alert when `actionsLast24h == 0` past
