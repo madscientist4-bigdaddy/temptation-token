@@ -4,7 +4,7 @@
 //   2. AT 10AM UTC daily: post round status update to Telegram
 
 import crypto from 'crypto'
-import { createWalletClient, createPublicClient, http, parseAbi, encodeAbiParameters } from 'viem'
+import { createWalletClient, createPublicClient, http, parseAbi, encodeAbiParameters, decodeAbiParameters } from 'viem'
 import { base } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
 import { evaluateAutoFund } from './_lib/autofund.js'

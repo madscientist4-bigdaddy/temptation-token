@@ -4,38 +4,73 @@ Guidance for Claude Code working in this repo. **Canonical CURRENT-STATE only.**
 Resolved sagas, dated audits, and superseded-contract narrative live in
 [CLAUDE_HISTORY.md](./CLAUDE_HISTORY.md).
 
-**Last verified: 2026-08-21.** 🚨 **CHAINLINK AUTOMATION IS DEAD ON BASE — settlement is
-now a MANUAL weekly Bank transaction.** The Automation registry
-`0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743` performed its last upkeep **for anyone** on
-**2026-08-05 13:35 UTC**; a contiguous, gap-free `UpkeepPerformed` scan of blocks
-49,700,000 → 50,274,317 found **0 performs across all 191 registered upkeeps** (the prior
-window had 278 across 32 upkeeps). Our upkeep is *not* the problem — 43.97 LINK vs a 2.17
-minimum, `paused=false`, uncancelled, forwarder matched, `performGas` 500k vs a 132k real
-settle, and `checkUpkeep()` returned **true** for ~18h while nothing happened. Note
-`typeAndVersion()` is **`AutomationRegistry 2.3.0`** — the current version with no published
-sunset — so version checks will *not* warn you; only the empty perform log tells the truth.
-The only registry traffic since is other teams cancelling upkeeps and withdrawing LINK.
-**Rounds 6 and 7 both closed unsettled for ~18h** and were rescued by hand from the Bank
-wallet (`manualExecute(3)` then `(1)`). See the Automation row below and the superseded-header
-correction at the top of `outputs/cre_migration_plan.md`.
+**Last verified: 2026-08-25** (block 50,445,515, 17:52 UTC).
 
-**Round 7 settled and the first Trophy mint landed.** `Trophy.totalSupply()` **0 → 3** as
-designed; token #1 owner `0xE15D7231…`, and its `tokenURI` resolves HTTP 200 (verified — a
-trophy that renders blank is not a delivered prize). Round 7 took 5 TTS of votes across 18
-profiles. V3d `currentRoundId` = **8**, `endTime` 2026-08-24 04:59 UTC, `settled=false`,
-`vrfPending=false`, 18 profiles, **0 votes so far**. `owner` = Keeper3 ✓, `nftContract` =
-Trophy ✓.
+🚨 **ROUND 8 IS STILL OPEN AND UNSETTLED — 37h past its calendar pin. The first
+unattended close FAILED, and the cause was ours, not Chainlink's.**
+`currentRoundId` = **8**, `settled=false`, `vrfPending=false`, `endTime` 2026-08-24
+04:59 UTC. `Keeper3.checkUpkeep()` returns **true** with performData `…03` (SETTLE).
+Round 8 took **0 votes**, so no prize, payout or mint is at stake — but **round 9 never
+started, so nobody can vote right now.** The game has been shut to new votes since
+2026-08-24. That is the actual damage.
 
-**⚠️ ROUND 8 CLOSES 2026-08-24 04:59 UTC.** Two ways to close it:
+**Root cause — a one-word import bug, hidden by a bare `catch {}`.**
+`api/scheduler.js` imported `encodeAbiParameters` but called **`decodeAbiParameters`**
+(line 552) to turn `checkUpkeep`'s performData into an action. The undefined name threw
+`ReferenceError` on every tick, `catch {}` swallowed it, and `action` stayed `null`.
+`evaluateKeeperAutopilot()` then correctly refused to act on an action it did not
+recognise. Everything else was healthy the whole time: `enabled=true`, `driverAlive=true`,
+`tickAgeSec=17`, `hasBankKey=true`, Bank holds 0.0316 ETH. `actionsLast24h=0` and
+`lastActionAt=null` — **the autopilot has never taken a single action in its life.**
+The tell was on the public status endpoint all along: `upkeepNeeded:true` next to
+`action:null` is a contradiction that can only mean the decode failed.
 
-1. **Keeper autopilot — SHIPPED AND ✅ ARMED 2026-08-21** (Jim's explicit go-ahead).
-   `admin_config.keeper_autopilot_enabled = 'true'`. Round 8 and every round after closes
-   ~15 min after the calendar pin with no human in the loop. Verified live: `enabled=true`,
-   `driverAlive=true`, Bank holds 0.0316 ETH ≈ 2,250 settles at ~0.000014 ETH each.
-   **To disarm:** set that row to anything else.
+**Fix applied 2026-08-25** (`decodeAbiParameters` added to the viem import). Unit-proven:
+with `action:3` the core returns `act:true, SETTLE due, 37h past the pin`. **⚠️ NOT YET
+DEPLOYED — deploying it settles round 8 from the Bank within ~10 minutes, unattended.**
+See "Keeper autopilot" below before shipping.
+
+**This is the third instance of the same bug class in this file.** `admin_audit_log`
+writes failed silently (`f872764`), `enabled` was undefined so `JSON.stringify` dropped it
+(`73b50a0`), and now the performData decode. **A bare `catch {}` around anything
+load-bearing is a latent outage** — see the rule in "Keeper autopilot".
+
+**Chainlink Automation remains dead on Base** (unchanged since 2026-08-05, still true).
+The registry `0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743` performed its last upkeep **for
+anyone** on **2026-08-05 13:35 UTC**; a contiguous, gap-free `UpkeepPerformed` scan of
+blocks 49,700,000 → 50,274,317 found **0 performs across all 191 registered upkeeps**.
+Our upkeep is *not* the problem — 43.97 LINK vs a 2.17 minimum, `paused=false`,
+uncancelled, forwarder matched, `performGas` 500k vs a 132k real settle. Note
+`typeAndVersion()` is **`AutomationRegistry 2.3.0`** — current, no published sunset — so
+version checks will *not* warn you; only the empty perform log tells the truth.
+
+**Rounds 6, 7 and now 8 have all closed unsettled.** 6 and 7 were rescued by hand from the
+Bank wallet (`manualExecute(3)` then `(1)`), ~18h late each. 8 is the one the autopilot was
+supposed to catch and did not.
+
+**Two ways to close round 8:**
+
+1. **Deploy the autopilot fix** — `npm run build && node scripts/check-prize-split.mjs &&
+   npm run deploy`. The Railway bot pings `/api/scheduler?action=keeper` every 10 min, so
+   settlement follows within ~10 minutes with no human in the loop, then round 9 starts on
+   the next tick (5-min min-interval). **This spends Bank gas unattended** — arming the
+   autopilot was Jim's standing go-ahead for exactly this, but the fix has never actually
+   fired, so treat the first one as supervised.
 2. **By hand** (fallback), one command with the Bank key: `node --env-file=.env
-   outputs/manual_settle_fallback.mjs --execute --wait` (read-only pre-flight re-verified
-   2026-08-21: correctly reports "nothing due" mid-round).
+   outputs/manual_settle_fallback.mjs --execute --wait` (read-only pre-flight is safe to
+   run any time; mid-round it correctly reports "nothing due").
+
+After either, confirm: `currentRoundId` → **9**, round 9 `endTime` = **1788152340**
+(2026-08-31 04:59 UTC), and `Trophy.totalSupply()` stays **3** (round 8 had no votes, so
+no mint is correct — do not read an unchanged supply as a failure here).
+
+**Prior anchor — 2026-08-21.** Keeper autopilot shipped and armed; `admin_audit_log`
+schema landmine found and fixed; round-audit launchd watchdog installed.
+
+**Prior anchor — 2026-08-17.** Round 7 settled and the first Trophy mint landed.
+`Trophy.totalSupply()` **0 → 3** as designed; token #1 owner `0xE15D7231…`, `tokenURI`
+resolves HTTP 200 (verified — a trophy that renders blank is not a delivered prize).
+Round 7 took 5 TTS of votes across 18 profiles.
 
 **Prior anchor — 2026-08-16.** Frontend NFT screen rewritten + deployed (it had never been
 able to render a trophy — see the NFT row below); `?buy=1` from the live WP /buy page now
@@ -136,7 +171,9 @@ guard cannot verify the real build without it.
 photos, vote with TTS, top voter + winning profile split the pool; charity + house take
 cuts; losing votes burn.
 
-Three systems:
+Four systems:
+0. **Expo mobile app** (`/mobile`) — React Native + Expo, `io.temptationtoken.app`,
+   shares wagmi/viem with the web. Not shipped to either store yet. See "Mobile app".
 1. **React SPA** (`/src`) — Vite + React 19, Vercel. All contract reads/writes happen
    client-side via Wagmi/Viem. `src/App.jsx` is the monolithic main UI (ABIs + addresses
    as top-of-file constants). `src/TTAdminDashboard.jsx` = password-gated admin panel.
@@ -150,16 +187,17 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 
 ---
 
-## Feature State (LIVE / PARTIAL / NOT-BUILT) — verified 2026-07-01
+## Feature State (LIVE / PARTIAL / NOT-BUILT) — round/keeper rows verified 2026-08-25
 
 | Feature | State | Notes |
 |---|---|---|
-| Voting (V3d) | ⚠️ LIVE, **settled by hand** | Round **8** in flight (ends 2026-08-24 04:59 UTC), calendar-pinned. Rounds 1-7 settled. **Chainlink Automation is dead since 2026-08-05** — rounds 6 and 7 each sat unsettled ~18h until a manual Bank `manualExecute`. Round 8 needs the same unless CRE lands first |
+| Voting (V3d) | 🔴 **STALLED — round 8 unsettled, round 9 never opened** | Round 8 closed 2026-08-24 04:59 UTC with **0 votes** and is still `settled=false` 37h later. Rounds 1-7 settled. **Chainlink Automation dead since 2026-08-05**; rounds 6-7 rescued by hand ~18h late. The keeper autopilot that was meant to close round 8 **never fired** — `decodeAbiParameters` was never imported, so it read `action:null` forever. Fix in the tree, undeployed. **No votes are possible until round 9 starts.** |
 | Prize split 35/35/10/20 | ✅ LIVE | hardcoded in V3d; CI-guarded |
 | Frontend (prod) | ✅ LIVE | `app.temptationtoken.io`, 12 functions |
 | Admin dashboard | ✅ LIVE | server-side auth, gated data proxy, anon key purged |
 | Club referral codes | ✅ LIVE | user enters club code on submit → auto-linked on-chain at admin approval. Club registration is admin-only |
 | NFT auto-mint | ✅ LIVE on Trophy (round 7 minted 3, verified 2026-08-21) | V3d mints 3 NFTs on settlement (winner / top voter / house). `V3d.nftContract()` = **Trophy `0x02DDd0e6…`**. Rounds 4-5 minted **6 tokens into the retired TTSRoundNFT** (pointer flipped after round 5); round 6 had zero votes; **round 7 was the first Trophy mint — `totalSupply()` 0 → 3, token #1 `tokenURI` resolves 200**. Verified 2026-08-16: `Trophy.minter()`=V3d, mint estimates 142k gas vs the 200k `try/catch` cap → will not silently no-op. `src/App.jsx` now reads **both** contracts |
+| **Mobile app (Expo)** | 🟡 BUILT, **not shipped** | `mobile/`, Expo SDK + RN, bundle `io.temptationtoken.app`, version 0.1.0. Play/Leaderboard/round countdown/community stats work against prod APIs. Wallet connect + voting need an EAS dev build (native modules Expo Go cannot load) — `metro.config.js` swaps in `src/wallet/appkit.stub.ts` unless `EXPO_PUBLIC_WALLET_ENABLED=true`. **Blocked on Jim, not code:** iOS needs an Apple Developer account (3 placeholders in `eas.json` → `submit.testflight`); Android needs a verified Play payments profile. Play listing copy drafted at `outputs/listings/play_store_listing.md`, no Play Console app created |
 | Telegram bot | ✅ LIVE + honest | running on Railway; staking/referral/VIP copy says "coming soon" — no undeliverable promises |
 | **Staking** | 🟢 ON-CHAIN LIVE / UI gated | Contracts deployed+verified on Base; **10B reward pool migrated 2026-08-07** into proxy `0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d` (old `0xaA12B889…` drained to 0, impl now RescueUUPS). V3d wired to it; mainnet E2E stake/unstake proven tax-free. Thresholds (TTS): 6k/12k/30k/120k/600k · APR 8/12/18/32/45% · **no lock-up** · 7-day multiplier clock. Frontend/bot still show "Coming Soon" — go-live is env-only (`VITE_STAKING_ENABLED` + `STAKING_LIVE`). See `staking/PHASE2_RUNBOOK.md` |
 | **User referral payouts** | ✅ LIVE (E2E-verified in prod 2026-07-01) | Web `?ref=` capture → `/api/bonus?action=refer-capture` (unique referee). Qualifying-vote payout via `?action=referral`, paid ONLY from `REFERRAL_WALLET_PRIVATE_KEY` (never Bank). `referral_enabled=true`. Anti-sybil all verified rejecting in prod: self-referral, double-capture, referrer-hijack, kill-switch, funding-source (Alchemy `getAssetTransfers`, bounded at TTS deploy block), fail-closed; ≥500 TTS threshold gates payout. Auto-funder (Marketing→referral wallet, never Bank) armed & correctly idle. Bot referral still coming-soon (no telegram→wallet bridge). |
@@ -193,13 +231,20 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 `107234397534438678…823641`. Several orphaned V3d duplicate deploys (2026-06-12) — see
 history.
 
-### V3d / Keeper3 — verified on-chain (round state 2026-08-21; wiring 2026-06-24/28)
+### V3d / Keeper3 — verified on-chain (round state 2026-08-25; wiring 2026-06-24/28)
 - V3d `owner` = Keeper3 ✓ (re-verified 2026-08-16 — returned after the round-4 VRF-stall
   recovery, automation intact) · `admin` = Bank ✓ · `nftContract` = **Trophy `0x02DDd0e6…`** ✓
 - V3d `houseWallet` = Marketing `0x7a9ff2f5…` ✓ · `charityWallet` = Polaris `0xf7dd429d…` ✓
 - V3d is a **VRF consumer** on sub `58222014…263722` ✓ · **`isTaxExempt(V3d)=true`** ✓
-- V3d `currentRoundId` = **8** · Round 8 `endTime` = `1787547540` (Mon 2026-08-24 04:59
-  UTC = Sun 23:59 EST), `settled=false`, `vrfPending=false`, 18 profiles, **0 votes**
+- V3d `currentRoundId` = **8** (2026-08-25 17:52 UTC) · Round 8: start 2026-08-17
+  23:33:33 UTC, `endTime` `1787547540` (Mon 2026-08-24 04:59 UTC = Sun 23:59 EST),
+  `totalTickets=0`, `totalRawVotes=0`, `settled=false`, `vrfPending=false`, 18 profiles.
+  **Closed 37h ago and never settled** — see the headline. `checkUpkeep()` = `true`,
+  performData `…03` (SETTLE). Because the round took **0 votes**, settling it produces no
+  winner, no payout and no mint by design; the cost of the delay is that **round 9 has not
+  started**, so the game is shut to new votes
+- Round 7 (settled ✓): start 2026-08-10 22:43:49 UTC, end 2026-08-17 04:59 UTC,
+  `totalRawVotes` 5 TTS, 18 profiles, `settled=true`, `vrfPending=false`
 - Settled history: round 4 end 2026-07-20 (10 TTS, VRF-stall recovered manually — see
   `outputs/recover_round4_report.txt`) · round 5 end 2026-08-03 (5 TTS, **last round
   Chainlink ever settled by itself**) · round 6 end 2026-08-10 (**0 votes** → no winner,
@@ -227,17 +272,41 @@ history.
   `outputs/cre_migration_plan.md`.
 - **Until CRE is live, settlement is manual and weekly** (Bank tx → needs Jim):
   `node --env-file=.env outputs/manual_settle_fallback.mjs --execute --wait`
-- Watchdog: `scripts/verify-round-settlement.mjs` (read-only) now fails on a stale perform
-  and probes registry-wide liveness, so this class of outage cannot read as health again.
-  Scheduled by `scripts/launchd/io.temptationtoken.round-audit.plist` at **Sun 20:00 ET
-  (pre-close), Mon 02:00 ET (~1h after close), Mon 06:00 ET (backstop)** — installed and
-  loaded 2026-08-21; it had never actually run before that (single Mon-06:00 fire, added
-  after that week's fire time had already passed).
+- Watchdog: `scripts/verify-round-settlement.mjs` (read-only) fails on a stale perform and
+  probes registry-wide liveness. Scheduled by
+  `scripts/launchd/io.temptationtoken.round-audit.plist` at **Sun 20:00 ET (pre-close),
+  Mon 02:00 ET (~1h after close), Mon 06:00 ET (backstop)**. **Proven working 2026-08-24:**
+  all three fired, exited 1, logged `round 8 is 5h overdue and settlement was NEVER
+  STARTED`, and relayed to Telegram. It correctly refuses to call a dead automation healthy
+  — but it only ever looks at Chainlink, so it misattributed round 8's failure and cannot
+  see the autopilot. See the two blind spots under "Keeper autopilot".
 - **VRF:** coordinator `0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634` · keyHash
   `0xdc2f87677b01473c763cb0aee938ed3341512f6057324a584e5944e786144d70` · sub
   `58222014484560539249027457203866883376041731162442592604288474822166186263722`
 
-### Keeper autopilot — the Automation replacement (shipped + ARMED 2026-08-21)
+### Keeper autopilot — the Automation replacement (ARMED 2026-08-21 · 🔴 NEVER FIRED — fix undeployed 2026-08-25)
+- 🔴 **STATUS 2026-08-25: armed, driven, funded — and it has never acted.** Live
+  `?action=keeper-status`: `enabled=true`, `driverAlive=true`, `tickAgeSec=17`,
+  `hasBankKey=true`, `upkeepNeeded=true`, **`action:null`**, `actionsLast24h=0`,
+  `lastActionAt=null`. Round 8 sat unsettled 37h with every green light lit.
+- **Why:** `api/scheduler.js` line 552 calls `decodeAbiParameters(...)` to turn
+  `checkUpkeep`'s performData into an action, but the viem import on line 7 only brought in
+  `encodeAbiParameters`. Every tick threw `ReferenceError: decodeAbiParameters is not
+  defined` straight into `try { … } catch {}`, leaving `action = null`. The pure core did
+  its job perfectly: `evaluateKeeperAutopilot({action:null})` →
+  `{act:false, reason:'unknown action null'}`. **The guard worked; the input was poisoned.**
+  Fixed 2026-08-25 by adding the name to the import — verify with
+  `grep -c 'decodeAbiParameters' api/scheduler.js` (expect 2: import + call).
+- ⚠️ **The fix is committed but the settle it enables has not happened.** Deploying to
+  Vercel arms a real Bank transaction on the next 10-min bot ping. `git push` alone is
+  safe — it only redeploys the Railway bot, which just rings the doorbell.
+- 📏 **RULE — no bare `catch {}` around anything load-bearing.** Three outages in this one
+  file now trace to a swallowed error: silent `admin_audit_log` writes (`f872764`, which
+  disabled the VRF funder's 7-day LINK cap), a dropped `enabled` key (`73b50a0`), and this
+  decode. If a `catch` cannot act on the error, it must at minimum leave a fingerprint in
+  the status blob — a field that reads `null` where a value is required is not a
+  fingerprint anyone will notice. **`upkeepNeeded:true` beside `action:null` was visible on
+  a public, unauthenticated endpoint for 37 hours and nobody read it.**
 - **What:** `api/_lib/keeper_autopilot.js` (pure decision core) + `runKeeperAutopilot()` in
   `api/scheduler.js`. Reads `Keeper3.checkUpkeep()` and, when work is due, sends
   `Keeper3.manualExecute(action)` from the **Bank** (Bank is `Keeper3.owner()` and
@@ -269,11 +338,26 @@ history.
 - **Observability:** Telegram receipt on every action, `admin_audit_log` row
   (`action='keeper_autopilot'`), `admin_config.keeper_autopilot_status` blob, and
   `GET /api/scheduler?action=keeper-status` (read-only, no auth, no writes).
-- **Watchdog:** `scripts/launchd/io.temptationtoken.round-audit.plist` is **installed and
-  loaded** in `~/Library/LaunchAgents` (fires Sun 20:00 / Mon 02:00 / Mon 06:00 ET,
-  read-only, Telegram-reported). `scripts/verify-round-settlement.mjs` now also flags
-  automation idle >8d and asks the registry whether the outage is Chainlink-wide or ours —
-  it previously reported "all good" through 18.6 days of dead automation.
+- **Watchdog — it worked, and it still was not enough.**
+  `scripts/launchd/io.temptationtoken.round-audit.plist` is installed and loaded
+  (`launchctl list` → `io.temptationtoken.round-audit`, last exit **1** = correctly
+  failing). It fired all three times for round 8 and logged the truth to
+  `logs/round-audit.log`:
+  `❌ round 8 is 5h overdue and settlement was NEVER STARTED (vrfPending=false)`, with
+  `Telegram via server relay: sent` on each. **Detection was never the problem — nobody
+  acted on three alerts for 37 hours.**
+- 🕳 **Watchdog blind spot: it audits the RETIRED mechanism.**
+  `scripts/verify-round-settlement.mjs` reports only on Chainlink ("automation is DEAD and
+  rounds are being closed by hand or not at all") and **never reads
+  `keeper_autopilot_status` or `?action=keeper-status`.** So it correctly said "overdue"
+  while attributing it to an outage that is no longer the operative cause — the autopilot
+  was the thing that failed, and the audit cannot see the autopilot at all. **Fix: teach it
+  to assert `action != null` whenever `upkeepNeeded` is true, and to alert when
+  `actionsLast24h == 0` after a pin+grace.** That single assertion would have caught this
+  on 2026-08-24 at 02:00 ET.
+- 🕳 **Coverage gap:** the schedule is Sun 20:00 / Mon 02:00 / Mon 06:00 ET only. After the
+  Monday 06:00 backstop there is **no check until the following Sunday**, which is exactly
+  the window round 8 rotted in. A daily tick would have re-alerted on Tue-Sat.
 
 ### TTSVotingV3d source / behavior
 - Source: `contracts/TTSVotingV3d.sol` (= V3c + `adminTransferOwnership`). Flattened:
@@ -439,6 +523,47 @@ Learned the hard way on 2026-08-16, when a homepage repair blanked ~1/3 of page 
 7. **Verify with a cache-buster** (`?cb=<random>`). LiteSpeed will happily serve a stale
    copy and make a successful write look like a failed one, and vice versa.
 
+## Mobile app (`/mobile`) — built, not shipped
+
+Expo / React Native, `package.json` name `tts-mobile` v0.1.0. Separate npm project — run
+commands from `mobile/`, not the repo root. Shares the web stack: wagmi + viem + Reown
+AppKit React Native, Base-only, same WalletConnect `projectId`.
+
+| Field | Value |
+|---|---|
+| Bundle id | `io.temptationtoken.app` (iOS + Android) |
+| Expo owner | `madscientist4` (pinned in `app.json` so EAS resolves the right account) |
+| Version / build | `0.1.0` / iOS `buildNumber` 1, Android `versionCode` 1 |
+| Scheme | `temptationtoken` · dark UI, `#0B0B0F` |
+
+- **Works today** (Expo Go, `npx expo start`): Play screen with all approved profiles,
+  round countdown, profile detail, Leaderboard, community stats — all against **production**
+  `/api/public-profiles` and `/api/community-stats`.
+- **Stubbed in Expo Go:** wallet connect, balance reads, voting. These are native modules
+  Expo Go cannot load — a hard platform limit, not unfinished work. `metro.config.js`
+  resolves `src/wallet/appkit.stub.ts` unless `EXPO_PUBLIC_WALLET_ENABLED=true`; the swap is
+  at **bundle** time, so a runtime flag alone cannot substitute. Light it up with
+  `eas build --profile development`.
+- **EAS profiles** (`eas.json`): `development`, `apk`, `apk-wallet`, `ios-simulator`,
+  `preview`, `testflight`, `production`. Gasless paymaster points at
+  `https://app.temptationtoken.io/api/paymaster`. `EXPO_PUBLIC_STAKING_LIVE=false`
+  everywhere — mobile must keep saying "coming soon" like the web app and bot.
+- **iOS compliance is done in-repo:** camera + photo-library purpose strings naming the 18+
+  ID/selfie check, `ios.privacyManifests` (CA92.1 / C617.1 / E174.1 / 35F9.1),
+  `ITSAppUsesNonExemptEncryption: false`. See `outputs/mobile_testflight_checklist.md`.
+- 🔒 **Blocked on Jim, not on code:**
+  - **iOS** — needs an Apple Developer account. `eas.json` → `submit.testflight` still holds
+    three literal placeholders: `REPLACE_WITH_APPLE_ID_EMAIL`,
+    `REPLACE_WITH_APP_STORE_CONNECT_APP_ID`, `REPLACE_WITH_APPLE_TEAM_ID`.
+  - **Android** — needs a verified Play payments profile. Listing copy is drafted at
+    `outputs/listings/play_store_listing.md`; **no Play Console app has been created.**
+- ⚠️ **The drafted Play copy says the contest "settles automatically on-chain."** That is a
+  promise the keeper autopilot has never once kept. Do not submit it until settlement has
+  actually run unattended at least once.
+
+Docs: `mobile/PHASE1_PLAN.md` (approach + rationale), `outputs/mobile_status.md`,
+`outputs/mobile_build_runbook.md`, `outputs/mobile_testflight_checklist.md`.
+
 ## Infrastructure
 | Service | ID |
 |---|---|
@@ -487,16 +612,36 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
 - **NFT (watch): CLOSED 2026-08-21.** Round 7's first Trophy mint landed —
   `Trophy.totalSupply()` 0 → **3**, token #1 owner `0xE15D7231…`, `tokenURI` resolves
   HTTP 200. Nothing further to watch here.
-- **AUTOMATION — MITIGATED 2026-08-21.** Chainlink stopped performing on Base 2026-08-05;
-  the **keeper autopilot** (see its section above) replaced it and is **ARMED** with Jim's
-  go-ahead. Round 8 (closes 2026-08-24 04:59 UTC) is the **first unattended close** —
-  worth confirming afterwards that `Trophy.totalSupply()` goes 3 → 6 and round 9 pins to
-  2026-08-31 04:59 UTC. Fallback if it ever fails: `node --env-file=.env
-  outputs/manual_settle_fallback.mjs --execute --wait`. Still open long-term:
-  the CRE migration in `outputs/cre_migration_plan.md` (Priority 2 — the decision gate
-  that used to say "probably don't migrate" now resolves to MIGRATE), then reclaim the
-  43.97 LINK (Priority 3). Both need Jim: CRE access is gated, and cutover ends in a
-  `Keeper3.setForwarder` from Bank.
+- 🔴 **P0 — ROUND 8 UNSETTLED, ROUND 9 NOT STARTED (live since 2026-08-24 04:59 UTC).**
+  The autopilot's first unattended close failed on a missing `decodeAbiParameters` import;
+  the fix is in the tree and **undeployed**. Deploy (`npm run deploy`) and the next 10-min
+  bot ping settles it, or run `node --env-file=.env
+  outputs/manual_settle_fallback.mjs --execute --wait`. Either way it is a **Bank
+  transaction → needs Jim**. Verify after: `currentRoundId` → 9, round 9 `endTime` =
+  1788152340, `Trophy.totalSupply()` stays 3 (round 8 had 0 votes — no mint is correct).
+- **P1 — teach the watchdog about the autopilot.** `scripts/verify-round-settlement.mjs`
+  audits Chainlink only and is blind to `keeper_autopilot_status`. Add: assert `action`
+  is non-null whenever `upkeepNeeded` is true, and alert when `actionsLast24h == 0` past
+  pin+grace. Also widen the launchd schedule beyond Sun/Mon — the Tue-Sat gap is where
+  round 8 rotted.
+- **P1 — sweep for other swallowed errors.** `grep -n 'catch {}' api/*.js api/_lib/*.js`.
+  Three production outages now trace to this pattern in `api/scheduler.js` alone.
+- **P2 — retract 32 false marketing posts.** Between 2026-08-05 and 2026-08-17, **9 posts
+  on X and 23 on Telegram** told followers settlement fires automatically via Chainlink
+  while it was in fact dead and rounds were closing ~18h late by hand. Full worklist with
+  ids and text: `outputs/truthup_verification_2026-08-25.md` §5. The 2026-08-22 truth-up
+  (`2c90580`) fixed everything generating *future* copy — dashboard, content generator, CI
+  guard, pending queue — and is verified live in the deployed bundle; it never reached back
+  to what had already been sent. **`scheduled_posts` has no `tweet_id`/`message_id`
+  column**, so these must be found by hand on the timeline by timestamp. Adding a
+  `platform_post_id` column would make the next retraction a query.
+- **AUTOMATION long-term:** the CRE migration in `outputs/cre_migration_plan.md`
+  (Priority 2 — the decision gate that used to say "probably don't migrate" now resolves to
+  MIGRATE), then reclaim the 43.97 LINK (Priority 3). Both need Jim: CRE access is gated,
+  and cutover ends in a `Keeper3.setForwarder` from Bank.
+- **Mobile**: code-complete for TestFlight and Play internal testing; blocked on an Apple
+  Developer account (3 placeholders in `eas.json`) and a verified Play payments profile.
+  Do not submit the drafted Play copy while it still promises automatic settlement.
 - **Trust/scanners**: SolidProof portal access + KYC ($600); GoPlus appeal
   (`service@gopluslabs.io`); Blockaid #1263614; CoinGecko/DexScreener resubmission.
   Detail + templates in history / `outputs/`.
