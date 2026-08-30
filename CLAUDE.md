@@ -626,6 +626,26 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
   is non-null whenever `upkeepNeeded` is true, and alert when `actionsLast24h == 0` past
   pin+grace. Also widen the launchd schedule beyond Sun/Mon — the Tue-Sat gap is where
   round 8 rotted.
+- ✅ **CLOSED 2026-08-30 — the admin dashboard was blank for 8 days.** `2c90580` added a
+  Keeper Autopilot row to **CommandScreen**'s health array but declared
+  `const [keeper, setKeeper]` in **SystemScreen**. `keeper` was a free identifier;
+  React threw `ReferenceError` on first render of the post-login landing screen
+  (`active` defaults to `"command"`) and, with no boundary above it, unmounted the whole
+  root — white page, every tab gone. Login was never broken.
+  **`vercel build` cannot catch this** — a free identifier is a runtime error, so the
+  bundle compiled clean and the minifier emitted `keeper` verbatim while renaming every
+  real local to one letter. ESLint had reported `'keeper' is not defined` the whole time;
+  **nothing in the deploy path ran ESLint.** Fixed in `8a495df`: CommandScreen owns its
+  keeper state, a `ScreenErrorBoundary` wraps the active screen so one bad screen
+  degrades to a card instead of a white page, and `scripts/predeploy-guard.mjs` now fails
+  on `eslint no-undef` in `src/` (negative-tested).
+  📏 **RULE — `npm run build` passing is not evidence the page renders.** Bundling and
+  rendering are different failure domains. Verify a UI change by loading it.
+- **Admin password: prod is rotated, local `.env` is stale.** `.env` still holds the
+  publicly-leaked `TTS2026Admin!`, which prod correctly rejects (401). Prod's real
+  `ADMIN_PASSWORD` (set 65d ago) is encrypted at rest — `vercel env pull` returns it
+  empty, as it does for every secret. Read or reset it in the Vercel dashboard; then
+  scrub the leaked value from local `.env`.
 - **P1 — sweep for other swallowed errors.** `grep -n 'catch {}' api/*.js api/_lib/*.js`.
   Three production outages now trace to this pattern in `api/scheduler.js` alone.
 - **P2 — retract 32 false marketing posts.** Between 2026-08-05 and 2026-08-17, **9 posts
