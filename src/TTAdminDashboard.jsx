@@ -3747,6 +3747,34 @@ function getWeekStartStr(from = new Date()) {
   return d.toISOString().split('T')[0]
 }
 
+// A render error in ONE screen used to unmount the whole admin root, leaving a blank
+// page with the failure visible only in the console. That is how the Command Center's
+// undefined `keeper` reference took the entire dashboard down. A screen that throws must
+// degrade to a card, never to a white page — the sidebar has to stay usable so the admin
+// can navigate to a screen that still works.
+class ScreenErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) { console.error(`[admin:${this.props.name}]`, error, info) }
+  componentDidUpdate(prev) {
+    // Switching tabs clears the error so one bad screen does not wedge the others.
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null })
+  }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: 28, color: 'var(--rose)', fontSize: '.8rem' }}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>“{this.props.name}” failed to render</div>
+        <div style={{ color: 'var(--muted)', marginBottom: 10, fontSize: '.72rem' }}>
+          The rest of the dashboard is unaffected — use the sidebar to switch screens.
+        </div>
+        <div style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: '.68rem', wordBreak: 'break-all' }}>{String(this.state.error?.message || this.state.error)}</div>
+        <button onClick={() => this.setState({ error: null })} style={{ marginTop: 14, padding: '6px 18px', background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', fontSize: '.75rem' }}>↺ Retry</button>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
 class ContentCalendarErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(error) { return { error } }
@@ -4539,6 +4567,10 @@ function CommandScreen({ setActive }) {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [, setTick] = useState(0);
+  // The Command Center health row reports the autopilot, so this screen has to fetch it
+  // itself. SystemScreen holds its own copy; React state is per-component and there is no
+  // shared store here. Reading `keeper` without this line is what blanked the dashboard.
+  const [keeper, setKeeper] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -4562,6 +4594,15 @@ function CommandScreen({ setActive }) {
       if (Array.isArray(posts)) setPendingContent(posts.length);
       setLastRefresh(new Date().toLocaleTimeString());
     } catch (e) {}
+    // Separate try: keeper-status is the settlement signal and must not be lost just
+    // because an unrelated Supabase read above threw. Leave a fingerprint if it fails --
+    // a silent null here reads identically to "still loading".
+    try {
+      const r = await fetch(`/api/scheduler?action=keeper-status&cb=${Date.now()}`);
+      setKeeper(r.ok ? await r.json() : { error: `keeper-status HTTP ${r.status}` });
+    } catch (e) {
+      setKeeper({ error: `keeper-status unreachable: ${e?.message || e}` });
+    }
     setLoading(false);
   };
 
@@ -4579,11 +4620,12 @@ function CommandScreen({ setActive }) {
 
   const health = [
     { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending && !roundOverdue, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
-    { label: 'Keeper Autopilot', ok: keeper?.enabled === true && keeper?.driverAlive === true, warn: keeper == null,
+    { label: 'Keeper Autopilot', ok: keeper?.enabled === true && keeper?.driverAlive === true && !keeper?.error, warn: keeper == null || !!keeper?.error,
       text: keeper == null ? 'Loading…'
+        : keeper.error ? `⚠ ${keeper.error}`
         : !keeper.enabled ? '⛔ DISARMED — nothing will settle the round'
         : !keeper.driverAlive ? '⛔ ARMED but no tick — the driver is down'
-        : `✅ Armed · ticking ${keeper.tickAgeSec}s ago · ${keeper.actionsLast24h}/6 actions 24h`, href: null, nav: null },
+        : `✅ Armed · ticking ${keeper.tickAgeSec}s ago · ${keeper.actionsLast24h}/6 actions 24h`, href: null, nav: 'system' },
     { label: 'Chainlink Automation', ok: false, warn: true, text: '⛔ OUTAGE since Aug 5 — replaced by autopilot · 43.97 LINK recoverable later', href: null, nav: null },
     { label: 'Railway Bot', ok: true, warn: false, text: `${RAILWAY_PLAN} Plan · Online`, href: 'https://railway.app', nav: null },
     { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting`, href: null, nav: 'review' },
@@ -6065,7 +6107,9 @@ export default function AdminApp() {
           </div>
           <AlertsBanner setActive={setActive} />
           <div className="adm-page">
-            {screens[active]}
+            <ScreenErrorBoundary name={titles[active] || active} resetKey={active}>
+              {screens[active]}
+            </ScreenErrorBoundary>
           </div>
         </div>
       </div>

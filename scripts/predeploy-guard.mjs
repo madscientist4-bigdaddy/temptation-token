@@ -136,6 +136,37 @@ if (existsSync('.vercelignore')) {
   ok(`.vercelignore keeps all ${tracked.length} tracked files under src/ api/ lib/`)
 }
 
+// ── (a2) undefined identifiers in the browser bundle ────────────────────────
+// `vercel build` CANNOT catch this: an identifier that resolves to nothing is a runtime
+// ReferenceError, not a build error, so the bundle compiles clean and the minifier simply
+// emits the free name verbatim. On 2026-08-22 the truth-up commit referenced `keeper` in
+// CommandScreen while declaring the state in SystemScreen; React threw on first render,
+// unmounted the whole root, and the admin dashboard was a blank white page until
+// 2026-08-30. ESLint had been reporting it the entire time — nothing ran ESLint.
+// Scoped to no-undef in src/ only: api/ runs on Node and its config lacks node globals,
+// and the repo carries pre-existing lint errors of other kinds that are not deploy-fatal.
+{
+  const res = spawnSync('sh', ['-lc', 'npx eslint src -f json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  let undef = []
+  try {
+    for (const f of JSON.parse(res.stdout || '[]')) {
+      for (const m of f.messages || []) {
+        if (m.ruleId === 'no-undef') undef.push(`${f.filePath.replace(process.cwd() + '/', '')}:${m.line}  ${m.message}`)
+      }
+    }
+  } catch {
+    // A parse failure means ESLint itself did not run — say so instead of passing silently.
+    die('could not run ESLint over src/ (no JSON output) — the no-undef check could not be verified')
+  }
+  if (undef.length) {
+    console.error(`\n${RED}${undef.length} undefined identifier(s) in src/ — these throw at runtime and blank the page${OFF}`)
+    for (const u of undef.slice(0, 20)) console.error(`    ${u}`)
+    if (undef.length > 20) console.error(`    …and ${undef.length - 20} more`)
+    die('undefined identifiers in src/ — `vercel build` passes and the page still dies on render')
+  }
+  ok('no undefined identifiers in src/ (eslint no-undef)')
+}
+
 // ── (b) the build Vercel will actually run ──────────────────────────────────
 // vercel build needs `uv` (it installs Python deps for the repo's requirements.txt).
 const hasUv = spawnSync('sh', ['-lc', 'command -v uv'], { encoding: 'utf8' }).status === 0
