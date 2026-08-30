@@ -541,6 +541,53 @@ async function reserveKeeperSlot(actionName, reason) {
   } catch { return null }
 }
 
+// Last settlement — WHICH round closed, WHEN, and whether anything automatic did it.
+// The dashboard used to assert "settles automatically" as static copy; that sentence was
+// false for the 20 days Chainlink was dark and rounds were being closed by hand. A claim
+// like that has to be earned from the record, so `automatic` is set ONLY by a
+// keeper_autopilot audit row that actually moved chain state (status 'done'). A row that
+// reads 'no_state_change' is a swallowed revert, not a settlement, and is skipped.
+//
+// `curStartSec` is the current round's on-chain startTime, already fetched by the caller.
+async function readLastSettlement(curRoundId, curStartSec, curSettled) {
+  try {
+    const rows = await (await sbService('/admin_audit_log?config_key=eq.keeper_autopilot&order=id.desc&limit=100&select=created_at,new_value')).json()
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        let d = null
+        try { d = JSON.parse(row.new_value) } catch { continue }
+        if (d?.keeperAction !== 'SETTLE' || d?.status !== 'done') continue
+        const atMs = new Date(row.created_at).getTime()
+        if (!Number.isFinite(atMs)) continue
+        return {
+          roundId: d?.before?.round ?? null,
+          at: new Date(atMs).toISOString(),
+          ageSec: Math.floor((Date.now() - atMs) / 1000),
+          automatic: true,
+          approx: false,
+          source: 'keeper autopilot (admin_audit_log)',
+          txHash: d?.tx_hash ?? null,
+        }
+      }
+    }
+  } catch {}
+  // No audit row. A round can only START after the previous one settles, so the current
+  // round's startTime bounds the last settlement from above — useful, but it says nothing
+  // about WHO closed it, so this branch never claims `automatic`.
+  if (!curSettled && curRoundId > 1 && curStartSec > 0) {
+    return {
+      roundId: curRoundId - 1,
+      at: new Date(curStartSec * 1000).toISOString(),
+      ageSec: Math.floor(Date.now() / 1000) - curStartSec,
+      automatic: false,
+      approx: true,
+      source: 'inferred from round start — no autopilot audit row, so closed by hand or before audit logging',
+      txHash: null,
+    }
+  }
+  return null
+}
+
 // Read-only snapshot of everything the decision needs. No writes, no alerts.
 // `enabled` is included deliberately: armed-vs-disarmed is the single most important
 // thing an operator needs to see, and without it here the only way to know is DB access.
@@ -565,6 +612,7 @@ async function computeKeeperStatus() {
     if (Array.isArray(d) && d[0]) lastTickAt = JSON.parse(d[0].value)?.checkedAt ?? null
   } catch {}
   const tickAgeSec = lastTickAt ? Math.floor((Date.now() - new Date(lastTickAt).getTime()) / 1000) : null
+  const lastSettlement = await readLastSettlement(Number(roundId), Number(r[0]), r[4])
   return {
     enabled,
     lastTickAt,
@@ -584,6 +632,7 @@ async function computeKeeperStatus() {
     upkeepNeeded: needed,
     action,
     actionName: ACTION_NAME[action] || null,
+    lastSettlement,
     nowSec: Math.floor(Date.now() / 1000),
   }
 }

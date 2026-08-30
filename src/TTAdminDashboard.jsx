@@ -3405,9 +3405,56 @@ async function getVrfSubBalance() {
 }
 
 function StatusBadge({ status }) {
-  const colors = { ok: '#2ecc71', warn: '#f39c12', critical: '#e84040', unknown: '#666' };
-  const labels = { ok: '● Healthy', warn: '● Warning', critical: '● Critical', unknown: '● Unknown' };
-  return <span style={{ color: colors[status], fontSize: '.72rem', fontWeight: 700, letterSpacing: '.06em' }}>{labels[status]}</span>;
+  const colors = { ok: '#2ecc71', warn: '#f39c12', critical: '#e84040', unknown: '#666', retired: '#6b7280' };
+  const labels = { ok: '● Healthy', warn: '● Warning', critical: '● Critical', unknown: '● Unknown', retired: '○ Retired' };
+  return <span style={{ color: colors[status] || colors.unknown, fontSize: '.72rem', fontWeight: 700, letterSpacing: '.06em' }}>{labels[status] || labels.unknown}</span>;
+}
+
+// ─── SEVERITY IS COMPUTED, NEVER HARDCODED ────────────────────────────────────
+// A literal severity is a claim that keeps asserting itself after reality moves on, and
+// this dashboard has now been wrong in BOTH directions from exactly that bug:
+//   · a hardcoded `ok` badge on the old round-schedule card asserted the crons were
+//     confirmed — and stayed green for the 17 days the registry was dark and rounds were
+//     closing ~18h late by hand.
+//   · `<StatusBadge status="critical" />` on the Chainlink card that replaced it — kept
+//     crying outage after the autopilot had taken over and settled round 8 cleanly.
+// Same defect twice: a constant where a function belongs. Every badge below derives from
+// live state, and `unknown` is a real answer — a card with no data must say so rather
+// than assume the best.
+
+// Autopilot health. Order matters: the states that mean "the round will not close"
+// outrank the ones that merely mean "work is in flight".
+function keeperSeverity(k) {
+  if (k == null) return 'unknown';
+  if (k.error) return 'warn';
+  if (!k.enabled) return 'critical';                              // nothing will settle
+  if (!k.driverAlive) return 'critical';                          // armed, but nobody calls it
+  if (Number(k.actionsLast24h) >= 6) return 'critical';           // runaway cap hit; it has stopped
+  // Work due and more than an hour past the pin: the 15-min grace has long expired, so
+  // something is wrong rather than merely pending.
+  if (k.upkeepNeeded && Number(k.nowSec) - Number(k.endTime) > 3600) return 'critical';
+  if (k.vrfPending || k.upkeepNeeded) return 'warn';
+  return 'ok';
+}
+
+// Is the game visibly closing itself? Rounds are weekly, so a settlement older than
+// ~8 days means a rollover was missed even if every other light is green.
+function settlementSeverity(s) {
+  if (s == null) return 'unknown';
+  if (!s.automatic) return 'warn';                                // closed by hand, or unproven
+  if (Number(s.ageSec) > 8 * 86400) return 'warn';
+  return 'ok';
+}
+
+const SEV_COLOR = { ok: '#2ecc71', warn: '#f39c12', critical: '#e84040', unknown: '#666', retired: '#6b7280' };
+
+function agoLabel(sec) {
+  if (sec == null || !Number.isFinite(Number(sec))) return '—';
+  const n = Math.max(0, Math.floor(Number(sec)));
+  if (n < 60) return `${n}s ago`;
+  if (n < 3600) return `${Math.floor(n / 60)}m ago`;
+  if (n < 172800) return `${Math.floor(n / 3600)}h ago`;
+  return `${Math.floor(n / 86400)}d ago`;
 }
 
 function SystemScreen() {
@@ -3419,6 +3466,9 @@ function SystemScreen() {
   const [referralStats, setReferralStats] = React.useState(null);
   const [autofund, setAutofund] = React.useState(null);
   const [keeper, setKeeper] = React.useState(null);
+  // Emergency controls stay behind an explicit arm step. Closed by default: the autopilot
+  // is the normal path now, and these buttons are only for the case where it has failed.
+  const [manualArmed, setManualArmed] = React.useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -3468,6 +3518,15 @@ function SystemScreen() {
 
   // VRF stall: vrfPending true for > 60 min past endTime (the Round-4 failure mode).
   const vrfAgeSec = round && round.vrfPending && !round.settled ? Math.max(0, now - round.endTime) : null;
+
+  // Every badge on this page derives from these. No literals.
+  const lastSet = keeper?.lastSettlement ?? null;
+  const keeperSev = keeperSeverity(keeper);
+  const settleSev = settlementSeverity(lastSet);
+  // The Railway bot is what pings the keeper every 10 min, so a live tick IS the evidence
+  // the bot is up. `RAILWAY_PLAN · Online` used to be asserted unconditionally — it would
+  // have read "Online" with the bot stopped.
+  const railwaySev = keeper == null ? 'unknown' : keeper.driverAlive ? 'ok' : 'critical';
   const vrfStalled = vrfAgeSec != null && vrfAgeSec > VRF_STALL_SECONDS;
   const fmtAge = (s) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h ${m}m` : `${h}h ${m}m`; };
 
@@ -3494,6 +3553,67 @@ function SystemScreen() {
           </div>
         </div>
       )}
+
+      {/* ── PRIMARY STATUS ─────────────────────────────────────────────────────
+          The autopilot IS the settlement mechanism, so it leads the page. Chainlink is
+          history and sits collapsed near the bottom. Severity is computed by
+          keeperSeverity() — never written as a literal. */}
+      <div className="table-card" style={{ marginBottom: 20, borderLeft: `3px solid ${SEV_COLOR[keeperSev]}` }}>
+        <div className="table-head">
+          <div className="table-head-title">🤖 Keeper Autopilot — settlement driver</div>
+          <StatusBadge status={keeperSev} />
+        </div>
+
+        {/* Top line: is the game closing itself? One glance should answer that. */}
+        <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', background:'var(--surface2)' }}>
+          <div style={{ fontSize:'.6rem', letterSpacing:'.1em', color:'var(--muted)', marginBottom:5 }}>LAST SETTLEMENT</div>
+          {lastSet == null ? (
+            <div style={{ fontSize:'.9rem', color:'var(--muted)' }}>
+              {keeper == null ? 'Loading…' : 'No settlement on record'}
+            </div>
+          ) : (
+            <div style={{ fontSize:'1rem', fontWeight:700, color:SEV_COLOR[settleSev] }}>
+              Round {lastSet.roundId ?? '—'} · {agoLabel(lastSet.ageSec)} · {lastSet.automatic ? '✅ automatic' : '⚠️ manual / unproven'}
+              <div style={{ fontSize:'.66rem', fontWeight:400, color:'var(--muted)', marginTop:4 }}>
+                {lastSet.at ? new Date(lastSet.at).toUTCString() : '—'} · {lastSet.source}
+                {lastSet.txHash && <> · <a href={`https://basescan.org/tx/${lastSet.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color:'var(--gold-dim)' }}>tx →</a></>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {keeper == null ? (
+          <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading keeper status…</div>
+        ) : keeper.error ? (
+          <div style={{ padding: 16, color: 'var(--amber)', fontSize: '.8rem' }}>⚠ {keeper.error}</div>
+        ) : (
+        <table className="adm-table"><tbody>
+          <tr><td style={{ color:'var(--muted)' }}>Armed</td><td>{keeper.enabled
+            ? <span style={{ color:'#2ecc71' }}>✅ ARMED — closes the round automatically</span>
+            : <span style={{ color:'#e84040' }}>⛔ DISARMED — nothing will settle the round. Set admin_config.keeper_autopilot_enabled = 'true'</span>}</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Driver alive</td><td>{keeper.driverAlive
+            ? <span style={{ color:'#2ecc71' }}>✅ ticking — last {keeper.tickAgeSec}s ago</span>
+            : <span style={{ color:'#e84040' }}>⛔ NO TICK for {keeper.tickAgeSec == null ? '—' : Math.round(keeper.tickAgeSec / 60) + ' min'} — the Railway bot ping is down. An armed keeper nobody calls settles nothing.</span>}
+            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>(bot pings /api/scheduler?action=keeper every 10 min)</span></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Actions (24h)</td><td><strong>{keeper.actionsLast24h}</strong> / 6 cap
+            {keeper.actionsLast24h >= 6 && <span style={{ color:'#e84040', marginLeft:6 }}>⛔ cap reached — autopilot has stopped acting</span>}
+            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>a clean weekly rollover is 2 (settle + start)</span></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Last action</td><td style={{ fontSize:'.75rem' }}>{keeper.lastActionAt || <span style={{ color:'var(--muted)' }}>none in 24h</span>}</td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Next expected close</td><td>
+            <strong>{keeper.endTime ? new Date(keeper.endTime * 1000).toUTCString() : '—'}</strong>
+            <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>round {keeper.roundId} · settles ~15 min after the pin (grace window lets a revived Chainlink go first)</div></td></tr>
+          <tr><td style={{ color:'var(--muted)' }}>Work due now</td><td>{keeper.upkeepNeeded
+            ? <span style={{ color:'#f39c12' }}>⏳ {keeper.actionName || 'action'} pending</span>
+            : <span style={{ color:'var(--muted)' }}>nothing due — round still open</span>}
+            {keeper.vrfPending && <span style={{ color:'#f39c12', marginLeft:6 }}>· VRF in flight</span>}</td></tr>
+        </tbody></table>
+        )}
+        <div style={{ padding:'10px 16px', fontSize:'.62rem', color:'var(--muted)', lineHeight:1.7 }}>
+          Bank is <code>Keeper3.owner()</code> and <code>manualExecute</code> is <code>onlyOwner</code>, so the autopilot does exactly what the
+          Chainlink forwarder used to and nothing else. The action is read from <code>Keeper3.checkUpkeep()</code>, never recomputed off-chain.
+          Rails: 15-min grace · 5-min min interval · 6 actions/24h · refuses to re-settle while VRF is pending · refuses if the signer is not the keeper owner.
+        </div>
+      </div>
 
       {/* ROUND STATUS */}
       <div className="table-card" style={{ marginBottom: 20 }}>
@@ -3597,10 +3717,17 @@ function SystemScreen() {
       <div className="table-card" style={{ marginTop: 20 }}>
         <div className="table-head">
           <div className="table-head-title">🚂 Railway Bot Status</div>
-          <StatusBadge status="ok" />
+          <StatusBadge status={railwaySev} />
         </div>
         <table className="adm-table">
           <tbody>
+            <tr><td style={{ color:'var(--muted)' }}>Liveness</td><td>{keeper == null
+              ? <span style={{ color:'var(--muted)' }}>Unknown — keeper status unavailable</span>
+              : keeper.driverAlive
+                ? <span style={{ color:'#2ecc71' }}>✅ Pinging the keeper — last tick {keeper.tickAgeSec}s ago</span>
+                : <span style={{ color:'#e84040' }}>⛔ No keeper ping for {keeper.tickAgeSec == null ? '—' : Math.round(keeper.tickAgeSec / 60) + ' min'} — treat the bot as DOWN</span>}
+              <div style={{ fontSize:'.62rem', color:'var(--muted)', marginTop:3 }}>Derived from the 10-min keeper tick, not asserted. A hardcoded “Online” once read green with the driver dead.</div>
+            </td></tr>
             <tr><td style={{ color:'var(--muted)' }}>Plan</td><td><strong style={{ color:'var(--green)' }}>{RAILWAY_PLAN} (paid April 24, 2026)</strong></td></tr>
             <tr><td style={{ color:'var(--muted)' }}>Project</td><td>proud-unity</td></tr>
             <tr><td style={{ color:'var(--muted)' }}>Bots</td><td>@TTSGameBot · @TTSBroadcastBot</td></tr>
@@ -3613,7 +3740,7 @@ function SystemScreen() {
       <div className="table-card" style={{ marginTop: 20 }}>
         <div className="table-head">
           <div className="table-head-title">🔗 Referral System</div>
-          <StatusBadge status="ok" />
+          <StatusBadge status={referralStats == null ? 'unknown' : 'ok'} />
         </div>
         {referralStats ? (
           <table className="adm-table">
@@ -3627,74 +3754,58 @@ function SystemScreen() {
         ) : <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading referral data…</div>}
       </div>
 
-      {/* KEEPER AUTOPILOT — this is what closes the round now. Primary card. */}
-      <div className="table-card" style={{ marginTop: 20 }}>
-        <div className="table-head">
-          <div className="table-head-title">🤖 Keeper Autopilot (settlement driver)</div>
-          <StatusBadge status={keeper == null ? 'unknown' : !keeper.enabled ? 'critical' : !keeper.driverAlive ? 'critical' : 'ok'} />
+      {/* Chainlink — HISTORY, not a live alarm. It was a red "Critical" card for five days
+          after the autopilot had already settled round 8 cleanly, which is the same
+          stale-literal bug as the old "Chainlink crons confirmed ✅". Retired systems get
+          a neutral collapsed note; only live systems get colour. */}
+      <details style={{ marginTop: 20, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10 }}>
+        <summary style={{ cursor:'pointer', padding:'12px 16px', fontSize:'.72rem', color:'var(--muted)', listStyle:'revert' }}>
+          <span style={{ color:'#6b7280', fontWeight:700 }}>○ Retired</span>
+          {'  '}⛓️ Chainlink Automation retired 2026-08-05 — replaced by the autopilot (43.97 LINK recoverable)
+        </summary>
+        <div style={{ padding:'4px 18px 16px', fontSize:'.7rem', color:'var(--muted)', lineHeight:1.8 }}>
+          Registry <code>0xf4bAb6A1…</code> (AutomationRegistry 2.3.0) stopped performing for <strong>every one</strong> of its ~191 upkeeps,
+          not just ours. Our upkeep read entirely healthy throughout — funded, unpaused, uncancelled, forwarder matched,
+          <code>checkUpkeep()</code> returning true on schedule — and still nothing fired. Nothing to fix on our side.
+          Rounds 6→7 and 7→8 were closed by hand from the Bank ~18h late; the keeper autopilot has settled every round since
+          (first unaided rollover: round 8, 2026-08-25).
+          <div style={{ marginTop:8 }}>
+            <strong>43.97 LINK recoverable</strong> — cancel the upkeep, wait the post-cancel block delay, then withdraw. Not urgent.
+            {' '}Verify liveness with <code>node scripts/verify-round-settlement.mjs</code>.
+          </div>
         </div>
-        {keeper == null ? (
-          <div style={{ padding: 16, color: 'var(--muted)', fontSize: '.8rem' }}>Loading keeper status…</div>
-        ) : (
-        <table className="adm-table"><tbody>
-          <tr><td style={{ color:'var(--muted)' }}>Armed</td><td>{keeper.enabled
-            ? <span style={{ color:'#2ecc71' }}>✅ ARMED — closes the round automatically</span>
-            : <span style={{ color:'#e84040' }}>⛔ DISARMED — nothing will settle the round. Set admin_config.keeper_autopilot_enabled = 'true'</span>}</td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Driver alive</td><td>{keeper.driverAlive
-            ? <span style={{ color:'#2ecc71' }}>✅ ticking — last {keeper.tickAgeSec}s ago</span>
-            : <span style={{ color:'#e84040' }}>⛔ NO TICK for {keeper.tickAgeSec == null ? '—' : Math.round(keeper.tickAgeSec / 60) + ' min'} — the Railway bot ping is down. An armed keeper nobody calls settles nothing.</span>}
-            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>(bot pings /api/scheduler?action=keeper every 10 min)</span></td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Actions (24h)</td><td><strong>{keeper.actionsLast24h}</strong> / 6 cap
-            {keeper.actionsLast24h >= 6 && <span style={{ color:'#e84040', marginLeft:6 }}>⛔ cap reached — autopilot has stopped acting</span>}
-            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>a clean weekly rollover is 2 (settle + start)</span></td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Last action</td><td style={{ fontSize:'.75rem' }}>{keeper.lastActionAt || <span style={{ color:'var(--muted)' }}>none in 24h</span>}</td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Next expected close</td><td>
-            <strong>{keeper.endTime ? new Date(keeper.endTime * 1000).toUTCString() : '—'}</strong>
-            <div style={{ fontSize:'.7rem', color:'var(--muted)' }}>round {keeper.roundId} · settles ~15 min after the pin (grace window lets a revived Chainlink go first)</div></td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Work due now</td><td>{keeper.upkeepNeeded
-            ? <span style={{ color:'#f39c12' }}>⏳ {keeper.actionName || 'action'} pending</span>
-            : <span style={{ color:'var(--muted)' }}>nothing due — round still open</span>}
-            {keeper.vrfPending && <span style={{ color:'#f39c12', marginLeft:6 }}>· VRF in flight</span>}</td></tr>
-        </tbody></table>
-        )}
-        <div style={{ padding:'10px 16px', fontSize:'.62rem', color:'var(--muted)', lineHeight:1.7 }}>
-          Bank is <code>Keeper3.owner()</code> and <code>manualExecute</code> is <code>onlyOwner</code>, so the autopilot does exactly what the
-          Chainlink forwarder used to and nothing else. The action is read from <code>Keeper3.checkUpkeep()</code>, never recomputed off-chain.
-          Rails: 15-min grace · 5-min min interval · 6 actions/24h · refuses to re-settle while VRF is pending · refuses if the signer is not the keeper owner.
-        </div>
-      </div>
+      </details>
 
-      {/* Chainlink upkeep — OUTAGE since 2026-08-05, kept visible so the failure is on the record */}
-      <div className="table-card" style={{ marginTop: 20 }}>
-        <div className="table-head">
-          <div className="table-head-title">⛓️ Chainlink Automation upkeep</div>
-          <StatusBadge status="critical" />
-        </div>
-        <table className="adm-table"><tbody>
-          <tr><td style={{ color:'var(--muted)' }}>Status</td><td><span style={{ color:'#e84040', fontWeight:700 }}>⛔ OUTAGE since 2026-08-05 — replaced by the keeper autopilot</span></td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>What happened</td><td style={{ fontSize:'.72rem' }}>
-            Registry <code>0xf4bAb6A1…</code> (AutomationRegistry 2.3.0) stopped performing for <strong>every one</strong> of its ~191 upkeeps, not just ours.
-            Our upkeep reads entirely healthy — funded, unpaused, uncancelled, forwarder matched, <code>checkUpkeep()</code> returning true on schedule — and still nothing fires.
-            Nothing to fix on our side; this is Chainlink&rsquo;s outage. Rounds 6→7 and 7→8 were closed by hand from the Bank ~17.7h late before the autopilot took over.
-          </td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>LINK</td><td><strong>43.97 LINK recoverable later</strong>
-            <span style={{ fontSize:'.66rem', color:'var(--muted)', marginLeft:6 }}>cancel the upkeep, wait the post-cancel block delay, then withdraw. Not urgent, and not while it is the only fallback on paper.</span></td></tr>
-          <tr><td style={{ color:'var(--muted)' }}>Verify</td><td style={{ fontSize:'.72rem' }}>
-            <code>node scripts/verify-round-settlement.mjs</code> reports registry-wide liveness and distinguishes a Chainlink outage from our upkeep being skipped.
-          </td></tr>
-        </tbody></table>
-      </div>
-
-      {/* MANUAL ROUND CONTROL */}
-      <div className="table-card" style={{ marginTop: 20 }}>
-        <div className="table-head">
-          <div className="table-head-title">🎮 Manual Round Control</div>
-          <span style={{ fontSize:'0.6rem', color:'var(--muted)' }}>Via TTSKeeper3 · Requires owner wallet</span>
-        </div>
+      {/* EMERGENCY FALLBACK — collapsed, and armed by an explicit click.
+          These are Bank-wallet round controls. The autopilot is the normal path; this
+          section exists only for the case where it has failed. Note what it actually
+          does: each button opens the BaseScan write page — no transaction is signed from
+          this dashboard — but it is still the panel someone reaches for at 3am, so it
+          does not sit open next to the healthy-status cards. */}
+      <details style={{ marginTop: 20, background:'var(--surface)', border:'1px solid rgba(232,64,64,.25)', borderRadius:10 }}
+        onToggle={e => { if (!e.currentTarget.open) setManualArmed(false); }}>
+        <summary style={{ cursor:'pointer', padding:'12px 16px', fontSize:'.72rem', color:'var(--amber)', fontWeight:700, listStyle:'revert' }}>
+          ⚠️ Emergency fallback — only if the autopilot fails
+          <span style={{ fontWeight:400, color:'var(--muted)', marginLeft:8 }}>Manual round control · TTSKeeper3 · requires the owner wallet (Bank)</span>
+        </summary>
         <div style={{ padding: 20 }}>
           <div style={{ fontSize:'0.65rem', color:'var(--muted)', lineHeight:1.8, marginBottom:16 }}>
-            These actions call TTSKeeper3 (<code style={{ fontFamily:'monospace', color:'var(--gold-dim)' }}>0x363ce4960e3b459f5892587a37ae1ff2ed04442c</code>) using the owner wallet (Bank). Click a button to open the BaseScan write contract page pre-filled.
+            These actions call TTSKeeper3 (<code style={{ fontFamily:'monospace', color:'var(--gold-dim)' }}>0x363ce4960e3b459f5892587a37ae1ff2ed04442c</code>) using the owner wallet (Bank). Each button opens the BaseScan write contract page pre-filled.
           </div>
+          {!manualArmed ? (
+            <div style={{ background:'rgba(232,64,64,.06)', border:'1px solid rgba(232,64,64,.25)', borderRadius:8, padding:'16px 18px' }}>
+              <div style={{ fontSize:'.75rem', color:'var(--text)', fontWeight:700, marginBottom:6 }}>Confirm before continuing</div>
+              <div style={{ fontSize:'.68rem', color:'var(--muted)', lineHeight:1.8, marginBottom:14 }}>
+                {keeperSev === 'ok'
+                  ? <>The autopilot currently reads <strong style={{ color:'var(--green)' }}>healthy</strong>{lastSet?.automatic ? <> and last settled round {lastSet.roundId} {agoLabel(lastSet.ageSec)}</> : null}. Settling by hand now would duplicate work it is about to do on its own.</>
+                  : <>The autopilot is <strong style={{ color:SEV_COLOR[keeperSev] }}>{keeperSev}</strong> — check the card at the top of this page before acting by hand.</>}
+              </div>
+              <button onClick={() => setManualArmed(true)}
+                style={{ background:'transparent', border:'1px solid var(--amber)', color:'var(--amber)', padding:'8px 18px', borderRadius:6, cursor:'pointer', fontSize:'.68rem', fontWeight:700, letterSpacing:'.06em' }}>
+                I understand — show emergency controls
+              </button>
+            </div>
+          ) : (<>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[
               { label:'▶ Start New Round', desc:'Calls manualExecute(1) — starts Round on TTSVotingV3d', fn:'manualExecute', arg:'1', color:'var(--green)' },
@@ -3722,8 +3833,10 @@ function SystemScreen() {
           <div style={{ marginTop:14, fontSize:'0.6rem', color:'var(--muted)', lineHeight:1.7 }}>
             ℹ Connect the TTSKeeper3 owner wallet (Bank) in MetaMask on BaseScan. For <strong>Start New Round</strong> and <strong>Force Settle</strong>, call <code style={{ fontFamily:'monospace' }}>manualExecute(1)</code> or <code style={{ fontFamily:'monospace' }}>manualExecute(3)</code>. For <strong>Approve All Pending</strong>, open TTSVotingV3d write contract and call <code style={{ fontFamily:'monospace' }}>batchApproveProfiles</code> with the profile IDs and wallet addresses from the Review tab.
           </div>
+          </>
+          )}
         </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -4618,16 +4731,26 @@ function CommandScreen({ setActive }) {
   const secs = timeLeft % 60;
   const timeClass = round?.settled ? '' : roundOverdue ? 'danger' : timeLeft < 3600 ? 'danger' : timeLeft < 86400 ? 'warn' : 'ok';
 
+  // Every row's severity is computed from live state. `sev` wins where present; the older
+  // ok/warn booleans remain for the rows whose inputs are already local.
+  const lastSet = keeper?.lastSettlement ?? null;
+  const keeperSev = keeperSeverity(keeper);
+
   const health = [
     { label: 'Round Status', ok: round && !round.error && !roundOverdue && !round.vrfPending, warn: round?.vrfPending && !roundOverdue, text: !round ? 'Loading…' : round.error ? 'RPC Error' : round.settled ? 'Settled ✓' : roundOverdue ? 'OVERDUE' : round.vrfPending ? 'VRF Pending' : 'Active', href: null, nav: 'system' },
-    { label: 'Keeper Autopilot', ok: keeper?.enabled === true && keeper?.driverAlive === true && !keeper?.error, warn: keeper == null || !!keeper?.error,
+    { label: 'Keeper Autopilot', sev: keeperSev,
       text: keeper == null ? 'Loading…'
         : keeper.error ? `⚠ ${keeper.error}`
         : !keeper.enabled ? '⛔ DISARMED — nothing will settle the round'
         : !keeper.driverAlive ? '⛔ ARMED but no tick — the driver is down'
         : `✅ Armed · ticking ${keeper.tickAgeSec}s ago · ${keeper.actionsLast24h}/6 actions 24h`, href: null, nav: 'system' },
-    { label: 'Chainlink Automation', ok: false, warn: true, text: '⛔ OUTAGE since Aug 5 — replaced by autopilot · 43.97 LINK recoverable later', href: null, nav: null },
-    { label: 'Railway Bot', ok: true, warn: false, text: `${RAILWAY_PLAN} Plan · Online`, href: 'https://railway.app', nav: null },
+    // Retired, not broken. It was a red alarm for five days after the autopilot had
+    // already taken over — an alarm nobody can act on trains people to ignore alarms.
+    { label: 'Chainlink Automation', sev: 'retired', text: 'Retired Aug 5 — replaced by autopilot · 43.97 LINK recoverable', href: null, nav: 'system' },
+    // The Railway bot drives the keeper ping, so a live tick is the evidence it is up.
+    { label: 'Railway Bot', sev: keeper == null ? 'unknown' : keeper.driverAlive ? 'ok' : 'critical',
+      text: keeper == null ? 'Loading…' : keeper.driverAlive ? `${RAILWAY_PLAN} Plan · pinging (${keeper.tickAgeSec}s ago)` : '⛔ No keeper ping — treat the bot as DOWN',
+      href: 'https://railway.app', nav: null },
     { label: 'Pending Review', ok: pendingSubs === 0, warn: pendingSubs > 0, text: pendingSubs === 0 ? 'All clear' : `${pendingSubs} waiting`, href: null, nav: 'review' },
     { label: 'Content Queue', ok: pendingContent === 0, warn: pendingContent > 0, text: pendingContent === 0 ? 'All approved' : `${pendingContent} to approve`, href: null, nav: 'content' },
   ];
@@ -4643,6 +4766,29 @@ function CommandScreen({ setActive }) {
             {loading ? '⟳ Refreshing…' : '⟳ Refresh'}
           </button>
         </div>
+      </div>
+
+      {/* Top line: is the game closing itself? The single question this dashboard exists
+          to answer, and the one it could not answer for the 20 days rounds were being
+          settled by hand behind a card that said settlement was automatic. `automatic` is
+          asserted only when an autopilot audit row proves it. */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+        background:'var(--surface)', border:'1px solid var(--border)',
+        borderLeft:`3px solid ${SEV_COLOR[settlementSeverity(lastSet)]}`,
+        borderRadius:10, padding:'12px 18px', marginBottom:16 }}>
+        <span style={{ fontSize:'.6rem', letterSpacing:'.1em', color:'var(--muted)' }}>LAST SETTLEMENT</span>
+        {lastSet == null ? (
+          <strong style={{ fontSize:'.85rem', color:'var(--muted)' }}>{keeper == null ? 'Loading…' : 'None on record'}</strong>
+        ) : (
+          <>
+            <strong style={{ fontSize:'.95rem', color:SEV_COLOR[settlementSeverity(lastSet)] }}>
+              Round {lastSet.roundId ?? '—'} · {agoLabel(lastSet.ageSec)} · {lastSet.automatic ? '✅ automatic' : '⚠️ manual / unproven'}
+            </strong>
+            <span style={{ fontSize:'.62rem', color:'var(--muted)' }}>
+              {lastSet.at ? new Date(lastSet.at).toUTCString() : ''}
+            </span>
+          </>
+        )}
       </div>
 
       <div className="cmd-countdown">
@@ -4678,13 +4824,15 @@ function CommandScreen({ setActive }) {
 
       <div className="cmd-health-grid">
         {health.map((h, i) => {
-          const color = h.ok ? 'var(--green)' : h.warn ? 'var(--amber)' : 'var(--rose)';
+          const sev = h.sev || (h.ok ? 'ok' : h.warn ? 'warn' : 'critical');
+          const color = SEV_COLOR[sev] || SEV_COLOR.unknown;
+          const dot = sev === 'retired' || sev === 'unknown' ? '○' : '●';
           const clickable = h.href || h.nav;
           const inner = (
-            <div className="cmd-health-card" style={{ borderLeftColor: color, cursor: clickable ? 'pointer' : 'default' }}
+            <div className="cmd-health-card" style={{ borderLeftColor: color, cursor: clickable ? 'pointer' : 'default', opacity: sev === 'retired' ? 0.72 : 1 }}
               onClick={() => { if (h.nav) setActive(h.nav); else if (h.href) window.open(h.href, '_blank'); }}>
               <div className="cmd-health-label">{h.label}</div>
-              <div className="cmd-health-val" style={{ color }}>● {h.text}{clickable ? ' →' : ''}</div>
+              <div className="cmd-health-val" style={{ color }}>{dot} {h.text}{clickable ? ' →' : ''}</div>
             </div>
           );
           return <div key={i}>{inner}</div>;

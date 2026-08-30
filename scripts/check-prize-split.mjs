@@ -55,15 +55,33 @@ const RULES = [
     // Targets the false CLAIM SHAPES specifically. A broad "chainlink near settlement"
     // heuristic also condemns true sentences like "the winner is being selected on-chain
     // via Chainlink VRF", and a guard that cries wolf on correct copy gets switched off.
-    test: line => [
-      /chainlink[^.]{0,40}\b(fires?|triggers?|schedules?|kicks off)\b[^.]{0,20}settl/i,
-      /settl[^.]{0,40}\b(fires?|triggered|happens|runs)\b[^.]{0,30}via chainlink/i,
-      /settlement[^.]{0,25}automatic[^.]{0,25}via chainlink/i,
-      /chainlink\s+vrf\s+settl/i,
-      /chainlink[^.]{0,20}\bsettles\b/i,
-      /chainlink\s+(automation|crons?|keeper)/i,
-      /\bsettlement:\s*chainlink/i,
-    ].some(re => re.test(line)),
+    //
+    // Two tiers. CLAIM SHAPES assert Chainlink does the settling and always fail. The
+    // MENTION-ONLY pattern just names the product, and naming it is how you say it is
+    // dead — "Chainlink Automation retired 2026-08-05 — replaced by the autopilot" is the
+    // most accurate sentence available and the guard must not condemn it. So a mention
+    // clears when the SAME LINE negates it. This is a narrowing, not a loosening: every
+    // claim shape below still fails regardless of what else the line says, and a bare
+    // "Chainlink Automation" with no negation (the old "crons confirmed ✅") still fails.
+    test: line => {
+      const claimShapes = [
+        /chainlink[^.]{0,40}\b(fires?|triggers?|schedules?|kicks off)\b[^.]{0,20}settl/i,
+        /settl[^.]{0,40}\b(fires?|triggered|happens|runs)\b[^.]{0,30}via chainlink/i,
+        /settlement[^.]{0,25}automatic[^.]{0,25}via chainlink/i,
+        // "Round settles automatically via Chainlink" — the exact shape of the posts that
+        // ran on @temptationtoken while rounds were closing by hand. The rule above only
+        // matched the noun "settlement", so this verb form slipped through from the start.
+        /settl\w*[^.]{0,30}automatic\w*[^.]{0,30}via\s+chainlink/i,
+        /chainlink\s+vrf\s+settl/i,
+        /chainlink[^.]{0,20}\bsettles\b/i,
+        /\bsettlement:\s*chainlink/i,
+      ]
+      if (claimShapes.some(re => re.test(line))) return true
+      const mentionOnly = /chainlink\s+(automation|crons?|keeper)/i
+      if (!mentionOnly.test(line)) return false
+      const negated = /\b(retired|dead|died|outage|dark|replaced|superseded|no longer|not a fallback|stopped|never|failed|recoverable|obsolete|former|was\s+the)\b/i
+      return !negated.test(line)
+    },
     note: 'Chainlink Automation is dead. Settlement is triggered by our keeper autopilot; attribute only WINNER SELECTION to Chainlink VRF.',
   },
   {
