@@ -621,6 +621,24 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
   `profileCount=0` and was unvotable until `POST /api/profiles?action=sync` ran by hand.
   Every future rollover has the same hole; PlayScreen's on-load sync only saves it if a
   human opens the app.
+- ✅ **CLOSED 2026-08-30 — dashboard accuracy pass (`a01c9a8`).** Chainlink sat as a red
+  "Critical" alarm for five days after the autopilot settled round 8 cleanly — the same
+  hardcoded-severity bug as the "crons confirmed ✅" banner it replaced, wrong green
+  before and wrong red after. Now: `keeperSeverity()` / `settlementSeverity()` compute
+  every badge from live state, **zero `StatusBadge status="…"` literals remain**, and
+  `unknown` is a real answer instead of an optimistic default. Railway Bot no longer
+  asserts "Online" — it derives from the 10-min keeper tick and reads DOWN without one.
+  Autopilot is the top card; Chainlink is a neutral grey collapsed note. Manual Round
+  Control is now a collapsed "⚠️ Emergency fallback" accordion with an arm step (it opens
+  BaseScan write pages — no tx is signed from the dashboard).
+  📏 **RULE — a severity literal is a lie with a delay.** If a badge cannot name the live
+  value it reads, it must say `unknown`.
+- **`keeper-status` now returns `lastSettlement`** — `{roundId, at, ageSec, automatic,
+  approx, source, txHash}`. `automatic` is EARNED: only a `keeper_autopilot` audit row
+  that actually moved chain state (`status:'done'`) sets it; a `'no_state_change'` row is
+  a swallowed revert and is skipped. With no row it infers from the round start time and
+  says "manual / unproven". Verified live: round 8, 2026-08-25T18:10:20Z, automatic,
+  tx `0x7708d02c…`. **The watchdog should read this field** rather than re-deriving it.
 - **P1 — teach the watchdog about the autopilot.** `scripts/verify-round-settlement.mjs`
   audits Chainlink only and is blind to `keeper_autopilot_status`. Add: assert `action`
   is non-null whenever `upkeepNeeded` is true, and alert when `actionsLast24h == 0` past
