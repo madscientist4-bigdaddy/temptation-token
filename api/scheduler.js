@@ -15,6 +15,21 @@ const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 
+// ── ONE RPC for the whole file ────────────────────────────────────────────────
+// The keeper path already used process.env.BASE_RPC_URL (Alchemy) and is rock solid —
+// it settles rounds and sends real Bank transactions through it. Every OTHER path in
+// this file hardcoded the public https://mainnet.base.org, which is rate-limited from
+// Vercel's egress. The consequences were quiet and specific:
+//   · computeReserveLink() caught the failure and returned its 15-LINK FALLBACK, so the
+//     dashboard reported a made-up reserve as if it were price-aware and live.
+//   · computeVrfStatus() threw ("currentRoundId read failed"), so runVrfAutoFunder()
+//     bailed BEFORE persistStatus() and never refreshed vrf_autofund_status — freezing
+//     the System Health card on whatever it last managed to write. That is how a "no
+//     fuel" warning from a period when the Bank actually was empty survived on screen
+//     long after the Bank had been refilled.
+// A monitor that silently reads a stale value is worse than one that is plainly down.
+const BASE_RPC = process.env.BASE_RPC_URL || 'https://mainnet.base.org'
+
 // ── Referral-wallet auto-funder (Marketing → referral wallet; NEVER Bank) ──────
 const TTS_ADDRESS        = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 const REFERRAL_WALLET    = '0x216a4555E11dcA788a78Cfe6F47277ADf396FF40'
@@ -69,7 +84,7 @@ async function runAutoFunder() {
   } catch {}
 
   // on-chain balances
-  const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  const pub = createPublicClient({ chain: base, transport: http(BASE_RPC) })
   let refWalletBalance = 0, marketingBalance = 0
   try { refWalletBalance = Number(await pub.readContract({ address: TTS_ADDRESS, abi: TTS_TRANSFER_ABI, functionName: 'balanceOf', args: [REFERRAL_WALLET] })) / 1e18 } catch {}
   try { marketingBalance = Number(await pub.readContract({ address: TTS_ADDRESS, abi: TTS_TRANSFER_ABI, functionName: 'balanceOf', args: [MARKETING_WALLET] })) / 1e18 } catch {}
@@ -89,7 +104,7 @@ async function runAutoFunder() {
   const pk = process.env.MARKETING_WALLET_PRIVATE_KEY
   const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
   const account = privateKeyToAccount(pkHex)
-  const wallet = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
+  const wallet = createWalletClient({ account, chain: base, transport: http(BASE_RPC) })
   const amountWei = BigInt(Math.floor(decision.amount * 1e18))
   const txHash = await wallet.writeContract({ address: TTS_ADDRESS, abi: TTS_TRANSFER_ABI, functionName: 'transfer', args: [REFERRAL_WALLET, amountWei] })
   await pub.waitForTransactionReceipt({ hash: txHash })
@@ -126,7 +141,7 @@ async function sbPatch(table, query, body) {
 // ── RPC / on-chain helpers ────────────────────────────────────────────────────
 
 async function rpcCall(method, params) {
-  const r = await fetch('https://mainnet.base.org', {
+  const r = await fetch(BASE_RPC, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
@@ -218,7 +233,7 @@ const AGG_ABI = parseAbi([
 // Live worst-case reserve in LINK (price-aware, with a safe fallback + staleness guard).
 async function computeReserveLink() {
   try {
-    const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+    const pub = createPublicClient({ chain: base, transport: http(BASE_RPC) })
     const read = async (a) => {
       const [dec, rd] = await Promise.all([
         pub.readContract({ address: a, abi: AGG_ABI, functionName: 'decimals' }),
@@ -325,7 +340,7 @@ async function checkTrophyMint() {
     if (Array.isArray(d) && d[0]?.value) { try { if (JSON.parse(d[0].value).done) return { skipped: 'already verified' } } catch {} }
   } catch {}
 
-  const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  const pub = createPublicClient({ chain: base, transport: http(BASE_RPC) })
   let supply
   try { supply = Number(await pub.readContract({ address: TROPHY_NFT, abi: TROPHY_ABI, functionName: 'totalSupply' })) } catch { return { error: 'totalSupply read failed' } }
   if (supply < 1) return { skipped: 'no trophy minted yet', supply }
@@ -380,7 +395,7 @@ async function runVrfAutoFunder() {
   const subBalance = vstat.subLinkBalance
   if (subBalance == null) return { skipped: 'sub balance read failed' }
 
-  const pub = createPublicClient({ chain: base, transport: http('https://mainnet.base.org') })
+  const pub = createPublicClient({ chain: base, transport: http(BASE_RPC) })
   let bankLink = 0
   try { bankLink = Number(await pub.readContract({ address: LINK_TOKEN, abi: LINK_ABI, functionName: 'balanceOf', args: [BANK_WALLET] })) / 1e18 } catch {}
 
@@ -411,7 +426,7 @@ async function runVrfAutoFunder() {
   const pk = process.env.DEPLOYER_PRIVATE_KEY
   const pkHex = pk.startsWith('0x') ? pk : `0x${pk}`
   const account = privateKeyToAccount(pkHex)
-  const wallet = createWalletClient({ account, chain: base, transport: http('https://mainnet.base.org') })
+  const wallet = createWalletClient({ account, chain: base, transport: http(BASE_RPC) })
   const amountWei = BigInt(Math.floor(decision.amount * 1e18))
   const data = encodeAbiParameters([{ type: 'uint256' }], [VRF_SUB_ID])
   let txHash
@@ -450,7 +465,7 @@ const KEEPER3_ABI = parseAbi([
 ])
 // The public Base RPC rate-limits; settlement must not hinge on that. Prefer the
 // project's Alchemy endpoint and fall back to public only if it is unset.
-const KEEPER_RPC = process.env.BASE_RPC_URL || 'https://mainnet.base.org'
+const KEEPER_RPC = BASE_RPC   // alias kept for readability at the keeper call sites
 const V3D_ROUND_ABI = parseAbi([
   'function currentRoundId() view returns (uint256)',
   'function getRound(uint256) view returns (uint256 startTime,uint256 endTime,uint256 totalTickets,uint256 totalRawVotes,bool settled,bool vrfPending,uint256 profileCount)',
