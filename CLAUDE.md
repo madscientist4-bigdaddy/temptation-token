@@ -639,6 +639,29 @@ match 1:1/1000, (8) burn = winning-profile pool only. Guard: `scripts/check-priz
   a swallowed revert and is skipped. With no row it infers from the round start time and
   says "manual / unproven". Verified live: round 8, 2026-08-25T18:10:20Z, automatic,
   tx `0x7708d02c…`. **The watchdog should read this field** rather than re-deriving it.
+- ✅ **CLOSED 2026-09-03 — the VRF "no fuel" warning was STALE, and the reserve was fake.**
+  Every RPC path in `api/scheduler.js` except the keeper's hardcoded the public
+  `mainnet.base.org`, which is rate-limited from Vercel (`?action=vrf-status` failed 6/6
+  while the same reads from a laptop succeeded). Two silent effects: `computeReserveLink()`
+  returned its **15-LINK fallback dressed as a live price-aware number**, and
+  `computeVrfStatus()` threw so `runVrfAutoFunder()` returned *before* `persistStatus()` —
+  freezing `vrf_autofund_status`, which is how a "no fuel" decision from when the Bank was
+  empty stayed on screen after it was refilled. Fixed: one `BASE_RPC` constant
+  (`BASE_RPC_URL` → Alchemy) for the whole file. Verified live — `reserveLink` now reads
+  **15.91**, the true feed value, 6/6 successful.
+- 📊 **A VRF draw actually costs ~0.000476 LINK.** Measured from round 9's
+  `RandomWordsFulfilled` (2026-08-31T05:18:51Z, success). The **15.9-LINK "reserve" is a
+  worst-case provision** (2.5M callback gas × 30-gwei lane) — about **33,000× the real
+  cost**. The VRF sub (32.76 LINK) is therefore not a practical constraint; Bank LINK fuel
+  guards the *policy thresholds*, not real consumption. Bank at 9.16 LINK has only
+  **4.16 usable** (5-LINK floor), so every top-up is a partial fill; 35 LINK total enables
+  one full max top-up, 65 the full 7-day cap.
+- ⚠️ **P1 — round 9 settled but left no completed autopilot audit row.** `currentRoundId`
+  is 10 and VRF fulfilled 2026-08-31 05:18:51Z (20 min after the 04:59 pin — squarely in
+  the autopilot's grace window), yet `keeper-status.lastSettlement` still reports **round
+  8**. Either the settle row never reconciled off `status:'pending'` or it recorded
+  `no_state_change`. **The 24h runaway cap reads that same table**, so an unreconciled row
+  also mis-counts the cap. Check `admin_audit_log` where `config_key='keeper_autopilot'`.
 - **P1 — teach the watchdog about the autopilot.** `scripts/verify-round-settlement.mjs`
   audits Chainlink only and is blind to `keeper_autopilot_status`. Add: assert `action`
   is non-null whenever `upkeepNeeded` is true, and alert when `actionsLast24h == 0` past
