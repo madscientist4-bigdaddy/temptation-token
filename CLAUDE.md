@@ -586,9 +586,20 @@ Docs: `mobile/PHASE1_PLAN.md` (approach + rationale), `outputs/mobile_status.md`
 ## WordPress (tts-api-auth plugin — bypasses Hostinger App-Password block)
 - Base `https://temptationtoken.io/wp-json/tts/v1/` · header `X-TTS-API-Key:` (Vercel
   `TTS_WP_API_KEY`) · plugin `wp-plugins/tts-api-auth/`. Routes: `/setup`, `/status`,
-  `/elementor/{id}`, `/meta/{id}`, `/fix-logo`, `/css`. **Plugin not yet installed** →
-  WP edits blocked; live-site copy fixes (price-target/adult-content/40% strings,
-  /trust + /audit 404s) remain pending. Detail in history + `outputs/wordpress_meta_fixes.md`.
+  `/elementor/{id}`, `/meta/{id}`, `/fix-logo`, `/css`. ✅ **Plugin INSTALLED and
+  authenticated (verified 2026-09-15):** live version is **1.1.0** — the repo file is
+  1.1.1, so **`/rotate-key` does not exist on the site** (`rest_no_route`). Key rotated
+  2026-09-15 via wp-admin All Settings (`/wp-admin/options.php`, option `tts_api_key`,
+  single-option `page_options` POST from a logged-in admin tab) and stored in `.env` +
+  Vercel Production + Preview; `scripts/wp/client.mjs` preflight → `canWriteVia: apiKey`,
+  `/status` 200. The setup token is one-shot and the plugin retires it once a key exists,
+  so a "setup notice" with a token is stale whenever `GET /setup` says `api_key_set:true`.
+  **Handling the key: never paste it into chat or a tool call.** Generate it in the browser
+  tab, download it as a file, move the file into place and set Vercel with
+  `vercel env add NAME <env> --value "$(cat file)"` (the pinned CLI v50 loops on Preview
+  in non-interactive mode; `npx vercel@latest` works). Next: upload plugin 1.1.1 so
+  `/rotate-key` exists. Live-site copy fixes (price-target/adult-content/40% strings,
+  /trust + /audit 404s) are now unblocked. Detail: `outputs/wordpress_meta_fixes.md`.
 
 ## Content Generator CRITICAL RULES (`api/content-generator.js`)
 All 8 must stay in the system prompt: (1) round schedule, (2) zero stakers framed as
