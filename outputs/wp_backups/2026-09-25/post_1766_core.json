@@ -1,0 +1,192 @@
+{
+ "id": 1766,
+ "date": "2026-09-15T17:57:27",
+ "date_gmt": "2026-09-15T21:57:27",
+ "guid": {
+  "rendered": "https://temptationtoken.io/?p=1766",
+  "raw": "https://temptationtoken.io/?p=1766"
+ },
+ "modified": "2026-09-15T17:57:27",
+ "modified_gmt": "2026-09-15T21:57:27",
+ "password": "",
+ "slug": "vote-to-earn-round-mechanics-explained-from-first",
+ "status": "publish",
+ "type": "post",
+ "link": "https://temptationtoken.io/2026/09/15/vote-to-earn-round-mechanics-explained-from-first/",
+ "title": {
+  "raw": "Vote-to-Earn Round Mechanics Explained From First Vote To Trophy Distribution",
+  "rendered": "Vote-to-Earn Round Mechanics Explained From First Vote To Trophy Distribution"
+ },
+ "content": {
+  "raw": "<p>When a Temptation Token round ends at 11:59 PM ET on Sunday, voting stops, the contract asks Chainlink VRF for a random number weighted by votes, and one profile is drawn as the winner. The winning profile&#039;s pool is then split between the top voter, the winning profile, Polaris Project and the house, losing votes are burned, and three Trophy NFTs are minted: winner, top voter, house. That is the whole lifecycle, and everything else in this article is the detail underneath it.</p><h2>How does a vote-to-earn round work on Temptation Token?</h2><p>The short version: one round lasts one week, you vote on profiles with TTS during that week, and at the end one profile is drawn as the winner and its pool is paid out. Rounds run Monday 12:00 AM ET to Sunday 11:59 PM ET. Nothing is staggered. There is one round running at a time, and the clock is the same for everybody.</p><p>You can do this today. Connect a wallet and you get 500 TTS free, and no purchase is needed to play. The minimum vote is 5 TTS. Submitting a profile costs 5 TTS as well. If you have never touched a wallet before, start with the <a href=\"https://temptationtoken.io/2025/03/27/temptation-token-user-guide-navigating-the-adult-game-app/\">user guide</a>, then open the game at <a href=\"https://app.temptationtoken.io\">app.temptationtoken.io</a> or use the Telegram bot, @TemptationTokenBot.</p><p>Here is the part new players miss. A vote is not a purchase of a ticket that sits harmlessly in a drawer. Votes on profiles that do not win are burned, which means the moment you vote you have taken a side, and the <strong>vote-to-earn round mechanics</strong> that decide whether that side pays are settled in a single transaction at the end of the week. Everything before that transaction is just the game being played.</p><h2>What happens the moment voting closes on Sunday night?</h2><p>Voting stops, the contract reads the final vote weights, and it requests a random number from Chainlink VRF. That request, and the answer to it, is what turns a week of votes into a winner.</p><p>Chainlink VRF is the industry standard for this job. Per <a href=\"https://docs.chain.link/vrf\">Chainlink's own documentation</a>, for each request VRF generates one or more random values plus a cryptographic proof of how those values were determined, and the proof is published and verified onchain before any consuming application can use it. The same documentation is blunt about who can interfere: nobody, including oracle operators, miners, users and the smart contract developers themselves. That last group includes me.</p><p>Then the chain does its part. Base is fast, which is why settlement does not feel like waiting for a bank. <a href=\"https://docs.base.org/base-chain/network-information/transaction-finality\">Base's finality documentation</a> notes that after roughly two seconds the sequencer has built a transaction into an L2 block and distributed it to validator nodes, with near 0% probability of a reorg. So the draw, the split and the trophy mints land in the space of a coffee sip. If you want the longer argument about why this design cannot be rigged, I wrote it up in <a href=\"https://temptationtoken.io/2026/05/05/provablyfairvoting/\">Provably Fair Voting</a>.</p><h2>Who gets paid when the pool closes, and in what order?</h2><p>Only the winning profile's pool is split, and it is split four ways: top voter 35%, winning profile 35%, Polaris Project 10%, house 20%. If a club is attached to the winning profile, the split becomes top voter 35%, winning profile 35%, Polaris Project 10%, club 10%, and the house share drops to 10%.</p><p>Read those two lines again, because they carry most of the strategy in the game. The biggest single share available to a player is the top voter share, and it is the same 35% the winning profile itself receives. You are not splitting a consolation pot with everyone who voted correctly. Being the largest voter on the profile that gets drawn is the position that pays.</p><p>The charity share is not a marketing line bolted on at the end. Polaris Project takes 10% of every winning pool, week after week, and I explain why that is wired into the contract rather than promised in a blog post in <a href=\"https://temptationtoken.io/2026/05/05/cryptoforcharity/\">Crypto for Charity</a>.</p><h2>Why do the closing hours of a round matter most?</h2><p>Because weight is only counted once, at the end. Votes cast on Monday and votes cast four minutes before close are worth exactly the same in the draw, which means the final picture of who leads, and who is top voter on each profile, is the only picture that ever gets used.</p><p>Let me walk through a round. Two profiles are live. One pulls ahead early in the week and looks unbeatable. A quiet voter has been stacking behind the second profile and is its top voter, unchallenged. On Sunday evening, supporters of the second profile pile in, and the quiet voter gets overtaken in the last hour. The draw runs. The second profile wins. The player who held top voter all week gets nothing extra for holding it, because the contract only ever reads the final standings. No numbers in that story, because I will not invent a pool for you. The shape is what matters.</p><p>Here is the real problem with early voting as a strategy: an early lead tells you nothing, since more votes mean more weight in the draw but never a guaranteed win, and a profile that trails all week can still be the one VRF selects. Multipliers change the arithmetic too, and I covered those separately in <a href=\"https://temptationtoken.io/2026/05/05/ttsstaking/\">TTS Staking Explained</a>.</p><h2>What are Trophy NFTs and who receives them each round?</h2><p>Each settlement mints three Trophy NFTs: one for the winner, one for the top voter, one for the house. Three per round, no more, minted by the same transaction that splits the pool.</p><p>A trophy is a record, not a payment. The payment is the pool split. The trophy is the permanent onchain note that says this profile won this round and this wallet was its top voter. Non-fungible tokens are built for exactly this. <a href=\"https://docs.base.org/learn/erc-721-token/erc-721-standard\">Base's developer documentation</a> puts the distinction plainly: ERC-20 tokens are interchangeable like currency, while ERC-721 tokens are unique and not interchangeable with any other token. <a href=\"https://ethereum.org/developers/docs/standards/tokens/erc-721/\">Ethereum.org notes</a> the standard was proposed by William Entriken, Dieter Shirley, Jacob Evans and Nastassia Sachs in January 2018, and describes it as a good fit for collectible items and numbered seats, which is a fair description of a round result.</p><p>You cannot buy one late. You cannot claim one after the fact. A trophy exists because a round closed and the contract minted it.</p><h2>What triggers a win versus a loss in a round?</h2><p>A win is one thing only: your profile is the one Chainlink VRF draws at settlement. A loss is everything else, and the consequence of a loss is written into the contract, because losing votes are burned.</p><p>So there are two questions a player should ask before voting, and they are not the same question. Did I back the profile that gets drawn? And was I its top voter when the clock stopped? Back the winner without being top voter and you did not take the 35% top voter share. Be top voter on a profile that is not drawn and your votes are burned along with everybody else's on that profile. The winning combination is both at once.</p><p>The guardrails are boring on purpose. The contract is audited by Solidproof, the LP is locked for 12 months, total supply is 69B TTS, and the contract address on Base is 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9. Temptation Token is a weekly game on Base mainnet operated by Blockchain Entertainment LLC, and if you want the plain overview rather than the mechanics, read <a href=\"https://temptationtoken.io/2026/05/01/what-is-temptation-token/\">What is Temptation Token?</a> or <a href=\"https://temptationtoken.io/2026/05/05/wincryptoprizes/\">How to Win Crypto Prizes Every Week with $TTS</a>.</p><h2>Frequently asked questions</h2><h3>When does a Temptation Token round start and end?</h3><p>Every round runs weekly on Base mainnet, opening Monday at 12:00 AM ET and closing Sunday at 11:59 PM ET. There is no separate entry window and no staggered heat. One round, one week. When the clock hits 11:59 PM ET on Sunday, voting stops and settlement begins. The next round opens hours later on Monday morning.</p><h3>What is the minimum vote in a vote-to-earn round?</h3><p>The minimum vote is 5 TTS. Submitting a profile also costs 5 TTS. Connecting a wallet gives you 500 TTS free, and no purchase is needed to play, so a new player can vote in a round without buying anything first. There is no upper limit written into the game beyond the tokens you hold.</p><h3>Are the losing votes returned at the end of a round?</h3><p>No. Losing votes are burned. Tokens voted on a profile that is not drawn as the winner are destroyed rather than refunded or rolled into the following week. That is the cost of a vote, and it is why the pool on the winning profile is the only pool that pays. Total supply is 69B TTS.</p><h3>How is the winner of a Temptation Token round chosen?</h3><p>The winner is chosen by Chainlink VRF, weighted by votes. A profile with more votes carries more weight in the draw, but weight is not certainty, and no profile is guaranteed to win a round. The randomness is requested at settlement and verified onchain, so the outcome is not decided by the house, the players, or me.</p><h3>What does a club earn when its profile wins a round?</h3><p>When a club is attached to the winning profile, the split changes. Top voter takes 35%, the winning profile takes 35%, Polaris Project takes 10%, the club takes 10%, and the house share drops to 10%. Without a club, the house takes 20% and the club share does not exist. The club is paid at settlement, automatically.</p><h2>The Bottom Line</h2><p>A round is simple once you see it as one transaction with a week of setup in front of it. Votes accumulate. The clock stops. A random number weighted by votes picks the winning profile. The pool splits, the trophies mint, the losing votes burn, and Monday morning it starts again. Nothing about the ending is negotiated, and nothing about it is decided after the fact.</p><p>Here is the one thing to try this week. Join a round early with the minimum vote, then watch the standings in the last hour before close and notice how the top voter position moves. You will understand more from one Sunday night than from any explainer, including this one. Questions about a round you played, or about running a club profile, come to me directly at jim@temptationtoken.io, or start at <a href=\"https://temptationtoken.io/\">temptationtoken.io</a>.</p><p><strong>Play at app.temptationtoken.io.</strong></p><h2>Sources</h2><ul><li><a href=\"https://docs.chain.link/vrf\" rel=\"nofollow noopener\" target=\"_blank\">Chainlink VRF | Chainlink Documentation</a></li><li><a href=\"https://docs.base.org/base-chain/network-information/transaction-finality\" rel=\"nofollow noopener\" target=\"_blank\">Transaction Finality | Base Documentation</a></li><li><a href=\"https://docs.base.org/learn/erc-721-token/erc-721-standard\" rel=\"nofollow noopener\" target=\"_blank\">The ERC-721 Token Standard | Base Docs</a></li><li><a href=\"https://ethereum.org/developers/docs/standards/tokens/erc-721/\" rel=\"nofollow noopener\" target=\"_blank\">ERC-721 Non-Fungible Token Standard | ethereum.org</a></li></ul>",
+  "rendered": "<p>When a Temptation Token round ends at 11:59 PM ET on Sunday, voting stops, the contract asks Chainlink VRF for a random number weighted by votes, and one profile is drawn as the winner. The winning profile&#039;s pool is then split between the top voter, the winning profile, Polaris Project and the house, losing votes are burned, and three Trophy NFTs are minted: winner, top voter, house. That is the whole lifecycle, and everything else in this article is the detail underneath it.</p>\n<h2>How does a vote-to-earn round work on Temptation Token?</h2>\n<p>The short version: one round lasts one week, you vote on profiles with TTS during that week, and at the end one profile is drawn as the winner and its pool is paid out. Rounds run Monday 12:00 AM ET to Sunday 11:59 PM ET. Nothing is staggered. There is one round running at a time, and the clock is the same for everybody.</p>\n<p>You can do this today. Connect a wallet and you get 500 TTS free, and no purchase is needed to play. The minimum vote is 5 TTS. Submitting a profile costs 5 TTS as well. If you have never touched a wallet before, start with the <a href=\"https://temptationtoken.io/2025/03/27/temptation-token-user-guide-navigating-the-adult-game-app/\">user guide</a>, then open the game at <a href=\"https://app.temptationtoken.io\">app.temptationtoken.io</a> or use the Telegram bot, @TemptationTokenBot.</p>\n<p>Here is the part new players miss. A vote is not a purchase of a ticket that sits harmlessly in a drawer. Votes on profiles that do not win are burned, which means the moment you vote you have taken a side, and the <strong>vote-to-earn round mechanics</strong> that decide whether that side pays are settled in a single transaction at the end of the week. Everything before that transaction is just the game being played.</p>\n<h2>What happens the moment voting closes on Sunday night?</h2>\n<p>Voting stops, the contract reads the final vote weights, and it requests a random number from Chainlink VRF. That request, and the answer to it, is what turns a week of votes into a winner.</p>\n<p>Chainlink VRF is the industry standard for this job. Per <a href=\"https://docs.chain.link/vrf\" target=\"_blank\" rel=\"noopener\">Chainlink&#8217;s own documentation</a>, for each request VRF generates one or more random values plus a cryptographic proof of how those values were determined, and the proof is published and verified onchain before any consuming application can use it. The same documentation is blunt about who can interfere: nobody, including oracle operators, miners, users and the smart contract developers themselves. That last group includes me.</p>\n<p>Then the chain does its part. Base is fast, which is why settlement does not feel like waiting for a bank. <a href=\"https://docs.base.org/base-chain/network-information/transaction-finality\" target=\"_blank\" rel=\"noopener\">Base&#8217;s finality documentation</a> notes that after roughly two seconds the sequencer has built a transaction into an L2 block and distributed it to validator nodes, with near 0% probability of a reorg. So the draw, the split and the trophy mints land in the space of a coffee sip. If you want the longer argument about why this design cannot be rigged, I wrote it up in <a href=\"https://temptationtoken.io/2026/05/05/provablyfairvoting/\">Provably Fair Voting</a>.</p>\n<h2>Who gets paid when the pool closes, and in what order?</h2>\n<p>Only the winning profile&#8217;s pool is split, and it is split four ways: top voter 35%, winning profile 35%, Polaris Project 10%, house 20%. If a club is attached to the winning profile, the split becomes top voter 35%, winning profile 35%, Polaris Project 10%, club 10%, and the house share drops to 10%.</p>\n<p>Read those two lines again, because they carry most of the strategy in the game. The biggest single share available to a player is the top voter share, and it is the same 35% the winning profile itself receives. You are not splitting a consolation pot with everyone who voted correctly. Being the largest voter on the profile that gets drawn is the position that pays.</p>\n<p>The charity share is not a marketing line bolted on at the end. Polaris Project takes 10% of every winning pool, week after week, and I explain why that is wired into the contract rather than promised in a blog post in <a href=\"https://temptationtoken.io/2026/05/05/cryptoforcharity/\">Crypto for Charity</a>.</p>\n<h2>Why do the closing hours of a round matter most?</h2>\n<p>Because weight is only counted once, at the end. Votes cast on Monday and votes cast four minutes before close are worth exactly the same in the draw, which means the final picture of who leads, and who is top voter on each profile, is the only picture that ever gets used.</p>\n<p>Let me walk through a round. Two profiles are live. One pulls ahead early in the week and looks unbeatable. A quiet voter has been stacking behind the second profile and is its top voter, unchallenged. On Sunday evening, supporters of the second profile pile in, and the quiet voter gets overtaken in the last hour. The draw runs. The second profile wins. The player who held top voter all week gets nothing extra for holding it, because the contract only ever reads the final standings. No numbers in that story, because I will not invent a pool for you. The shape is what matters.</p>\n<p>Here is the real problem with early voting as a strategy: an early lead tells you nothing, since more votes mean more weight in the draw but never a guaranteed win, and a profile that trails all week can still be the one VRF selects. Multipliers change the arithmetic too, and I covered those separately in <a href=\"https://temptationtoken.io/2026/05/05/ttsstaking/\">TTS Staking Explained</a>.</p>\n<h2>What are Trophy NFTs and who receives them each round?</h2>\n<p>Each settlement mints three Trophy NFTs: one for the winner, one for the top voter, one for the house. Three per round, no more, minted by the same transaction that splits the pool.</p>\n<p>A trophy is a record, not a payment. The payment is the pool split. The trophy is the permanent onchain note that says this profile won this round and this wallet was its top voter. Non-fungible tokens are built for exactly this. <a href=\"https://docs.base.org/learn/erc-721-token/erc-721-standard\" target=\"_blank\" rel=\"noopener\">Base&#8217;s developer documentation</a> puts the distinction plainly: ERC-20 tokens are interchangeable like currency, while ERC-721 tokens are unique and not interchangeable with any other token. <a href=\"https://ethereum.org/developers/docs/standards/tokens/erc-721/\" target=\"_blank\" rel=\"noopener\">Ethereum.org notes</a> the standard was proposed by William Entriken, Dieter Shirley, Jacob Evans and Nastassia Sachs in January 2018, and describes it as a good fit for collectible items and numbered seats, which is a fair description of a round result.</p>\n<p>You cannot buy one late. You cannot claim one after the fact. A trophy exists because a round closed and the contract minted it.</p>\n<h2>What triggers a win versus a loss in a round?</h2>\n<p>A win is one thing only: your profile is the one Chainlink VRF draws at settlement. A loss is everything else, and the consequence of a loss is written into the contract, because losing votes are burned.</p>\n<p>So there are two questions a player should ask before voting, and they are not the same question. Did I back the profile that gets drawn? And was I its top voter when the clock stopped? Back the winner without being top voter and you did not take the 35% top voter share. Be top voter on a profile that is not drawn and your votes are burned along with everybody else&#8217;s on that profile. The winning combination is both at once.</p>\n<p>The guardrails are boring on purpose. The contract is audited by Solidproof, the LP is locked for 12 months, total supply is 69B TTS, and the contract address on Base is 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9. Temptation Token is a weekly game on Base mainnet operated by Blockchain Entertainment LLC, and if you want the plain overview rather than the mechanics, read <a href=\"https://temptationtoken.io/2026/05/01/what-is-temptation-token/\">What is Temptation Token?</a> or <a href=\"https://temptationtoken.io/2026/05/05/wincryptoprizes/\">How to Win Crypto Prizes Every Week with $TTS</a>.</p>\n<h2>Frequently asked questions</h2>\n<h3>When does a Temptation Token round start and end?</h3>\n<p>Every round runs weekly on Base mainnet, opening Monday at 12:00 AM ET and closing Sunday at 11:59 PM ET. There is no separate entry window and no staggered heat. One round, one week. When the clock hits 11:59 PM ET on Sunday, voting stops and settlement begins. The next round opens hours later on Monday morning.</p>\n<h3>What is the minimum vote in a vote-to-earn round?</h3>\n<p>The minimum vote is 5 TTS. Submitting a profile also costs 5 TTS. Connecting a wallet gives you 500 TTS free, and no purchase is needed to play, so a new player can vote in a round without buying anything first. There is no upper limit written into the game beyond the tokens you hold.</p>\n<h3>Are the losing votes returned at the end of a round?</h3>\n<p>No. Losing votes are burned. Tokens voted on a profile that is not drawn as the winner are destroyed rather than refunded or rolled into the following week. That is the cost of a vote, and it is why the pool on the winning profile is the only pool that pays. Total supply is 69B TTS.</p>\n<h3>How is the winner of a Temptation Token round chosen?</h3>\n<p>The winner is chosen by Chainlink VRF, weighted by votes. A profile with more votes carries more weight in the draw, but weight is not certainty, and no profile is guaranteed to win a round. The randomness is requested at settlement and verified onchain, so the outcome is not decided by the house, the players, or me.</p>\n<h3>What does a club earn when its profile wins a round?</h3>\n<p>When a club is attached to the winning profile, the split changes. Top voter takes 35%, the winning profile takes 35%, Polaris Project takes 10%, the club takes 10%, and the house share drops to 10%. Without a club, the house takes 20% and the club share does not exist. The club is paid at settlement, automatically.</p>\n<h2>The Bottom Line</h2>\n<p>A round is simple once you see it as one transaction with a week of setup in front of it. Votes accumulate. The clock stops. A random number weighted by votes picks the winning profile. The pool splits, the trophies mint, the losing votes burn, and Monday morning it starts again. Nothing about the ending is negotiated, and nothing about it is decided after the fact.</p>\n<p>Here is the one thing to try this week. Join a round early with the minimum vote, then watch the standings in the last hour before close and notice how the top voter position moves. You will understand more from one Sunday night than from any explainer, including this one. Questions about a round you played, or about running a club profile, come to me directly at jim@temptationtoken.io, or start at <a href=\"https://temptationtoken.io/\">temptationtoken.io</a>.</p>\n<p><strong>Play at app.temptationtoken.io.</strong></p>\n<h2>Sources</h2>\n<ul>\n<li><a href=\"https://docs.chain.link/vrf\" rel=\"nofollow noopener\" target=\"_blank\">Chainlink VRF | Chainlink Documentation</a></li>\n<li><a href=\"https://docs.base.org/base-chain/network-information/transaction-finality\" rel=\"nofollow noopener\" target=\"_blank\">Transaction Finality | Base Documentation</a></li>\n<li><a href=\"https://docs.base.org/learn/erc-721-token/erc-721-standard\" rel=\"nofollow noopener\" target=\"_blank\">The ERC-721 Token Standard | Base Docs</a></li>\n<li><a href=\"https://ethereum.org/developers/docs/standards/tokens/erc-721/\" rel=\"nofollow noopener\" target=\"_blank\">ERC-721 Non-Fungible Token Standard | ethereum.org</a></li>\n</ul>\n",
+  "protected": false,
+  "block_version": 0
+ },
+ "excerpt": {
+  "raw": "",
+  "rendered": "<p>When a Temptation Token round ends at 11:59 PM ET on Sunday, voting stops, the contract asks Chainlink VRF for a random number weighted by votes, and one profile is drawn as the winner. The winning profile&#039;s pool is then split between the top voter, the winning profile, Polaris Project and the house, losing votes [&hellip;]</p>\n",
+  "protected": false
+ },
+ "author": 1,
+ "featured_media": 1768,
+ "comment_status": "open",
+ "ping_status": "open",
+ "sticky": false,
+ "template": "",
+ "format": "standard",
+ "meta": {
+  "_acf_changed": false,
+  "footnotes": "",
+  "_elementor_edit_mode": "",
+  "_elementor_template_type": "",
+  "_elementor_data": "",
+  "_elementor_page_settings": null
+ },
+ "categories": [
+  1
+ ],
+ "tags": [
+  34,
+  35,
+  32,
+  33
+ ],
+ "permalink_template": "https://temptationtoken.io/2026/09/15/%postname%/",
+ "generated_slug": "vote-to-earn-round-mechanics-explained-from-first-vote-to-trophy-distribution",
+ "class_list": [
+  "post-1766",
+  "post",
+  "type-post",
+  "status-publish",
+  "format-standard",
+  "has-post-thumbnail",
+  "hentry",
+  "category-news",
+  "tag-base-ecosystem",
+  "tag-how-the-game-works",
+  "tag-rounds-and-trophies",
+  "tag-vote-to-earn"
+ ],
+ "acf": [],
+ "_links": {
+  "self": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766",
+    "targetHints": {
+     "allow": [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+     ]
+    }
+   }
+  ],
+  "collection": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts"
+   }
+  ],
+  "about": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/types/post"
+   }
+  ],
+  "author": [
+   {
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/users/1"
+   }
+  ],
+  "replies": [
+   {
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/comments?post=1766"
+   }
+  ],
+  "version-history": [
+   {
+    "count": 1,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766/revisions"
+   }
+  ],
+  "predecessor-version": [
+   {
+    "id": 1767,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766/revisions/1767"
+   }
+  ],
+  "wp:featuredmedia": [
+   {
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/media/1768"
+   }
+  ],
+  "wp:attachment": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/media?parent=1766"
+   }
+  ],
+  "wp:term": [
+   {
+    "taxonomy": "category",
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/categories?post=1766"
+   },
+   {
+    "taxonomy": "post_tag",
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/tags?post=1766"
+   }
+  ],
+  "wp:action-publish": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-unfiltered-html": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-sticky": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-assign-author": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-create-categories": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-assign-categories": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-create-tags": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "wp:action-assign-tags": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1766"
+   }
+  ],
+  "curies": [
+   {
+    "name": "wp",
+    "href": "https://api.w.org/{rel}",
+    "templated": true
+   }
+  ]
+ }
+}

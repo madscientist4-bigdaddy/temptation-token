@@ -12,6 +12,7 @@ Assembled 2026-09-25. Every figure in here is a chain read or a database query, 
 | 7 | Corrected public claims (disclosure log) | `../../site/false_claims_2026-09-25.md` | **ready** |
 | 8 | Metrics snapshot | `metrics_snapshot.md` | **ready** |
 | 9 | Monthly cost sheet | `costs.md` | **needs Jim** — actual invoice amounts |
+| 9b | Replacement-cost sheet | `replacement_cost.md` | **ready** — from git history |
 | 10 | Transfer runbook (Closing tab) | `transfer_runbook.md` | **ready (draft)** |
 | 11 | Loom walkthrough | — | **needs Jim** — record a 5-minute screen share of a live round |
 | 12 | Entity pack (LLC formation, operating agreement, EIN) | — | **needs Jim** |

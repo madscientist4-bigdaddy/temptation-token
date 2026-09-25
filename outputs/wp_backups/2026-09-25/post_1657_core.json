@@ -1,0 +1,178 @@
+{
+ "id": 1657,
+ "date": "2026-05-01T20:38:20",
+ "date_gmt": "2026-05-01T20:38:20",
+ "guid": {
+  "rendered": "https://temptationtoken.io/?p=1657",
+  "raw": "https://temptationtoken.io/?p=1657"
+ },
+ "modified": "2026-05-04T01:06:42",
+ "modified_gmt": "2026-05-04T01:06:42",
+ "password": "",
+ "slug": "what-is-temptation-token",
+ "status": "publish",
+ "type": "post",
+ "link": "https://temptationtoken.io/2026/05/01/what-is-temptation-token/",
+ "title": {
+  "raw": "What is Temptation Token?",
+  "rendered": "What is Temptation Token?"
+ },
+ "content": {
+  "raw": "<h2><strong>What is Temptation Token?</strong></h2><p>Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \u2014 no admin, no escrow, no waiting.</p><p>That is Temptation Token in one paragraph. The rest of this post is for people who want to know how it actually works, why it is built the way it is built, and what makes it different from every other \"vote with crypto\" project that has come and gone.</p><p>Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \u2014 no admin, no escrow, no waiting.</p><p>That is Temptation Token in one paragraph. The rest of this post is for people who want to know how it actually works, why it is built the way it is built, and what makes it different from every other \"vote with crypto\" project that has come and gone.</p><h3>\u00a0</h3>\t\t\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t<img width=\"6720\" height=\"4480\" src=\"https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304.jpg\" alt=\"What is Temptation Token\" srcset=\"https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304.jpg 6720w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-300x200.jpg 300w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-1024x683.jpg 1024w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-768x512.jpg 768w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-1536x1024.jpg 1536w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-2048x1365.jpg 2048w\" sizes=\"(max-width: 6720px) 100vw, 6720px\" />\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\n\t\t<h3>The Core Loop of Temptation Token</h3><p>Temptation Token runs one round per week. Each round follows the same four-stage cycle:</p><ul><li><strong>Submission window</strong> \u2014 anyone can submit a profile for 5 TTS</li><li><strong>Voting window</strong> \u2014 holders vote with $TTS, minimum 5 per vote</li><li><strong>Settlement</strong> \u2014 the smart contract distributes the pool automatically</li><li><strong>Rollover</strong> \u2014 a new round starts the next Monday</li></ul><p>Voters do not \"tip.\" They cast weighted votes. The profile with the most TTS wins. The wallet that contributed the most votes wins. Both get paid in the same transaction.</p><h3>How the Prize Pool Splits in Temptation Token</h3><p>Every TTS spent on voting flows into the round's pool. When the round ends, the contract splits it like this:</p><ul><li><strong>35% to the winning profile</strong></li><li><strong>35% to the top voter</strong></li><li><strong>10% to Polaris Project</strong> (anti-trafficking nonprofit)</li><li><strong>20% to Blockchain Entertainment LLC</strong> (operating treasury)</li></ul><p>If the winning profile is sponsored by a partner club, an additional 10% routes to that club's wallet automatically and the operator share drops to 10%. No invoices. No spreadsheets. The contract handles it.</p><h3>Why Temptation Token Runs on Base</h3><p>Temptation Token runs on Base because the chain is fast, cheap, and built on Ethereum's security model. A single vote costs pennies. Settlement happens in seconds. Bridging in is one click from any major wallet.</p><p>The \"provably fair\" part comes from Chainlink VRF \u2014 a verifiable random function used wherever the contract needs randomness. Combined with the Solidproof audit on the TTS token contract (zero critical findings), every holder can verify on-chain that no human ever touches the prize money. The code pays out. That's it.</p><p>This matters because the entire premise of Temptation Token depends on trust. If holders ever suspected a rigged round, the project dies in one tweet. Building on Base, locking liquidity for twelve months on Team.Finance, deploying a 2-of-2 Gnosis Safe multisig, and publishing the audit are not marketing choices. They are survival choices.</p><h3>Who Temptation Token Is Built For</h3><p>Three groups overlap inside Temptation Token:</p><ul><li><strong>Voters</strong> who want to win 35% of a real prize pool with a few minutes of attention per week</li><li><strong>Profiles</strong> who want a transparent way to monetize an audience without paying a platform 50% in fees</li><li><strong>Holders</strong> who want exposure to a token whose entire supply gets cycled through weekly demand</li></ul><p>The 500 TTS signup bonus and the 1:1 vote match on the first vote (up to 1,000 TTS) exist to remove the \"I have to figure out a wallet first\" friction. New users can play their first round without ever opening Uniswap.</p><h3>What Comes Next for Temptation Token</h3><p>Round 1 is live now and settles next Sunday. The roadmap from here: NFT round trophies live in Round 2, the full club partnership program already integrated on-chain, exchange listings post-audit delivery, and a Telegram Mini App that lets users vote without leaving the chat.</p><p>Temptation Token is not a memecoin. It is a scheduled cash-flow product wrapped in a game. Every week, a pool fills, the contract settles, and the next round starts.</p><p>If you want to play, the app is at app.temptationtoken.io. If you want to read the contracts, every address is published on the trust page. If you want to read the audit, it is linked there too.</p><p>The point of Temptation Token is that you do not have to take anyone's word for any of this. It is all on Base. Go look.</p>",
+  "rendered": "\t\t<div data-elementor-type=\"wp-post\" data-elementor-id=\"1657\" class=\"elementor elementor-1657\">\n\t\t\t\t<div data-particle_enable=\"false\" data-particle-mobile-disabled=\"false\" class=\"elementor-element elementor-element-ec94489 e-flex e-con-boxed e-con e-parent\" data-id=\"ec94489\" data-element_type=\"container\" data-e-type=\"container\">\n\t\t\t\t\t<div class=\"e-con-inner\">\n\t\t\t\t<div class=\"elementor-element elementor-element-8b1e79d elementor-widget elementor-widget-text-editor\" data-id=\"8b1e79d\" data-element_type=\"widget\" data-e-type=\"widget\" data-settings=\"{&quot;ekit_we_effect_on&quot;:&quot;none&quot;}\" data-widget_type=\"text-editor.default\">\n\t\t\t\t<div class=\"elementor-widget-container\">\n\t\t\t\t\t\t\t\t\t<h2 class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\"><strong>What is Temptation Token?</strong></h2><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \u2014 no admin, no escrow, no waiting.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">That is Temptation Token in one paragraph. The rest of this post is for people who want to know how it actually works, why it is built the way it is built, and what makes it different from every other &#8220;vote with crypto&#8221; project that has come and gone.</p>\t\t\t\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t<div data-particle_enable=\"false\" data-particle-mobile-disabled=\"false\" class=\"elementor-element elementor-element-5f381a1 e-con-full e-flex e-con e-child\" data-id=\"5f381a1\" data-element_type=\"container\" data-e-type=\"container\">\n\t\t<div data-particle_enable=\"false\" data-particle-mobile-disabled=\"false\" class=\"elementor-element elementor-element-0060817 e-grid e-con-full e-con e-child\" data-id=\"0060817\" data-element_type=\"container\" data-e-type=\"container\">\n\t\t\t\t<div class=\"elementor-element elementor-element-626eb32 elementor-widget elementor-widget-text-editor\" data-id=\"626eb32\" data-element_type=\"widget\" data-e-type=\"widget\" data-settings=\"{&quot;ekit_we_effect_on&quot;:&quot;none&quot;}\" data-widget_type=\"text-editor.default\">\n\t\t\t\t<div class=\"elementor-widget-container\">\n\t\t\t\t\t\t\t\t\t<p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \u2014 no admin, no escrow, no waiting.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">That is Temptation Token in one paragraph. The rest of this post is for people who want to know how it actually works, why it is built the way it is built, and what makes it different from every other &#8220;vote with crypto&#8221; project that has come and gone.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">\u00a0</h3>\t\t\t\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t<div class=\"elementor-element elementor-element-c9e33b7 elementor-widget elementor-widget-image\" data-id=\"c9e33b7\" data-element_type=\"widget\" data-e-type=\"widget\" data-settings=\"{&quot;ekit_we_effect_on&quot;:&quot;none&quot;}\" data-widget_type=\"image.default\">\n\t\t\t\t<div class=\"elementor-widget-container\">\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t<img fetchpriority=\"high\" decoding=\"async\" width=\"6720\" height=\"4480\" src=\"https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304.jpg\" class=\"attachment-full size-full wp-image-1669\" alt=\"What is Temptation Token\" srcset=\"https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304.jpg 6720w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-300x200.jpg 300w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-1024x683.jpg 1024w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-768x512.jpg 768w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-1536x1024.jpg 1536w, https://temptationtoken.io/wp-content/uploads/2026/05/4J6A1304-2048x1365.jpg 2048w\" sizes=\"(max-width: 6720px) 100vw, 6720px\" title=\"\">\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t<div class=\"elementor-element elementor-element-379c4df elementor-widget elementor-widget-text-editor\" data-id=\"379c4df\" data-element_type=\"widget\" data-e-type=\"widget\" data-settings=\"{&quot;ekit_we_effect_on&quot;:&quot;none&quot;}\" data-widget_type=\"text-editor.default\">\n\t\t\t\t<div class=\"elementor-widget-container\">\n\t\t\t\t\t\t\t\t\t<h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">The Core Loop of Temptation Token</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Temptation Token runs one round per week. Each round follows the same four-stage cycle:</p><ul class=\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\"><li class=\"whitespace-normal break-words pl-2\"><strong>Submission window</strong> \u2014 anyone can submit a profile for 5 TTS</li><li class=\"whitespace-normal break-words pl-2\"><strong>Voting window</strong> \u2014 holders vote with $TTS, minimum 5 per vote</li><li class=\"whitespace-normal break-words pl-2\"><strong>Settlement</strong> \u2014 the smart contract distributes the pool automatically</li><li class=\"whitespace-normal break-words pl-2\"><strong>Rollover</strong> \u2014 a new round starts the next Monday</li></ul><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Voters do not &#8220;tip.&#8221; They cast weighted votes. The profile with the most TTS wins. The wallet that contributed the most votes wins. Both get paid in the same transaction.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">How the Prize Pool Splits in Temptation Token</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Every TTS spent on voting flows into the round&#8217;s pool. When the round ends, the contract splits it like this:</p><ul class=\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\"><li class=\"whitespace-normal break-words pl-2\"><strong>35% to the winning profile</strong></li><li class=\"whitespace-normal break-words pl-2\"><strong>35% to the top voter</strong></li><li class=\"whitespace-normal break-words pl-2\"><strong>10% to Polaris Project</strong> (anti-trafficking nonprofit)</li><li class=\"whitespace-normal break-words pl-2\"><strong>20% to Blockchain Entertainment LLC</strong> (operating treasury)</li></ul><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">If the winning profile is sponsored by a partner club, an additional 10% routes to that club&#8217;s wallet automatically and the operator share drops to 10%. No invoices. No spreadsheets. The contract handles it.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">Why Temptation Token Runs on Base</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Temptation Token runs on Base because the chain is fast, cheap, and built on Ethereum&#8217;s security model. A single vote costs pennies. Settlement happens in seconds. Bridging in is one click from any major wallet.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The &#8220;provably fair&#8221; part comes from Chainlink VRF \u2014 a verifiable random function used wherever the contract needs randomness. Combined with the Solidproof audit on the TTS token contract (zero critical findings), every holder can verify on-chain that no human ever touches the prize money. The code pays out. That&#8217;s it.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">This matters because the entire premise of Temptation Token depends on trust. If holders ever suspected a rigged round, the project dies in one tweet. Building on Base, locking liquidity for twelve months on Team.Finance, deploying a 2-of-2 Gnosis Safe multisig, and publishing the audit are not marketing choices. They are survival choices.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">Who Temptation Token Is Built For</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Three groups overlap inside Temptation Token:</p><ul class=\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\"><li class=\"whitespace-normal break-words pl-2\"><strong>Voters</strong> who want to win 35% of a real prize pool with a few minutes of attention per week</li><li class=\"whitespace-normal break-words pl-2\"><strong>Profiles</strong> who want a transparent way to monetize an audience without paying a platform 50% in fees</li><li class=\"whitespace-normal break-words pl-2\"><strong>Holders</strong> who want exposure to a token whose entire supply gets cycled through weekly demand</li></ul><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The 500 TTS signup bonus and the 1:1 vote match on the first vote (up to 1,000 TTS) exist to remove the &#8220;I have to figure out a wallet first&#8221; friction. New users can play their first round without ever opening Uniswap.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">What Comes Next for Temptation Token</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Round 1 is live now and settles next Sunday. The roadmap from here: NFT round trophies live in Round 2, the full club partnership program already integrated on-chain, exchange listings post-audit delivery, and a Telegram Mini App that lets users vote without leaving the chat.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Temptation Token is not a memecoin. It is a scheduled cash-flow product wrapped in a game. Every week, a pool fills, the contract settles, and the next round starts.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">If you want to play, the app is at app.temptationtoken.io. If you want to read the contracts, every address is published on the trust page. If you want to read the audit, it is linked there too.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The point of Temptation Token is that you do not have to take anyone&#8217;s word for any of this. It is all on Base. Go look.</p>\t\t\t\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t",
+  "protected": false,
+  "block_version": 0
+ },
+ "excerpt": {
+  "raw": "",
+  "rendered": "<p>What is Temptation Token? Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \u2014 no admin, no escrow, no waiting. That is Temptation Token in one paragraph. The [&hellip;]</p>\n",
+  "protected": false
+ },
+ "author": 1,
+ "featured_media": 0,
+ "comment_status": "open",
+ "ping_status": "open",
+ "sticky": false,
+ "template": "",
+ "format": "standard",
+ "meta": {
+  "_acf_changed": false,
+  "footnotes": "",
+  "_elementor_edit_mode": "builder",
+  "_elementor_template_type": "wp-post",
+  "_elementor_data": "[{\"id\":\"ec94489\",\"elType\":\"container\",\"settings\":{\"ekit_section_parallax_multi_items\":[],\"eael_parallax_layers_list\":[],\"eael_cl_logics\":[{\"_id\":\"89a8840\"}],\"ekit_all_conditions_list\":[],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[{\"id\":\"8b1e79d\",\"elType\":\"widget\",\"settings\":{\"editor\":\"<h2 class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\"><strong>What is Temptation Token?<\\/strong><\\/h2><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \\u2014 no admin, no escrow, no waiting.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">That is Temptation Token in one paragraph. The rest of this post is for people who want to know how it actually works, why it is built the way it is built, and what makes it different from every other \\\"vote with crypto\\\" project that has come and gone.<\\/p>\",\"typography_typography\":\"custom\",\"typography_font_size\":{\"unit\":\"px\",\"size\":20,\"sizes\":[]},\"eael_vto_writing_gradient_color_repeater\":[{\"eael_vto_writing_gradient_color\":\"#7C62FF\",\"eael_vto_writing_gradient_color_location\":{\"unit\":\"%\",\"size\":50},\"_id\":\"344c704\"},{\"eael_vto_writing_gradient_color\":\"#FF6464\",\"eael_vto_writing_gradient_color_location\":{\"unit\":\"%\",\"size\":90},\"_id\":\"bbf4bca\"}],\"ekit_all_conditions_list\":[],\"ekit_adv_tooltip_content\":\"Tooltip Content.\",\"eael_tooltip_section_content\":\"I am a tooltip\",\"eael_ext_content_protection_password_placeholder\":\"Enter Password\",\"eael_ext_content_protection_password_submit_btn_txt\":\"Submit\",\"eael_ext_content_protection_password_incorrect_message\":\"Password does not match.\",\"eael_cl_logics\":[{\"_id\":\"c83d527\"}],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[],\"widgetType\":\"text-editor\"},{\"id\":\"5f381a1\",\"elType\":\"container\",\"settings\":{\"content_width\":\"full\",\"ekit_section_parallax_multi_items\":[],\"eael_parallax_layers_list\":[],\"eael_cl_logics\":[{\"_id\":\"4794d43\"}],\"ekit_all_conditions_list\":[],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[{\"id\":\"0060817\",\"elType\":\"container\",\"settings\":{\"container_type\":\"grid\",\"presetTitle\":\"Grid\",\"presetIcon\":\"eicon-container-grid\",\"content_width\":\"full\",\"grid_columns_grid\":{\"unit\":\"fr\",\"size\":2,\"sizes\":[]},\"grid_rows_grid\":{\"unit\":\"fr\",\"size\":1,\"sizes\":[]},\"ekit_section_parallax_multi_items\":[],\"eael_parallax_layers_list\":[],\"eael_cl_logics\":[{\"_id\":\"bd8d776\"}],\"ekit_all_conditions_list\":[],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[{\"id\":\"626eb32\",\"elType\":\"widget\",\"settings\":{\"editor\":\"<p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Every Monday at midnight Eastern, a new round of Temptation Token opens on the Base blockchain. Profiles compete. Voters back their picks with $TTS. Six days later, the smart contract automatically pays out the prize pool \\u2014 no admin, no escrow, no waiting.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">That is Temptation Token in one paragraph. The rest of this post is for people who want to know how it actually works, why it is built the way it is built, and what makes it different from every other \\\"vote with crypto\\\" project that has come and gone.<\\/p><h3 class=\\\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\\\">\\u00a0<\\/h3>\",\"eael_vto_writing_gradient_color_repeater\":[{\"eael_vto_writing_gradient_color\":\"#7C62FF\",\"eael_vto_writing_gradient_color_location\":{\"unit\":\"%\",\"size\":50},\"_id\":\"1b76fac\"},{\"eael_vto_writing_gradient_color\":\"#FF6464\",\"eael_vto_writing_gradient_color_location\":{\"unit\":\"%\",\"size\":90},\"_id\":\"e0f4404\"}],\"ekit_all_conditions_list\":[],\"ekit_adv_tooltip_content\":\"Tooltip Content.\",\"eael_tooltip_section_content\":\"I am a tooltip\",\"eael_ext_content_protection_password_placeholder\":\"Enter Password\",\"eael_ext_content_protection_password_submit_btn_txt\":\"Submit\",\"eael_ext_content_protection_password_incorrect_message\":\"Password does not match.\",\"eael_cl_logics\":[{\"_id\":\"7b96b01\"}],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[],\"widgetType\":\"text-editor\"},{\"id\":\"c9e33b7\",\"elType\":\"widget\",\"settings\":{\"image\":{\"url\":\"https:\\/\\/temptationtoken.io\\/wp-content\\/uploads\\/2026\\/05\\/4J6A1304.jpg\",\"id\":1669,\"size\":\"\",\"alt\":\"What is Temptation Token\",\"source\":\"library\"},\"image_size\":\"full\",\"ekit_all_conditions_list\":[],\"ekit_adv_tooltip_content\":\"Tooltip Content.\",\"eael_tooltip_section_content\":\"I am a tooltip\",\"eael_ext_content_protection_password_placeholder\":\"Enter Password\",\"eael_ext_content_protection_password_submit_btn_txt\":\"Submit\",\"eael_ext_content_protection_password_incorrect_message\":\"Password does not match.\",\"eael_cl_logics\":[{\"_id\":\"fd37f08\"}],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[],\"widgetType\":\"image\"}],\"isInner\":true}],\"isInner\":true},{\"id\":\"379c4df\",\"elType\":\"widget\",\"settings\":{\"editor\":\"<h3 class=\\\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\\\">The Core Loop of Temptation Token<\\/h3><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Temptation Token runs one round per week. Each round follows the same four-stage cycle:<\\/p><ul class=\\\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\\\"><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Submission window<\\/strong> \\u2014 anyone can submit a profile for 5 TTS<\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Voting window<\\/strong> \\u2014 holders vote with $TTS, minimum 5 per vote<\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Settlement<\\/strong> \\u2014 the smart contract distributes the pool automatically<\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Rollover<\\/strong> \\u2014 a new round starts the next Monday<\\/li><\\/ul><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Voters do not \\\"tip.\\\" They cast weighted votes. The profile with the most TTS wins. The wallet that contributed the most votes wins. Both get paid in the same transaction.<\\/p><h3 class=\\\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\\\">How the Prize Pool Splits in Temptation Token<\\/h3><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Every TTS spent on voting flows into the round's pool. When the round ends, the contract splits it like this:<\\/p><ul class=\\\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\\\"><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>35% to the winning profile<\\/strong><\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>35% to the top voter<\\/strong><\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>10% to Polaris Project<\\/strong> (anti-trafficking nonprofit)<\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>20% to Blockchain Entertainment LLC<\\/strong> (operating treasury)<\\/li><\\/ul><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">If the winning profile is sponsored by a partner club, an additional 10% routes to that club's wallet automatically and the operator share drops to 10%. No invoices. No spreadsheets. The contract handles it.<\\/p><h3 class=\\\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\\\">Why Temptation Token Runs on Base<\\/h3><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Temptation Token runs on Base because the chain is fast, cheap, and built on Ethereum's security model. A single vote costs pennies. Settlement happens in seconds. Bridging in is one click from any major wallet.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">The \\\"provably fair\\\" part comes from Chainlink VRF \\u2014 a verifiable random function used wherever the contract needs randomness. Combined with the Solidproof audit on the TTS token contract (zero critical findings), every holder can verify on-chain that no human ever touches the prize money. The code pays out. That's it.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">This matters because the entire premise of Temptation Token depends on trust. If holders ever suspected a rigged round, the project dies in one tweet. Building on Base, locking liquidity for twelve months on Team.Finance, deploying a 2-of-2 Gnosis Safe multisig, and publishing the audit are not marketing choices. They are survival choices.<\\/p><h3 class=\\\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\\\">Who Temptation Token Is Built For<\\/h3><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Three groups overlap inside Temptation Token:<\\/p><ul class=\\\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\\\"><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Voters<\\/strong> who want to win 35% of a real prize pool with a few minutes of attention per week<\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Profiles<\\/strong> who want a transparent way to monetize an audience without paying a platform 50% in fees<\\/li><li class=\\\"whitespace-normal break-words pl-2\\\"><strong>Holders<\\/strong> who want exposure to a token whose entire supply gets cycled through weekly demand<\\/li><\\/ul><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">The 500 TTS signup bonus and the 1:1 vote match on the first vote (up to 1,000 TTS) exist to remove the \\\"I have to figure out a wallet first\\\" friction. New users can play their first round without ever opening Uniswap.<\\/p><h3 class=\\\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\\\">What Comes Next for Temptation Token<\\/h3><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Round 1 is live now and settles next Sunday. The roadmap from here: NFT round trophies live in Round 2, the full club partnership program already integrated on-chain, exchange listings post-audit delivery, and a Telegram Mini App that lets users vote without leaving the chat.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">Temptation Token is not a memecoin. It is a scheduled cash-flow product wrapped in a game. Every week, a pool fills, the contract settles, and the next round starts.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">If you want to play, the app is at app.temptationtoken.io. If you want to read the contracts, every address is published on the trust page. If you want to read the audit, it is linked there too.<\\/p><p class=\\\"font-claude-response-body break-words whitespace-normal leading-[1.7]\\\">The point of Temptation Token is that you do not have to take anyone's word for any of this. It is all on Base. Go look.<\\/p>\",\"eael_vto_writing_gradient_color_repeater\":[{\"eael_vto_writing_gradient_color\":\"#7C62FF\",\"eael_vto_writing_gradient_color_location\":{\"unit\":\"%\",\"size\":50},\"_id\":\"46dcfb6\"},{\"eael_vto_writing_gradient_color\":\"#FF6464\",\"eael_vto_writing_gradient_color_location\":{\"unit\":\"%\",\"size\":90},\"_id\":\"20c88c9\"}],\"ekit_all_conditions_list\":[],\"ekit_adv_tooltip_content\":\"Tooltip Content.\",\"eael_tooltip_section_content\":\"I am a tooltip\",\"eael_ext_content_protection_password_placeholder\":\"Enter Password\",\"eael_ext_content_protection_password_submit_btn_txt\":\"Submit\",\"eael_ext_content_protection_password_incorrect_message\":\"Password does not match.\",\"eael_cl_logics\":[{\"_id\":\"4aacd49\"}],\"ekit_cursor_text_label\":\"Elementskit Cursor\"},\"elements\":[],\"widgetType\":\"text-editor\"}],\"isInner\":false}]",
+  "_elementor_page_settings": {
+   "eael_ext_toc_title": "Table of Contents"
+  }
+ },
+ "categories": [
+  1
+ ],
+ "tags": [],
+ "permalink_template": "https://temptationtoken.io/2026/05/01/%postname%/",
+ "generated_slug": "what-is-temptation-token",
+ "class_list": [
+  "post-1657",
+  "post",
+  "type-post",
+  "status-publish",
+  "format-standard",
+  "hentry",
+  "category-news"
+ ],
+ "acf": [],
+ "_links": {
+  "self": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657",
+    "targetHints": {
+     "allow": [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+     ]
+    }
+   }
+  ],
+  "collection": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts"
+   }
+  ],
+  "about": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/types/post"
+   }
+  ],
+  "author": [
+   {
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/users/1"
+   }
+  ],
+  "replies": [
+   {
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/comments?post=1657"
+   }
+  ],
+  "version-history": [
+   {
+    "count": 12,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657/revisions"
+   }
+  ],
+  "predecessor-version": [
+   {
+    "id": 1691,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657/revisions/1691"
+   }
+  ],
+  "wp:attachment": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/media?parent=1657"
+   }
+  ],
+  "wp:term": [
+   {
+    "taxonomy": "category",
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/categories?post=1657"
+   },
+   {
+    "taxonomy": "post_tag",
+    "embeddable": true,
+    "href": "https://temptationtoken.io/wp-json/wp/v2/tags?post=1657"
+   }
+  ],
+  "wp:action-publish": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-unfiltered-html": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-sticky": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-assign-author": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-create-categories": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-assign-categories": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-create-tags": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "wp:action-assign-tags": [
+   {
+    "href": "https://temptationtoken.io/wp-json/wp/v2/posts/1657"
+   }
+  ],
+  "curies": [
+   {
+    "name": "wp",
+    "href": "https://api.w.org/{rel}",
+    "templated": true
+   }
+  ]
+ }
+}

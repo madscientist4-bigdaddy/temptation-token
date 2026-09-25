@@ -45,6 +45,32 @@ not this site's robots rules, and not Hostinger or LiteSpeed blocking these agen
 `ops/sale/gen_llms_full.py`, so the published figures carry their own timestamp and
 cannot quietly rot.
 
+## The Sept 24 "refused" fetch — solved
+
+Not robots rules. **`robots.txt` contains no Disallow rule for any AI crawler** — it is 122
+bytes, byte-identical for every user agent tested, and disallows only `/wp-admin/`.
+
+The refusal was **HTTP 429 from Hostinger's CDN edge**, before WordPress ever saw the
+request:
+
+```
+HTTP/2 429
+server: hcdn
+content-length: 0
+x-hcdn-request-id: cf54459c…-imm-edge4
+```
+
+No body, no `x-powered-by`, no LiteSpeed headers — so it never reached PHP. Reproducible:
+`GPTBot` and `meta-externalagent` get 429; `Googlebot`, `Bingbot`, `ClaudeBot`,
+`Claude-User`, `OAI-SearchBot`, `PerplexityBot`, `Applebot`, `DuckDuckBot`, `CCBot`,
+`Bytespider`, `Amazonbot`, `cohere-ai` and `Diffbot` all get 200. Vercel serves GPTBot 200
+on `app.temptationtoken.io`, so it is specific to the Hostinger host.
+
+**This is a Hostinger hPanel setting, not a WordPress one** — their bot-protection / "block
+AI crawlers" feature with a curated agent list. Jim: hPanel → the site → Security (or
+Performance → CDN) → find the AI-crawler or bot-protection toggle and allow GPTBot and
+meta-externalagent. Nothing in WordPress or Rank Math can override it.
+
 ## Still outstanding — needs Jim, no API path exists
 The WordPress plugin (`tts-api-auth` 1.1.0) exposes only `/elementor/{id}`, `/meta/{id}`,
 `/css`, `/fix-logo`, `/status`, `/setup`. Application Passwords are blocked by Hostinger
@@ -59,8 +85,10 @@ done from here:
 3. **`llms.txt` on the WordPress host** — no route can write a file at the domain root.
    Either upload `public/llms.txt` by SFTP, or ship plugin 1.1.1 with a route for it.
    The app's copy is live and is the canonical one meanwhile.
-4. **The false-claim copy fixes** listed in `false_claims_2026-09-25.md`. These are the
-   urgent ones — a buyer reads the marketing site before the app.
+4. ~~The false-claim copy fixes~~ — **done 2026-09-25.** Core REST does work with the
+   plugin key; my earlier "no API path" conclusion came from testing Application
+   Passwords, which is the one thing Hostinger blocks and precisely what the plugin
+   bypasses. All seventeen edits applied and verified; see `false_claims_2026-09-25.md`.
 
 ## Re-run the matrix
 `bash scripts/sale/ua_matrix.sh` reprints the table above against both hosts.

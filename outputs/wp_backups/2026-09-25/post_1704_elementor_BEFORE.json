@@ -1,0 +1,157 @@
+[
+ {
+  "id": "e30ad59",
+  "elType": "container",
+  "settings": {
+   "container_type": "grid",
+   "presetTitle": "Grid",
+   "presetIcon": "eicon-container-grid",
+   "grid_columns_grid": {
+    "unit": "fr",
+    "size": 2,
+    "sizes": []
+   },
+   "grid_rows_grid": {
+    "unit": "fr",
+    "size": 1,
+    "sizes": []
+   },
+   "ekit_section_parallax_multi_items": [],
+   "eael_parallax_layers_list": [],
+   "eael_cl_logics": [
+    {
+     "_id": "05298a4"
+    }
+   ],
+   "ekit_all_conditions_list": [],
+   "ekit_cursor_text_label": "Elementskit Cursor"
+  },
+  "elements": [
+   {
+    "id": "780e846",
+    "elType": "widget",
+    "settings": {
+     "image": {
+      "url": "https://temptationtoken.io/wp-content/uploads/2026/05/4J6A0178.jpg",
+      "id": 1682,
+      "size": "",
+      "alt": "tts staking",
+      "source": "library"
+     },
+     "image_size": "full",
+     "ekit_all_conditions_list": [],
+     "ekit_adv_tooltip_content": "Tooltip Content.",
+     "eael_tooltip_section_content": "I am a tooltip",
+     "eael_ext_content_protection_password_placeholder": "Enter Password",
+     "eael_ext_content_protection_password_submit_btn_txt": "Submit",
+     "eael_ext_content_protection_password_incorrect_message": "Password does not match.",
+     "eael_cl_logics": [
+      {
+       "_id": "bd111cd"
+      }
+     ],
+     "ekit_cursor_text_label": "Elementskit Cursor"
+    },
+    "elements": [],
+    "widgetType": "image"
+   },
+   {
+    "id": "e0b1fe8",
+    "elType": "widget",
+    "settings": {
+     "editor": "<p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Most crypto staking pays a single number. You lock tokens, you earn APR, you unlock. TTS staking does that \u2014 and adds a second reward layer most projects do not have: increased voting power inside the weekly Temptation Token rounds. Every tier of TTS staking gives both yield and a multiplier on every vote you cast.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">This post breaks down the five TTS staking tiers, the math behind the APR, and how the vote multiplier compounds your edge as a player.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">The Five TTS Staking Tiers</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The TTS staking contract recognizes five tiers, denominated in USD value at the time of stake:</p>",
+     "eael_vto_writing_gradient_color_repeater": [
+      {
+       "eael_vto_writing_gradient_color": "#7C62FF",
+       "eael_vto_writing_gradient_color_location": {
+        "unit": "%",
+        "size": 50
+       },
+       "_id": "ce346e0"
+      },
+      {
+       "eael_vto_writing_gradient_color": "#FF6464",
+       "eael_vto_writing_gradient_color_location": {
+        "unit": "%",
+        "size": 90
+       },
+       "_id": "968283a"
+      }
+     ],
+     "ekit_all_conditions_list": [],
+     "ekit_adv_tooltip_content": "Tooltip Content.",
+     "eael_tooltip_section_content": "I am a tooltip",
+     "eael_ext_content_protection_password_placeholder": "Enter Password",
+     "eael_ext_content_protection_password_submit_btn_txt": "Submit",
+     "eael_ext_content_protection_password_incorrect_message": "Password does not match.",
+     "eael_cl_logics": [
+      {
+       "_id": "77f4a6d"
+      }
+     ],
+     "ekit_cursor_text_label": "Elementskit Cursor"
+    },
+    "elements": [],
+    "widgetType": "text-editor"
+   }
+  ],
+  "isInner": false
+ },
+ {
+  "id": "dbb4a3c",
+  "elType": "container",
+  "settings": {
+   "ekit_section_parallax_multi_items": [],
+   "eael_parallax_layers_list": [],
+   "eael_cl_logics": [
+    {
+     "_id": "204ed85"
+    }
+   ],
+   "ekit_all_conditions_list": [],
+   "ekit_cursor_text_label": "Elementskit Cursor"
+  },
+  "elements": [
+   {
+    "id": "f9e3889",
+    "elType": "widget",
+    "settings": {
+     "editor": "<div class=\"overflow-x-auto w-full px-2 mb-6\"><table class=\"min-w-full border-collapse text-sm leading-[1.7] whitespace-normal\"><thead class=\"text-left\"><tr><th class=\"text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold\" scope=\"col\">Tier</th><th class=\"text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold\" scope=\"col\">Minimum Stake</th><th class=\"text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold\" scope=\"col\">APR</th><th class=\"text-text-100 border-b-0.5 border-border-300/60 py-2 pr-4 align-top font-bold\" scope=\"col\">Vote Multiplier</th></tr></thead><tbody><tr><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">Bronze</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">$50</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">8%</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">1.1x</td></tr><tr><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">Silver</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">$100</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">12%</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">1.25x</td></tr><tr><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">Gold</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">$250</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">18%</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">1.5x</td></tr><tr><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">Diamond</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">$1,000</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">32%</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">2x</td></tr><tr><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">VIP</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">$5,000</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">45%</td><td class=\"border-b-0.5 border-border-300/30 py-2 pr-4 align-top\">3x</td></tr></tbody></table></div><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Tiers are evaluated at stake time. If TTS appreciates after you stake, your tier does not downgrade. Your locked TTS earns at the tier you qualified for when you committed.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">Why Two Reward Layers Matter</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The basic APR is straightforward. $1,000 staked at the Diamond tier earns roughly $320 over twelve months at the published rate. Competitive but not extraordinary by DeFi standards.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The second layer is where TTS staking becomes interesting. The vote multiplier means every TTS you vote with during a round counts as more than 1 TTS toward your top voter position. At the VIP tier, 100 TTS voted counts as 300 TTS toward the leaderboard. At Gold, 100 TTS counts as 150.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">For players actively trying to win the 35% top voter prize, this is decisive. A Gold-tier staker can outvote a non-staker spending 1.5x the TTS. A VIP-tier staker can outvote a non-staker spending 3x. TTS staking turns into a structural edge inside the game, not just a yield play.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">How TTS Staking Compounds the Win</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Imagine two players both trying to win the top voter slot. Player A has not staked. Player B is in the Diamond tier with $1,000 in TTS staking.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Both vote with 500 TTS in a single round.</p><ul class=\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\"><li class=\"whitespace-normal break-words pl-2\">Player A's leaderboard position counts as 500 TTS</li><li class=\"whitespace-normal break-words pl-2\">Player B's leaderboard position counts as 1,000 TTS (2x multiplier)</li></ul><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">If Player B wins the top voter slot and the pool is 50,000 TTS, Player B takes 17,500 TTS as the prize. Their staked $1,000 worth of TTS earned them a multiple of itself in a single round, on top of accruing 32% APR in the background.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">This is the mechanic that makes TTS staking different from passive farming. It is participation infrastructure. The more you stake, the more efficient your votes become.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">How to Start TTS Staking</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The Staking tab inside app.temptationtoken.io shows live tier requirements in both USD and TTS at current Uniswap price. Connect your wallet, choose a tier, approve, and stake. The contract is deployed at <code class=\"bg-text-200/5 border border-0.5 border-border-300 text-danger-000 whitespace-pre-wrap rounded-[0.4rem] px-1 py-px text-[0.9rem]\">0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc</code>.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Rewards accrue continuously. The vote multiplier applies automatically the next time you cast a vote \u2014 no manual claim, no separate signup. The voting contract reads your TTS staking balance and applies the corresponding multiplier in the same transaction.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">Risk and Lock Considerations</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">TTS staking carries the standard risks any token-locking arrangement carries. Token price can move against you. The longer you stake, the more exposure you have to TTS volatility. The published APR is paid in TTS, so its dollar value tracks the token.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">That said, every TTS used to pay TTS staking rewards comes from the scheduled emissions documented on the trust page. The contract is the only entity that can mint or distribute rewards. The deployer wallet cannot inflate beyond the schedule.</p><h3 class=\"text-text-100 mt-3 -mb-1 text-[1.125rem] font-bold\">Who TTS Staking Is Built For</h3><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">Three player types benefit most from TTS staking:</p><ul class=\"[li_&amp;]:mb-0 [li_&amp;]:mt-1 [li_&amp;]:gap-1 [&amp;:not(:last-child)_ul]:pb-1 [&amp;:not(:last-child)_ol]:pb-1 list-disc flex flex-col gap-1 pl-8 mb-3\"><li class=\"whitespace-normal break-words pl-2\"><strong>Active voters</strong> who want a multiplier edge in weekly rounds</li><li class=\"whitespace-normal break-words pl-2\"><strong>Long-term holders</strong> who would hold TTS regardless and want the APR layered on top</li><li class=\"whitespace-normal break-words pl-2\"><strong>High-tier players</strong> who want VIP treatment, including the 3x multiplier and access to upcoming VIP-only round features</li></ul><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">If you are buying TTS only to vote occasionally, the basic 1x rate works fine. If you are serious about winning weekly, TTS staking is the lever that compounds every other decision you make.</p><p class=\"font-claude-response-body break-words whitespace-normal leading-[1.7]\">The five tiers are live now in the app. Pick the level that matches how you want to play.</p>",
+     "eael_vto_writing_gradient_color_repeater": [
+      {
+       "eael_vto_writing_gradient_color": "#7C62FF",
+       "eael_vto_writing_gradient_color_location": {
+        "unit": "%",
+        "size": 50
+       },
+       "_id": "bf17504"
+      },
+      {
+       "eael_vto_writing_gradient_color": "#FF6464",
+       "eael_vto_writing_gradient_color_location": {
+        "unit": "%",
+        "size": 90
+       },
+       "_id": "9f6f1d4"
+      }
+     ],
+     "ekit_all_conditions_list": [],
+     "ekit_adv_tooltip_content": "Tooltip Content.",
+     "eael_tooltip_section_content": "I am a tooltip",
+     "eael_ext_content_protection_password_placeholder": "Enter Password",
+     "eael_ext_content_protection_password_submit_btn_txt": "Submit",
+     "eael_ext_content_protection_password_incorrect_message": "Password does not match.",
+     "eael_cl_logics": [
+      {
+       "_id": "5f8636f"
+      }
+     ],
+     "ekit_cursor_text_label": "Elementskit Cursor"
+    },
+    "elements": [],
+    "widgetType": "text-editor"
+   }
+  ],
+  "isInner": false
+ }
+]
