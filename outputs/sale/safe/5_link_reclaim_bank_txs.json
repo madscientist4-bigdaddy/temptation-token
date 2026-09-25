@@ -1,0 +1,22 @@
+{
+  "note": "Bank wallet transactions. The upkeep admin is the Bank EOA, not the Safe, so these cannot be executed from the Safe Transaction Builder. Jim signs these directly. cancelUpkeep is IRREVERSIBLE.",
+  "chainId": 8453,
+  "from": "0xb1e991bf617459b58964eef7756b350e675c53b5 (Bank)",
+  "transactions": [
+    {
+      "step": 1,
+      "to": "0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743",
+      "value": "0",
+      "data": "0xc8048022fad056ac000000000000000000000000beb8c51eb230bfb387eb031c4b252f28",
+      "description": "Cancel Chainlink upkeep 113446314522587151772280129999432062856069985411437977877707978564657748455208. IRREVERSIBLE. The upkeep has not performed since 2026-08-05 and neither has any other upkeep on this registry."
+    },
+    {
+      "step": 2,
+      "to": "0xf4bAb6A129164aBa9B113cB96BA4266dF49f8743",
+      "value": "0",
+      "data": "0x744bfe61fad056ac000000000000000000000000beb8c51eb230bfb387eb031c4b252f28000000000000000000000000b1e991bf617459b58964eef7756b350e675c53b5",
+      "description": "Withdraw 43.973920836091753618 LINK to the Bank wallet. Must wait for the cancellation delay after step 1 — proven on fork to revert if sent too early.",
+      "waitBlocksAfterStep1": 50
+    }
+  ]
+}

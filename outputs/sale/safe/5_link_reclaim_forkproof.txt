@@ -1,0 +1,36 @@
+# LINK reclaim — fork test
+
+Upkeep 113446314522587151…
+  target 0x363Ce4960E3B459f5892587A37Ae1fF2ED04442C (Keeper3)   performGas 500000
+  balance **43.973920836091753618 LINK**   admin 0xB1E991bF617459B58964eEf7756B350e675C53b5
+  paused false   cancelled false   lastPerformedBlock 49471915
+
+VRF subscription: 32.761881681995610793 LINK   Bank: 9.159747603246322401 LINK
+
+## Preconditions
+  PASS  upkeep admin is the Bank wallet  — so this is a Bank tx, not a Safe batch
+  PASS  not already cancelled  — maxValidBlocknumber 4294967295 = UINT32_MAX means active
+  PASS  VRF subscription already at or above 25 LINK  — 32.761881681995610793 LINK — no top-up needed before withdrawing
+
+## Step 1 — cancelUpkeep (from Bank)
+  PASS  cancelUpkeep succeeded  — gas 67458
+  maxValidBlocknumber is now 51772092 (current block 51772042)
+
+## Step 2 — withdrawFunds must be blocked until the cancellation delay passes
+  PASS  withdraw blocked immediately after cancel  — Automation enforces a cancellation delay
+  mining 52 blocks to pass the delay…
+
+## Step 3 — withdrawFunds (from Bank)
+  PASS  withdrawFunds succeeded  — gas 71546
+  PASS  LINK actually arrived at the Bank  — +43.973920836091753618 LINK  (Bank 9.159747603246322401 -> 53.133668439338076019)
+  PASS  recovered the full upkeep balance  — expected ~43.973920836091753618
+  PASS  registry balance now zero
+
+## What is then available
+  Bank after withdraw: 53.133668439338076019 LINK
+  VRF subscription:    32.761881681995610793 LINK (already >= 25, no top-up)
+  Keeping a 5 LINK operational floor leaves **48.133668439338076019 LINK** to swap to ETH
+  A VRF draw costs ~0.000476 LINK, so 32.761881681995610793 LINK is roughly 69k draws — fuel is not the constraint.
+
+================================================================
+ALL CHECKS PASSED — the cancel/withdraw sequence works
