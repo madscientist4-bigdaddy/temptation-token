@@ -1,0 +1,30 @@
+# Timelock package — fork test
+
+Fork block 51771919  ·  minDelay 172800s (48h)
+
+## 1. Deploy
+  PASS  TimelockController deployed  — 0x537a0b5611c83484f45ed4537ccb6ba8328aae6e, gas 1962343
+  PASS  minDelay is 48h
+  PASS  Safe is proposer
+  PASS  Safe is executor
+  PASS  nobody holds TIMELOCK_ADMIN except the timelock itself  — admin=address(0) at construction, so the timelock self-administers
+
+## 2. Transfer token admin
+  PASS  timelock holds DEFAULT_ADMIN_ROLE on the token
+  PASS  Safe no longer holds DEFAULT_ADMIN_ROLE
+  PASS  Safe can no longer call setTaxExempt directly  — this is the irreversible step
+
+## 3. setTaxExempt through the timelock
+  PASS  operation scheduled  — id 0xd927fccf8d5bfef9…
+  PASS  NOT ready before the delay
+  PASS  execute reverts before 48h
+  PASS  ready after 48h
+  PASS  execute succeeds after 48h  — gas 67964
+  PASS  setTaxExempt ACTUALLY TOOK EFFECT through the timelock  — this is the claim the whole package rests on
+
+## 4. Mint is now delayed, not prevented
+  PASS  Safe can no longer grant itself MINTER_ROLE directly  — it must now go through a public 48-hour notice period
+
+================================================================
+ALL CHECKS PASSED — the package is safe to sign on closing day
+Timelock address is deterministic only by nonce; the real deploy will differ.
