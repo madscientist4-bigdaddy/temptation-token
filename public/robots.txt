@@ -1,0 +1,44 @@
+# app.temptationtoken.io — the application surface.
+# Marketing and editorial content is canonical on https://temptationtoken.io.
+#
+# Every crawler that matters is named explicitly as well as covered by the wildcard.
+# That is deliberate: a bare "User-agent: *" is ambiguous to operators who look for
+# their own token, and some of these agents document that an explicit group wins over
+# the wildcard. Naming them costs nothing and removes the argument.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /protect.html
+Disallow: /delete-account.html
+
+User-agent: Googlebot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: Bingbot
+Allow: /
+User-agent: DuckDuckBot
+Allow: /
+User-agent: Applebot
+Allow: /
+User-agent: Applebot-Extended
+Allow: /
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Claude-User
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://app.temptationtoken.io/sitemap.xml
+Sitemap: https://temptationtoken.io/sitemap_index.xml

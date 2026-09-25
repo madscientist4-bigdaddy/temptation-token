@@ -7,49 +7,57 @@
     <!-- viewport-fit=cover lets the installed app paint under the notch/home indicator;
          the CSS uses env(safe-area-inset-*) so nothing important lands underneath. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Temptation Token — Vote. Win. Earn $TTS.</title>
-    <meta name="description" content="The first vote-to-earn game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 35% of the prize pool. Audited by Solidproof. LP locked. Chainlink VRF." />
-    <meta name="keywords" content="temptation token, TTS, vote to earn, Base blockchain, crypto game, DeFi, NFT, staking" />
+    <title>Temptation Token — weekly onchain fan voting on Base</title>
+    <!-- Copy rule for this file (sale sprint, 2026-09-25): true, current facts only.
+         No token price, no dollar figure, no earnings promise, and no audit claim
+         until an audit actually exists. The previous head asserted "vote-to-earn",
+         "Earn $TTS" and "Audited by Solidproof" — none of which we can stand behind,
+         and all of which a buyer's diligence would have caught. The 35/35/10/20 split
+         stays: it is hardcoded in V3d and guarded by scripts/check-prize-split.mjs. -->
+    <meta name="description" content="A weekly fan-voting game on Base. Fans vote for creator profiles with $TTS; each round closes on a fixed weekly schedule, picks a winner with Chainlink VRF, and mints Trophy NFTs onchain. Split: 35% top voter, 35% winning profile, 10% charity, 20% house." />
+    <meta name="keywords" content="temptation token, TTS, Base blockchain, onchain voting, creator voting, NFT trophy, Chainlink VRF" />
     <meta name="author" content="Blockchain Entertainment LLC" />
+    <link rel="canonical" href="https://app.temptationtoken.io/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://app.temptationtoken.io" />
-    <meta property="og:title" content="Temptation Token — Vote. Win. Earn $TTS." />
-    <meta property="og:description" content="The first vote-to-earn game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 35% of the prize pool (35/35/10/20 split). Audited by Solidproof. LP locked. Chainlink VRF." />
+    <meta property="og:url" content="https://app.temptationtoken.io/" />
+    <meta property="og:title" content="Temptation Token — weekly onchain fan voting on Base" />
+    <meta property="og:description" content="Fans vote for creator profiles with $TTS. Every round settles onchain with Chainlink VRF and mints Trophy NFTs. 35/35/10/20 split, hardcoded in the contract." />
     <meta property="og:image" content="https://app.temptationtoken.io/og-image.png" />
     <meta property="og:site_name" content="Temptation Token" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@TemptationToken" />
-    <meta name="twitter:title" content="Temptation Token — Vote. Win. Earn $TTS." />
-    <meta name="twitter:description" content="The first vote-to-earn game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 35% of the prize pool (35/35/10/20 split)." />
+    <meta name="twitter:title" content="Temptation Token — weekly onchain fan voting on Base" />
+    <meta name="twitter:description" content="Fans vote for creator profiles with $TTS. Every round settles onchain with Chainlink VRF and mints Trophy NFTs." />
     <meta name="twitter:image" content="https://app.temptationtoken.io/og-image.png" />
 
-    <!-- JSON-LD Structured Data -->
+    <!-- JSON-LD. SoftwareApplication (not WebApplication) is what Part 1.4 asks for and
+         what Google documents for app rich results; operatingSystem names both surfaces
+         we actually ship. No aggregateRating: we have no reviews, and inventing one is
+         a manual action waiting to happen. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
+      "@type": "SoftwareApplication",
       "name": "Temptation Token",
-      "url": "https://app.temptationtoken.io",
-      "description": "The first vote-to-earn game on Base blockchain. Vote $TTS on weekly profiles — top voter wins 35% of the prize pool (35/35/10/20 split).",
+      "url": "https://app.temptationtoken.io/",
+      "description": "A weekly fan-voting game on Base. Fans vote for creator profiles with $TTS; each round settles onchain with Chainlink VRF and mints Trophy NFTs.",
       "applicationCategory": "GameApplication",
-      "operatingSystem": "Web Browser",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
+      "operatingSystem": "Web, Android",
+      "browserRequirements": "Requires JavaScript and a Base-compatible wallet",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "publisher": {
         "@type": "Organization",
         "name": "Blockchain Entertainment LLC",
-        "url": "https://temptationtoken.io"
+        "url": "https://temptationtoken.io",
+        "email": "jim@temptationtoken.io"
       }
     }
     </script>
-
 
     <!-- ── PWA / installability ────────────────────────────────────────────────
          Manifest drives the Android install prompt and the installed app's name,

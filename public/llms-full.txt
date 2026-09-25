@@ -1,0 +1,86 @@
+# Temptation Token
+
+> A weekly fan-voting game on Base (Ethereum L2, chain id 8453). Fans vote for creator
+> profiles using the $TTS token. Each round closes on a fixed weekly schedule, picks a
+> winner with Chainlink VRF, splits the pool onchain, and mints Trophy NFTs.
+> Operated by Blockchain Entertainment LLC.
+
+Everything below is verified against the deployed contracts and the production database
+as of 2026-09-25. Figures that cannot be verified are marked as such rather than
+estimated.
+
+## How a round works
+- A round runs Monday 00:00 ET to Sunday 23:59 ET. End times are pinned to a fixed UTC
+  calendar anchor, so rounds do not drift week to week.
+- Voting costs a minimum of 5 $TTS. No single profile may take more than 40% of a
+  round's pool from one voter after the first vote.
+- At close, Chainlink VRF selects the winning profile, weighted by votes received.
+- The pool is the winning profile's votes only. It splits 35% to the top voter on that
+  profile, 35% to the winning profile, 10% to the Polaris Project (anti-trafficking
+  nonprofit), 20% to the house. Votes cast on losing profiles are burned.
+- Three Trophy NFTs mint per settled round with votes: winner, top voter, house.
+- A round with zero votes has no winner, no payout and no mint. That is the designed
+  outcome, not a failure.
+
+## What is live
+- Web app at https://app.temptationtoken.io
+- Telegram bot (@TTSGameBot) and channel (@temptationtoken)
+- Android build; no iOS App Store listing (Apple guideline 1.2 excludes this format)
+- Weekly rounds settling without human intervention
+- Referral payouts, signup bonus, club partner program, admin dashboard
+
+## What is not
+- Staking contracts are deployed and the reward pool is funded, but the feature is
+  gated off in every client. Anything you read describing staking rewards, APR or vote
+  multipliers as available is describing design intent, not a live feature.
+- No third-party security audit has been completed. Older marketing copy claiming a
+  completed SolidProof audit is incorrect and is being retracted.
+
+## Key pages
+- Play: https://app.temptationtoken.io/
+- Contracts and settlement log: https://app.temptationtoken.io/audit
+- Marketing site and blog: https://temptationtoken.io
+- FAQ: https://temptationtoken.io/#faq
+
+## Contracts (Base mainnet, chain id 8453)
+- $TTS token (UUPS proxy): 0x5570eA97d53A53170e973894A9Fa7feb5785d3b9
+- Voting (TTSVotingV3d): 0x783b8cd80b586b723188c93ef94ee1beede617b4
+- Keeper (TTSKeeper3): 0x363ce4960e3b459f5892587a37ae1ff2ed04442c
+- Trophy NFT: 0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5
+- Staking (proxy): 0x7848cceEb8613375D36BA3f50dD577B4E6BCfc0d
+- Admin multisig (Gnosis Safe, 2-of-2): 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86
+All are verifiable on https://basescan.org.
+
+## Token facts
+- Total supply 69,000,000,000 $TTS, fixed. There is no mint function and MINTER_ROLE
+  has no members.
+- A 1% transfer tax is hardcoded and permanent. Several operational addresses are
+  tax-exempt, including the liquidity pool.
+- This page states no token price and no expected return. $TTS is a game token, not an
+  investment product.
+
+## Contact
+- jim@temptationtoken.io
+- https://calendly.com/temptationtoken/phone-meeting
+
+## Full text
+- https://app.temptationtoken.io/llms-full.txt
+
+
+## Live operating numbers (generated 2026-09-25 01:09 UTC)
+Regenerated from the chain and the production database by `ops/sale/gen_llms_full.py`.
+These are the real numbers, including the unflattering ones.
+
+- Round 13: 21 profiles, 0.00 TTS voted, closes in 3d 3h (Mon Sep 28 04:59 UTC)
+- Trophy NFTs minted: 3
+- Registered players: 23
+- Votes cast, all time: 3
+- Approved profiles on the board: 21 (7 KYC-verified)
+- Rounds run to date: 13 (12 settled onchain)
+- Uniswap v2 liquidity: 0.5266 WETH / 101,612 TTS (shallow — large purchases move the price significantly)
+
+## Verifying any of this yourself
+- Round state: call `getRound(uint256)` on 0x783b8cd80b586b723188c93ef94ee1beede617b4
+- Trophy count: `totalSupply()` on 0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5
+- Settlement history: contract events on BaseScan, or the public read-only endpoint
+  https://app.temptationtoken.io/api/scheduler?action=keeper-status

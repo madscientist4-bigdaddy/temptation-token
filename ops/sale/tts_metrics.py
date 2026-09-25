@@ -403,3 +403,56 @@ def collect() -> list[str]:
 if __name__ == "__main__":
     for line in collect():
         print(" ", line)
+
+
+# ── public surface ────────────────────────────────────────────────────────
+
+def public_lines() -> list[str]:
+    """The subset of the numbers that may appear on a public page (llms-full.txt).
+
+    Deliberately NOT `collect()`. The digest is an internal email and its lines carry
+    sprint task ids, repo paths, sale-listing status and operational to-dos. Piping
+    that straight into a public file published "how we're doing" alongside "which sale
+    listings we haven't posted yet" — which is how the first draft of llms-full.txt
+    came out. Publishing is opt-in, per fact, here.
+
+    Unflattering numbers stay. An answer engine that quotes 3 lifetime votes is quoting
+    us correctly, and a buyer who finds a number here that contradicts the data room
+    walks away. Only internal *process* is withheld, never a bad result.
+    """
+    out: list[str] = []
+
+    def add(fn):
+        try:
+            out.extend(fn() or [])
+        except Exception as exc:
+            out.append(f"({fn.__name__[2:]} unavailable: {type(exc).__name__})")
+
+    add(m_round)
+    add(m_trophies)
+    try:
+        r = _sb("""
+          select (select count(*) from public.users) u,
+                 (select count(*) from votes) v,
+                 (select count(*) from submissions where status='approved') p,
+                 (select count(*) from verified_submitters where status='approved') k
+        """)[0]
+        out += [f"Registered players: {r['u']}",
+                f"Votes cast, all time: {r['v']}",
+                f"Approved profiles on the board: {r['p']} ({r['k']} KYC-verified)"]
+    except Exception as exc:
+        out.append(f"(funnel unavailable: {type(exc).__name__})")
+    try:
+        cur = _words(_rpc(VOTING_V3D, SEL_CURRENT_ROUND))[0]
+        out.append(f"Rounds run to date: {cur} ({cur - 1} settled onchain)")
+    except Exception:
+        pass
+    try:
+        w = _words(_rpc(V2_PAIR, SEL_GET_RESERVES))
+        t0 = "0x" + _rpc(V2_PAIR, SEL_TOKEN0)[-40:]
+        weth, tts = (w[0], w[1]) if t0.lower() == WETH.lower() else (w[1], w[0])
+        out.append(f"Uniswap v2 liquidity: {_fmt_eth(weth)} WETH / {_fmt_eth(tts, 0)} TTS "
+                   f"(shallow — large purchases move the price significantly)")
+    except Exception:
+        pass
+    return out
