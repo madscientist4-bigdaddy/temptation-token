@@ -18,7 +18,7 @@ const VOTING_V2       = '0x4dE347D547C7Ae2CB38c42A8166d29049C24e9DA'
 const TTS_TOKEN       = '0x5570eA97d53A53170e973894A9Fa7feb5785d3b9'
 const STAKING_ADDRESS = '0xaA12B889Ebcc32037bb8684B18DF7ED09b2B30fc'
 const SUPABASE_URL    = 'https://gmlikdxykgviyprqtqwz.supabase.co'
-const SUPABASE_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
+const SUPABASE_KEY    = process.env.SUPABASE_ANON_KEY || ''   // was hardcoded; read from env instead
 
 const KEEPER_ABI = [
   'function vrfCoordinator() view returns (address)',

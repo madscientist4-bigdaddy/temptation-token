@@ -2,7 +2,7 @@
 // Run: node scripts/seed-tts-posts.js
 
 const SUPABASE_URL = 'https://gmlikdxykgviyprqtqwz.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || ''   // was hardcoded; read from env instead
 const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 
 async function sbGet(table, query = '') {
