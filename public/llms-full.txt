@@ -79,11 +79,11 @@ All are verifiable on https://basescan.org.
 - https://app.temptationtoken.io/llms-full.txt
 
 
-## Live operating numbers (generated 2026-09-25 01:28 UTC)
+## Live operating numbers (generated 2026-09-25 11:04 UTC)
 Regenerated from the chain and the production database by `ops/sale/gen_llms_full.py`.
 These are the real numbers, including the unflattering ones.
 
-- Round 13: 21 profiles, 0.00 TTS voted, closes in 3d 3h (Mon Sep 28 04:59 UTC)
+- Round 13: 21 profiles, 0.00 TTS voted, closes in 2d 17h (Mon Sep 28 04:59 UTC)
 - Trophy NFTs minted: 3
 - Registered players: 23
 - Votes cast, all time: 3
