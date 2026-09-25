@@ -159,21 +159,28 @@
 
 <div class="content">
 
-  <!-- SECURITY CHECKLIST -->
+  <!-- SECURITY FACTS — every line below was executed or read against Base mainnet
+       (or a fork of it) on 2026-09-25. The list this replaced was a checklist of
+       green ticks, four of which were false. -->
   <div class="section">
-    <div class="section-tag">Security Checklist</div>
-    <h2>What the Audit Verified</h2>
+    <div class="section-tag">Verified 2026-09-25</div>
+    <h2>What is actually true of the deployed contracts</h2>
+    <p>Each line was checked directly against Base mainnet, or executed against a fork
+       of it, on the date above &mdash; not copied from the audit summary.</p>
     <ul class="checklist">
-      <li><span class="chk-icon" style="animation-delay:.05s">✓</span> No reentrancy vulnerabilities in prize distribution</li>
-      <li><span class="chk-icon" style="animation-delay:.1s">✓</span> No unauthorized minting — supply is fixed at 69,000,000,000 TTS</li>
-      <li><span class="chk-icon" style="animation-delay:.15s">✓</span> Access control properly enforced — owner-only functions verified</li>
-      <li><span class="chk-icon" style="animation-delay:.2s">✓</span> Chainlink VRF integration correct — cannot be manipulated</li>
-      <li><span class="chk-icon" style="animation-delay:.25s">✓</span> Transfer tax rate hardcoded — cannot be increased above 1%</li>
-      <li><span class="chk-icon" style="animation-delay:.3s">✓</span> Prize distribution logic verified — correct percentage splits enforced</li>
-      <li><span class="chk-icon" style="animation-delay:.35s">✓</span> UUPS proxy upgrade pattern correctly implemented</li>
-      <li><span class="chk-icon" style="animation-delay:.4s">✓</span> No backdoor functions, no hidden admin controls</li>
-      <li><span class="chk-icon" style="animation-delay:.45s">✓</span> ERC-20 standard compliance verified (with one noted exception in medium findings)</li>
+      <li><span class="chk-icon">&#10003;</span> <strong>The token cannot be upgraded.</strong> It is deployed directly, not behind a proxy. What runs today runs permanently.</li>
+      <li><span class="chk-icon">&#10003;</span> <strong>No address can be blacklisted.</strong> The contract checks a blacklist on every transfer, but contains no function that can write to it. Scanners that flag this are flagging unreachable code.</li>
+      <li><span class="chk-icon">&#10003;</span> <strong>The 1% transfer tax cannot be raised.</strong> It is a compile-time constant in a contract that cannot be upgraded.</li>
+      <li><span class="chk-icon">&#10003;</span> <strong>The 35/35/10/20 split is hardcoded</strong> in the voting contract and enforced on every settlement.</li>
+      <li><span class="chk-icon">&#10003;</span> <strong>Chainlink VRF picks the winner.</strong> Subscription and coordinator are public and verifiable.</li>
+      <li><span class="chk-icon">&#10003;</span> <strong>Liquidity is locked</strong> on Team.Finance until 2027-05-05.</li>
+      <li><span class="chk-icon" style="color:#e6a23c">!</span> <strong>Supply is governed, not fixed.</strong> A <code>mint()</code> function exists. MINTER_ROLE has no members today, but the 2-of-2 multisig holds DEFAULT_ADMIN_ROLE and can grant it to itself. We tested this on a mainnet fork and successfully minted. Treat 69,000,000,000 as the current supply, not a cap.</li>
+      <li><span class="chk-icon" style="color:#e6a23c">!</span> <strong>A transfer of exactly zero tokens reverts</strong> between two non-tax-exempt addresses, with an arithmetic panic rather than a clean error. This is an ERC-20 compliance defect. A fix was written and deployed as a separate contract, but it never took effect because the token is not upgradeable.</li>
+      <li><span class="chk-icon" style="color:#e6a23c">!</span> <strong>The voting contract has an accepted reentrancy finding</strong> in <code>vote()</code>. It is not exploitable: $TTS is a plain ERC-20 with no transfer hooks and its address is immutable in the voting contract. Recorded as AF-001.</li>
     </ul>
+    <p style="opacity:.75">Anything not on this list has not been independently verified.
+       If you are evaluating this project, read the contracts on BaseScan rather than
+       trusting this page.</p>
   </div>
 
   <!-- AUDIT REPORT -->

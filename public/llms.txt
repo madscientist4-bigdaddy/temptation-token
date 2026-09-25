@@ -52,10 +52,22 @@ estimated.
 All are verifiable on https://basescan.org.
 
 ## Token facts
-- Total supply 69,000,000,000 $TTS, fixed. There is no mint function and MINTER_ROLE
-  has no members.
-- A 1% transfer tax is hardcoded and permanent. Several operational addresses are
-  tax-exempt, including the liquidity pool.
+- Total supply is 69,000,000,000 $TTS today.
+- A `mint()` function does exist. It is restricted to MINTER_ROLE, which currently has
+  no members. However, the 2-of-2 admin multisig holds DEFAULT_ADMIN_ROLE and can grant
+  itself MINTER_ROLE at any time. **Supply is therefore governed by the multisig, not
+  fixed by the code.** Anyone telling you the supply is immutable is mistaken; this was
+  verified by executing it against a mainnet fork on 2026-09-25.
+- The token contract is deployed directly, not behind a proxy, so its code cannot be
+  upgraded. What is deployed is what runs, permanently.
+- The contract contains a `blacklisted` mapping checked on every transfer, but **no
+  function anywhere can write to it**, so no address can ever be blacklisted. Automated
+  scanners that flag the mapping are flagging unreachable code.
+- A 1% transfer tax is hardcoded and permanent. It is skipped when either the sender or
+  the recipient is tax-exempt; the liquidity pool is exempt, so swaps are untaxed.
+- Known defect: a transfer of exactly zero tokens between two non-exempt addresses
+  reverts with an arithmetic panic. A fix was written and deployed as a separate
+  contract but never took effect, because the token is not upgradeable.
 - This page states no token price and no expected return. $TTS is a game token, not an
   investment product.
 
