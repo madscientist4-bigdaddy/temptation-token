@@ -1,0 +1,79 @@
+[
+  {
+    "id": "C-1",
+    "sev": "Critical",
+    "finding": "Vote cap blocked every vote when the pool was empty",
+    "verdict": "FIXED (live)",
+    "detail": "first vote of an empty round succeeded on profile \"12a8e551-213f-45ed-841a-b8cd3e14ea20\"; round raw votes 0 -> 5 TTS"
+  },
+  {
+    "id": "H-1",
+    "sev": "High",
+    "finding": "VRF callback gas limit bricked settlement at 500k",
+    "verdict": "FIXED (live)",
+    "detail": "CALLBACK_GAS_LIMIT reads 2,500,000 on the deployed contract"
+  },
+  {
+    "id": "H-2",
+    "sev": "High",
+    "finding": "Zero wallet address could trap funds",
+    "verdict": "FIXED (live)",
+    "detail": "rejected: The contract function \"batchApproveProfiles\" reverted."
+  },
+  {
+    "id": "M-3",
+    "sev": "Medium",
+    "finding": "Round unrecoverable if VRF never delivered",
+    "verdict": "FIXED (live)",
+    "detail": "adminResetSettlement present; The contract function \"adminResetSettlement\" reverted with the following reason:"
+  },
+  {
+    "id": "M-6",
+    "sev": "Medium",
+    "finding": "rolloverRound executed before the round ended",
+    "verdict": "FIXED (live)",
+    "detail": "round ends 2026-09-28T04:59:00.000Z; early rollover rejected: The contract function \"rolloverRound\" reverted with the following reason:"
+  },
+  {
+    "id": "M-4",
+    "sev": "Medium",
+    "finding": "Single-step ownership with reachable renounceOwnership",
+    "verdict": "MITIGATED (live)",
+    "detail": "V3d owner is Keeper3; Keeper3's IVotingV3d interface declares no renounceOwnership and Keeper3 makes no low-level call, so it is unreachable. Direct call from Bank reverts."
+  },
+  {
+    "id": "M-2",
+    "sev": "Medium",
+    "finding": "NFT contract could gas-bomb settlement",
+    "verdict": "FIXED (source, verified on BaseScan)",
+    "detail": "nftContract = 0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5; mint wrapped in try/catch with gas:200000 in the BaseScan-verified source"
+  },
+  {
+    "id": "M-1",
+    "sev": "Medium",
+    "finding": "Admin can redirect club share during the VRF window",
+    "verdict": "ACKNOWLEDGED (live)",
+    "detail": "Admin is the 2-of-2 Safe; no single-key path. Unchanged by design."
+  },
+  {
+    "id": "M-5",
+    "sev": "Medium",
+    "finding": "State changes after external transferFrom in vote() (CEI)",
+    "verdict": "ACCEPTED — AF-001",
+    "detail": "TTS is a plain ERC-20 with no transfer hooks and its address is immutable in V3d, so there is no reentrancy vector."
+  },
+  {
+    "id": "M-7",
+    "sev": "Medium",
+    "finding": "Payout destinations mutable during the VRF window",
+    "verdict": "ACKNOWLEDGED (live)",
+    "detail": "Requires 2-of-2 signatures. Would be delayed by the proposed 48h timelock."
+  },
+  {
+    "id": "T/M-1",
+    "sev": "Medium",
+    "finding": "Token: zero-value transfer reverts (EIP-20 non-compliance)",
+    "verdict": "NOT FIXED — LIVE",
+    "detail": "transfer(B, 0) between two non-exempt addresses: The contract function \"transfer\" reverted with the following reason:. The fix exists in 0xb995b63c but nothing delegates to it."
+  }
+]

@@ -159,6 +159,49 @@
 
 <div class="content">
 
+
+  <!-- FINDINGS MAPPED TO DEPLOYED BYTECODE -->
+  <div class="section">
+    <div class="section-tag">Every original finding, mapped to what is deployed</div>
+    <h2>The 2026 audit, checked against the contract running today</h2>
+    <p>The SolidProof audit covered <strong>TTSVoting</strong>. What runs today is
+       <strong>TTSVotingV3d</strong>, deployed afterwards. The fixes are claimed to have
+       landed in V3b and carried forward &mdash; but &ldquo;carried forward&rdquo; is an
+       assumption until something executes it. On <strong>2026-09-25</strong> every
+       finding was re-tested as a <em>behaviour</em> against the live addresses on a Base
+       mainnet fork, not read off a summary.</p>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:.9rem;text-align:left">
+      <thead><tr style="border-bottom:2px solid rgba(255,255,255,.15)">
+        <th style="padding:10px 8px">ID</th><th style="padding:10px 8px">Severity</th>
+        <th style="padding:10px 8px">Finding</th><th style="padding:10px 8px">Against deployed code</th>
+        <th style="padding:10px 8px">Evidence</th></tr></thead>
+      <tbody>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>C-1</code></td><td style="padding:10px 8px;white-space:nowrap">Critical</td><td style="padding:10px 8px">Vote cap blocked every vote when the pool was empty</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; FIXED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">first vote of an empty round succeeded on profile "12a8e551-213f-45ed-841a-b8cd3e14ea20"; round raw votes 0 -> 5 TTS</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>H-1</code></td><td style="padding:10px 8px;white-space:nowrap">High</td><td style="padding:10px 8px">VRF callback gas limit bricked settlement at 500k</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; FIXED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">CALLBACK_GAS_LIMIT reads 2,500,000 on the deployed contract</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>H-2</code></td><td style="padding:10px 8px;white-space:nowrap">High</td><td style="padding:10px 8px">Zero wallet address could trap funds</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; FIXED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">rejected: The contract function "batchApproveProfiles" reverted.</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-3</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">Round unrecoverable if VRF never delivered</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; FIXED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">adminResetSettlement present; The contract function "adminResetSettlement" reverted with the following reason:</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-6</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">rolloverRound executed before the round ended</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; FIXED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">round ends 2026-09-28T04:59:00.000Z; early rollover rejected: The contract function "rolloverRound" reverted with the following reason:</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-4</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">Single-step ownership with reachable renounceOwnership</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; MITIGATED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">V3d owner is Keeper3; Keeper3's IVotingV3d interface declares no renounceOwnership and Keeper3 makes no low-level call, so it is unreachable. Direct call from Bank reverts.</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-2</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">NFT contract could gas-bomb settlement</td><td style="padding:10px 8px;color:var(--green);font-weight:600;white-space:nowrap">&#10003; FIXED (source, verified on BaseScan)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">nftContract = 0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5; mint wrapped in try/catch with gas:200000 in the BaseScan-verified source</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-1</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">Admin can redirect club share during the VRF window</td><td style="padding:10px 8px;color:#8a8a99;font-weight:600;white-space:nowrap">&#8226; ACKNOWLEDGED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">Admin is the 2-of-2 Safe; no single-key path. Unchanged by design.</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-5</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">State changes after external transferFrom in vote() (CEI)</td><td style="padding:10px 8px;color:#8a8a99;font-weight:600;white-space:nowrap">&#8226; ACCEPTED — AF-001</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">TTS is a plain ERC-20 with no transfer hooks and its address is immutable in V3d, so there is no reentrancy vector.</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>M-7</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">Payout destinations mutable during the VRF window</td><td style="padding:10px 8px;color:#8a8a99;font-weight:600;white-space:nowrap">&#8226; ACKNOWLEDGED (live)</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">Requires 2-of-2 signatures. Would be delayed by the proposed 48h timelock.</td></tr>
+<tr style="border-bottom:1px solid rgba(255,255,255,.07)"><td style="padding:10px 8px;white-space:nowrap"><code>T/M-1</code></td><td style="padding:10px 8px;white-space:nowrap">Medium</td><td style="padding:10px 8px">Token: zero-value transfer reverts (EIP-20 non-compliance)</td><td style="padding:10px 8px;color:#e6a23c;font-weight:600;white-space:nowrap">! NOT FIXED — LIVE</td><td style="padding:10px 8px;opacity:.8;font-size:.9em">transfer(B, 0) between two non-exempt addresses: The contract function "transfer" reverted with the following reason:. The fix exists in 0xb995b63c but nothing delegates to it.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="margin-top:18px"><strong>Result: no critical or high-severity finding is
+       live, and nothing live is exploitable.</strong> One medium defect remains live
+       &mdash; a transfer of exactly zero tokens reverts &mdash; and it cannot be patched,
+       because the token is not upgradeable. It is an EIP-20 compliance defect, not a path
+       to anyone's funds.</p>
+    <p style="opacity:.75">Reproduce it yourself:
+       <code>scripts/sale/verify_audit_findings.mjs</code> in the repository, against
+       <code>anvil --fork-url &lt;base-rpc&gt;</code>. Raw results:
+       <code>outputs/audit/findings_to_bytecode.json</code>.</p>
+  </div>
+
   <!-- SECURITY FACTS — every line below was executed or read against Base mainnet
        (or a fork of it) on 2026-09-25. The list this replaced was a checklist of
        green ticks, four of which were false. -->

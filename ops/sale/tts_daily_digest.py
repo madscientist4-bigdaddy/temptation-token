@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TTS sale — daily digest email via Proton Mail Bridge.
 
-Reads tasks.json (same schedule as the workbook Plan tab and the Proton Calendar .ics)
+Reads tasks_v2.json (same schedule as the workbook Plan tab and the Proton Calendar .ics)
 and emails: today's tasks, outreach touches, tomorrow's preview, days to offer review,
 and a live-metrics block (filled by metrics_hook() — Claude Code wires it to the app).
 
@@ -12,7 +12,7 @@ Config (env vars, read from the repo .env by the launchd wrapper):
   BRIDGE_SMTP_PORT     default 1025 (Proton Mail Bridge default SMTP port)
   BRIDGE_USER          the Proton address Bridge is logged into
   BRIDGE_PASS          the Bridge-generated password (NOT your Proton login password)
-  TTS_TASKS_JSON       path to tasks.json
+  TTS_TASKS_JSON       path to tasks_v2.json (v2 supersedes tasks.json, 2026-09-25)
   DIGEST_MODE          "morning" (default) or "evening" (tomorrow-only preview)
 Usage:
   python3 tts_daily_digest.py            # send
@@ -129,7 +129,7 @@ def send(subject, body):
 def main():
     dry = "--dry-run" in sys.argv
     mode = os.environ.get("DIGEST_MODE", "morning")
-    path = os.environ.get("TTS_TASKS_JSON", os.path.join(os.path.dirname(__file__), "tasks.json"))
+    path = os.environ.get("TTS_TASKS_JSON", os.path.join(os.path.dirname(__file__), "tasks_v2.json"))
     today = datetime.now(ET).date()
     subject, body = build(load_plan(path), today, mode)
     if dry:

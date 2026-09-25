@@ -34,7 +34,7 @@ cd "$REPO" || { echo "repo missing at $REPO"; exit 1; }
 if [[ -f .env ]]; then set -a; . ./.env; set +a; else echo "no .env"; exit 1; fi
 
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-export TTS_TASKS_JSON="${TTS_TASKS_JSON:-$REPO/ops/sale/tasks.json}"
+export TTS_TASKS_JSON="${TTS_TASKS_JSON:-$REPO/ops/sale/tasks_v2.json}"
 export DIGEST_TO="${DIGEST_TO:-jim@temptationtoken.io}"
 
 # Proton Bridge serves SMTP on loopback only while the app is running. If it is not up,
