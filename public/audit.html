@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Temptation Token Smart Contract Audit — Solidproof | Zero Critical Findings</title>
-  <meta name="description" content="Temptation Token smart contract independently audited by Solidproof. Zero critical findings. Zero high findings. TrustNet score 17.92. All contract addresses verified on BaseScan." />
+  <title>Temptation Token — smart contract audit status</title>
+  <meta name="description" content="Temptation Token's earlier voting contract was audited by SolidProof (2026). One critical and three high findings were raised and remediated in a later version. The contract running today, TTSVotingV3d, post-dates that audit and has not itself been audited. All addresses verified on BaseScan." />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -128,21 +128,21 @@
 </nav>
 
 <div class="hero">
-  <div class="hero-tag">Smart Contract Security · April 2026</div>
-  <h1><span style="color:var(--green)">Zero Critical Findings</span><br/>Solidproof Audit Complete</h1>
-  <p>Independent blockchain security audit by Solidproof GmbH (Germany). Every finding is documented, severity-rated, and publicly available.</p>
+  <div class="hero-tag">Smart Contract Security · audit 2026, page updated 2026-09-25</div>
+  <h1>Audit status,<br/>stated plainly</h1>
+  <p>SolidProof GmbH (Germany) audited an earlier version of the voting contract. It raised <strong>one critical and three high-severity findings</strong>; those were remediated in a later version. The contract running today &mdash; TTSVotingV3d &mdash; was deployed after that audit and <strong>has not itself been audited</strong>. A re-audit pinned to the live addresses is being arranged.</p>
 </div>
 
 <!-- SCORE CARDS -->
 <div class="score-row">
   <div class="score-card">
-    <div class="sc-label">TrustNet Score</div>
-    <div class="sc-val">17.92</div>
-    <div class="sc-sub">/ 100 (lower = safer)</div>
+    <div class="sc-label">SolidProof TrustNet</div>
+    <div class="sc-val">0.01</div>
+    <div class="sc-sub">live score on app.solidproof.io &mdash; KYC not completed, which is most of the gap</div>
   </div>
   <div class="score-card">
     <div class="sc-label">Critical Findings</div>
-    <div class="sc-val">0</div>
+    <div class="sc-val">1</div>
     <div class="sc-sub">none found</div>
   </div>
   <div class="score-card">
@@ -252,7 +252,7 @@
       </table>
     </div>
     <br/>
-    <p>Zero critical findings. Zero high findings. For low and informational findings, see the full Solidproof report.</p>
+    <p>The audit raised 1 critical, 3 high, 7 medium and 6 low findings against TTSVoting. C-1 and H-1&ndash;H-3 were fixed in V3b, along with M-2, M-3 and M-6. M-1, M-4 and M-7 were acknowledged and not patched; M-5 is recorded as accepted and non-exploitable (a reentrancy pattern that requires a token with transfer hooks &mdash; $TTS has none and its address is immutable). On the token, the zero-value-transfer finding was fixed in implementation <code>0xb995b63c</code>. See the full SolidProof report for the complete text.</p>
   </div>
 
   <!-- MEDIUM FINDINGS COLLAPSIBLE -->
@@ -383,9 +383,9 @@ function copyAddr(btn, addr) {
 {
   "@context": "https://schema.org",
   "@type": "WebPage",
-  "name": "Temptation Token Smart Contract Audit — Solidproof | Zero Critical Findings",
+  "name": "Temptation Token — smart contract audit status",
   "url": "https://temptationtoken.io/audit",
-  "description": "Independent smart contract audit of Temptation Token ($TTS) by Solidproof. Zero critical findings. Zero high findings. TrustNet score 17.92.",
+  "description": "SolidProof audited an earlier version of the Temptation Token voting contract; one critical and three high findings were raised and remediated. The contract deployed today has not itself been audited.",
   "publisher": {
     "@type": "Organization",
     "name": "Blockchain Entertainment LLC",

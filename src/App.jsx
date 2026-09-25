@@ -2323,8 +2323,13 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{background:'rgba(46,204,113,0.08)',borderBottom:'1px solid rgba(46,204,113,0.15)',padding:'5px 16px',textAlign:'center',fontSize:'.6rem',letterSpacing:'.08em',color:'#2ecc71',fontWeight:600}}>
-        ✓ Audited by Solidproof · Zero critical findings · <a href="https://app.solidproof.io/projects/temptation-token" target="_blank" rel="noopener" style={{color:'#2ecc71'}}>View Report →</a>
+      <div style={{background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'5px 16px',textAlign:'center',fontSize:'.6rem',letterSpacing:'.08em',color:'var(--muted)',fontWeight:600}}>
+        {/* This banner used to read "✓ Audited by Solidproof · Zero critical findings".
+            The audit is real (SolidProof, 2026) but it raised 1 critical and 3 high
+            findings, and it covered TTSVoting — not the V3d contract running today.
+            Both halves of that claim were false. Neutral styling too: a green tick is
+            itself a claim. */}
+        Contracts, audit status and the settlement log · <a href="/audit" style={{color:'var(--muted)',textDecoration:'underline'}}>See for yourself →</a>
         <span style={{color:'rgba(46,204,113,0.4)'}}> · </span><a href="/protect.html" target="_blank" rel="noopener" style={{color:'#2ecc71'}}>How we protect people →</a>
       </div>
 
@@ -2383,7 +2388,7 @@ export default function App() {
          <div style={{minHeight:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxSizing:'border-box',padding:'max(32px, env(safe-area-inset-top)) 24px max(32px, env(safe-area-inset-bottom))'}}>
           <img src="/tts_logo.webp" alt="TTS" style={{width:88,height:88,objectFit:'contain',marginBottom:20}} draggable="false"/>
           <div style={{fontFamily:'var(--font-b)',fontSize:'1.7rem',fontWeight:800,color:'var(--text)',marginBottom:8,textAlign:'center'}}>Temptation Token</div>
-          <div style={{fontSize:'.82rem',color:'var(--muted)',textAlign:'center',lineHeight:1.7,marginBottom:28,maxWidth:320}}>Vote on profiles. Pick the winner. Earn $TTS every week.</div>
+          <div style={{fontSize:'.82rem',color:'var(--muted)',textAlign:'center',lineHeight:1.7,marginBottom:28,maxWidth:320}}>Vote on profiles. Pick the winner. A new round every week.</div>
           <div style={{width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:12,marginBottom:28}}>
             {[["1","Browse & Pick Your Winner","Swipe through photos. Find the one you think wins."],["2","Vote $TTS on That Profile","Minimum 5 $TTS. No limit. Votes are final."],["3","Anyone Can Win","Provably fair Chainlink VRF lottery. More votes = better odds, but anyone can win."]].map(([n,t,b]) => (
               <div key={n} style={{display:'flex',alignItems:'flex-start',gap:14,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:16}}>
