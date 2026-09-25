@@ -1,0 +1,11 @@
+{
+  "fee": 3000,
+  "tickLower": 112260,
+  "tickUpper": 121680,
+  "ttsToDeposit": 1007574,
+  "sqrtPriceX96": "34802709885557852825233181900800",
+  "poolAddressOnFork": "0x09E7a7A90b1C4E8Ad69b26417fE88FE30Af31cC8",
+  "ethUsdAtDesign": 2693.1,
+  "ttsUsdAtDesign": 0.013956789386361987,
+  "targetLiquidity": 6117
+}

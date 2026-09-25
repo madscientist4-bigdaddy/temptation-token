@@ -1,0 +1,15 @@
+Replaying 5 transactions from 0xeFb59d88179edC49bDA60B43249722Ea0DE6fB86
+Safe TTS before: 10000000000
+
+  1. to=0x33128a8f… selector=0xa1671295 ok (gas 4558754)
+  2. to=0x09E7a7A9… selector=0xf637731d ok (gas 70440)
+  3. to=0x5570eA97… selector=0x1dc61040 ok (gas 48570)
+  4. to=0x5570eA97… selector=0x095ea7b3 ok (gas 46956)
+  5. to=0x03a520b3… selector=0x88316456 ok (gas 514508)
+
+Safe TTS after:  9998992149.000000000000000016
+Safe TTS spent:  1007850.999999999999999984
+Pool holds:      1007850.999999999999999984 TTS
+Pool taxExempt:  true
+
+BATCH VERIFIED — every transaction succeeded and the pool is funded and tax-exempt
