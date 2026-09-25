@@ -1,3 +1,38 @@
+✅ **SALE SPRINT — 2026-09-25.** Parts 0-8 of `ops/sale/TTS_Sale_Sprint_ClaudeCode.md`
+worked; full report `outputs/sale/sprint_report.md`. Three findings outrank everything else:
+
+1. 🔴 **The token is NOT behind a proxy.** It is immutable. `proxiableUUID()` succeeds
+   (OZ marks it `notDelegated`, so through a proxy it reverts — the staking proxy, tested
+   identically, DOES revert); EIP-1967 slot is zero; 20,747B of code where a proxy holds
+   ~170. Consequence: **the M-1 zero-value-transfer fix never went live** and cannot be
+   applied. `transfer(x, 0)` between two non-exempt addresses still reverts with panic
+   0x11 on mainnet. `0xb995b63c` is orphaned and its `initialize()` is unprotected — never
+   point a proxy at it. Upside: an immutable token is the strongest security story this
+   project has.
+2. 🔴 **Supply is NOT fixed.** `mint()` exists; MINTER_ROLE is empty but the Safe holds
+   DEFAULT_ADMIN_ROLE and can grant it. Proven on a fork: 69B → 70B. Never write "fixed
+   supply" or "no mint function" in public copy again.
+3. 🟢 **The `blacklisted` mapping has NO SETTER.** No address can ever be blacklisted.
+   This is the Blockaid/GoPlus appeal argument, and it makes the planned "remove the
+   blacklist" hardening unnecessary as well as impossible.
+
+📏 **RULE — a public claim about security is a claim you will be diligenced on.** Nine
+false ones were live: "Zero critical findings" (the audit found 1C+3H), "TrustNet 17.92"
+(live score 0.01), "supply is fixed", "UUPS proxy correctly implemented", "Audited by
+Solidproof" on a contract the audit never covered. Fixed on the app; **still live on
+WordPress** — list with exact replacement strings in
+`outputs/site/false_claims_2026-09-25.md`. Fix those before showing anyone the site.
+
+**Rounds 9-12 each settled unattended within 0.5h of close — four consecutive clean
+rollovers** (verified from chain, `outputs/sale/data_room/round_history.csv`). The
+autopilot works. That also unblocks reclaiming the retired upkeep's 43.97 LINK.
+
+**Safe tx #1 is built and fork-verified** (`outputs/sale/safe/1_liquidity.json`): raises
+the max card buy from ~$50 to $1,000 for 0.0101% of the Safe's TTS, no ETH, no cash.
+Expires 2026-10-09 — re-run `scripts/sale/build_safe_tx1.mjs` if the price moves.
+
+---
+
 # CLAUDE.md
 
 Guidance for Claude Code working in this repo. **Canonical CURRENT-STATE only.**
@@ -204,7 +239,7 @@ contracts on Base. Chain: Base mainnet (8453) ONLY — no testnet anywhere.
 
 | Contract | Address | Status |
 |---|---|---|
-| **TTS Token (UUPS proxy)** | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` | live (v2 impl `0xb995b63c`, M-1 fix) |
+| **TTS Token (NOT a proxy)** | `0x5570eA97d53A53170e973894A9Fa7feb5785d3b9` | live, **immutable**. ⚠️ Deployed directly — `proxiableUUID()` returns instead of reverting, EIP-1967 slot is 0, 20,747B of code. `0xb995b63c` is an **orphaned** impl; the M-1 fix it carried **never took effect** and `transfer(x,0)` still reverts on mainnet. Verified 2026-09-25 |
 | **TTSVotingV3d (CANONICAL)** | `0x783b8cd80b586b723188c93ef94ee1beede617b4` | ✅ live, owns rounds |
 | **TTSKeeper3 (CANONICAL)** | `0x363ce4960e3b459f5892587a37ae1ff2ed04442c` | ✅ owns V3d, automated |
 | **Trophy NFT (CANONICAL)** | `0x02DDd0e63DC2A5F66Fdb5a46F5981191959AC9A5` | ✅ `V3d.nftContract()` points here (verified on-chain 2026-08-08). `totalSupply()=0` — V3d mints here from Round 6 on. Used by `api/profiles.js` + `api/scheduler.js` (`TROPHY_NFT`) |
