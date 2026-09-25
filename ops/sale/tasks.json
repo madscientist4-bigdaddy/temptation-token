@@ -1,0 +1,978 @@
+{
+  "generated": "2026-09-24",
+  "timezone": "America/New_York",
+  "offers_review": "2026-10-16",
+  "tasks": [
+    {
+      "id": "T01",
+      "date": "2026-09-24",
+      "time_et": "20:00",
+      "owner": "Jim",
+      "stream": "OPS",
+      "task": "Turn on Telegram two-step verification",
+      "detail": "On the Telegram account that owns @TemptationTokenBot and the channels: Settings > Privacy & Security > Two-Step Verification. Starts the 7-day clock Telegram requires before a bot can change owners. Do not change the password afterward."
+    },
+    {
+      "id": "T02",
+      "date": "2026-09-24",
+      "time_et": "20:15",
+      "owner": "Jim",
+      "stream": "LEGAL",
+      "task": "Send Mike the member consent + Safe-signer agreement",
+      "detail": "Written consent to sell (assets or the LLC) plus his agreement to sign the Safe transfer at close. Checklist: Data Room tab."
+    },
+    {
+      "id": "T03",
+      "date": "2026-09-24",
+      "time_et": "21:00",
+      "owner": "Jim",
+      "stream": "OPS",
+      "task": "Paste the Claude Code sprint prompt and let it run overnight",
+      "detail": "File: TTS_Sale_Sprint_ClaudeCode.md. Opens the site to crawlers, generates the AI Models batch, fork-tests the liquidity move, runs the pre-audit, installs the daily reminder email."
+    },
+    {
+      "id": "T04",
+      "date": "2026-09-25",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "OPS",
+      "task": "First daily digest email arrives",
+      "detail": "Today's tasks, tomorrow's preview, live numbers. Arrives every day at 7:00 AM ET through Nov 6."
+    },
+    {
+      "id": "T05",
+      "date": "2026-09-25",
+      "time_et": "08:30",
+      "owner": "Jim",
+      "stream": "STORE",
+      "task": "Check Google Play account type",
+      "detail": "Play Console > Settings > Developer account > Account details. Personal (created after Nov 13, 2023) = 14-day closed test with 12+ testers first. Organization = submit to production now. Tell Claude Code which."
+    },
+    {
+      "id": "T06",
+      "date": "2026-09-25",
+      "time_et": "09:00",
+      "owner": "Jim",
+      "stream": "AUDIT",
+      "task": "Send the SolidProof quote request",
+      "detail": "Draft: outputs/sale/solidproof_request.md. Phase 1 scope: token + TTSVotingV3d; phase 2: staking + Trophy. Ask price, start date, expedited turnaround, report pinned to the live addresses."
+    },
+    {
+      "id": "T07",
+      "date": "2026-09-25",
+      "time_et": "09:30",
+      "owner": "Jim",
+      "stream": "LIQ",
+      "task": "Transak: generate the PRODUCTION API key",
+      "detail": "Business verification is done, so pull the production key in the Transak dashboard and hand it to Claude Code through its secure prompt (never paste keys in chat)."
+    },
+    {
+      "id": "T08",
+      "date": "2026-09-25",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "AI",
+      "task": "Create an image-generation API key",
+      "detail": "Replicate, fal.ai or OpenAI. Add IMAGE_API_KEY to the repo .env. Costs pennies per image."
+    },
+    {
+      "id": "T09",
+      "date": "2026-09-25",
+      "time_et": "12:00",
+      "owner": "Jim",
+      "stream": "LIQ",
+      "task": "Read the liquidity fork-test report",
+      "detail": "outputs/sale/liquidity_forktest.md: card-buy sizes before/after, price impact, and exactly what Safe transaction #1 does."
+    },
+    {
+      "id": "T10",
+      "date": "2026-09-25",
+      "time_et": "13:00",
+      "owner": "Jim + Mike",
+      "stream": "LIQ",
+      "task": "Sign Safe transaction #1: liquidity",
+      "detail": "Creates the new concentrated pool, exempts it from the transfer tax, adds Treasury TTS single-sided above the current price. Both signatures required."
+    },
+    {
+      "id": "T11",
+      "date": "2026-09-25",
+      "time_et": "15:00",
+      "owner": "Jim",
+      "stream": "AI",
+      "task": "Approve the AI Models batch in admin",
+      "detail": "Approval queue in admin. Reject anything that looks under 25, any nudity, any resemblance to a real person."
+    },
+    {
+      "id": "T12",
+      "date": "2026-09-25",
+      "time_et": "16:00",
+      "owner": "Jim",
+      "stream": "STORE",
+      "task": "Personal Play account only: recruit 15-20 testers",
+      "detail": "Send the closed-test opt-in link from outputs/listings/play_closed_test.md. 12 must stay opted in 14 straight days; over-recruit so attrition never resets the clock."
+    },
+    {
+      "id": "T13",
+      "date": "2026-09-25",
+      "time_et": "17:00",
+      "owner": "Jim",
+      "stream": "SITE",
+      "task": "Verify temptationtoken.io in Google Search Console + Bing Webmaster",
+      "detail": "DNS TXT record at the registrar, then import the site into Bing Webmaster Tools. Unlocks the traffic data buyers ask for."
+    },
+    {
+      "id": "T14",
+      "date": "2026-09-26",
+      "time_et": "10:00",
+      "owner": "Claude Code",
+      "stream": "SITE",
+      "task": "Site rebuild on staging: same look, new structure",
+      "detail": "Before/after screenshots in outputs/site/. Review on your phone."
+    },
+    {
+      "id": "T15",
+      "date": "2026-09-26",
+      "time_et": "14:00",
+      "owner": "Jim",
+      "stream": "SITE",
+      "task": "Approve the rebuilt site for publish",
+      "detail": "Additive, revision-safe edits only (the Aug 16 rule)."
+    },
+    {
+      "id": "T16",
+      "date": "2026-09-27",
+      "time_et": "11:00",
+      "owner": "Jim",
+      "stream": "DATA",
+      "task": "Record the 2-3 minute Loom demo",
+      "detail": "Board > Face ID signup > vote > trophy on Basescan > admin > club signup > AI Models division. Paste the link into LOOM_URL."
+    },
+    {
+      "id": "T17",
+      "date": "2026-09-27",
+      "time_et": "18:00",
+      "owner": "Jim",
+      "stream": "DATA",
+      "task": "Review the data room draft",
+      "detail": "outputs/sale/data_room/ - mark anything to add."
+    },
+    {
+      "id": "T18",
+      "date": "2026-09-28",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "AI",
+      "task": "AI Models rotation #1",
+      "detail": "Runs after the round settles. Retires the oldest AI entries, activates the next approved batch; one extra retires for each new verified creator."
+    },
+    {
+      "id": "T19",
+      "date": "2026-09-28",
+      "time_et": "09:00",
+      "owner": "Jim + Mike",
+      "stream": "AUDIT",
+      "task": "Sign Safe transaction #2: 48-hour timelock",
+      "detail": "Moves admin + upgrader roles behind the timelock. Runs after liquidity is live, because the pool's tax exemption must be set first."
+    },
+    {
+      "id": "T20",
+      "date": "2026-09-28",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "LIQ",
+      "task": "Live card test: buy $30 of TTS by card on your phone",
+      "detail": "Confirms Transak > swap > wallet end to end in production."
+    },
+    {
+      "id": "T21",
+      "date": "2026-09-28",
+      "time_et": "11:00",
+      "owner": "Claude Code",
+      "stream": "SITE",
+      "task": "IndexNow push + request indexing on the top 10 pages",
+      "detail": "Every URL goes to IndexNow engines within hours; Google via Search Console."
+    },
+    {
+      "id": "T22",
+      "date": "2026-09-28",
+      "time_et": "14:00",
+      "owner": "Jim",
+      "stream": "STORE",
+      "task": "Play: org account > submit production; personal > confirm 12+ testers opted in",
+      "detail": "Listing copy: outputs/listings/play_store_listing.md."
+    },
+    {
+      "id": "T23",
+      "date": "2026-09-29",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Register TTS on base.dev and submit the mini app form",
+      "detail": "Builder presence in the Base ecosystem; your paymaster already meets the sponsored-gas criterion."
+    },
+    {
+      "id": "T24",
+      "date": "2026-09-29",
+      "time_et": "11:00",
+      "owner": "Jim",
+      "stream": "DATA",
+      "task": "Approve the one-pager and listing drafts",
+      "detail": "outputs/sale/listings/ (Acquire.Fi, SideProjectors, IndieMaker)."
+    },
+    {
+      "id": "T25",
+      "date": "2026-09-29",
+      "time_et": "14:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "LinkedIn: follow every decision-maker on the Acquirers tab",
+      "detail": "Warms up the Oct 1 connection requests."
+    },
+    {
+      "id": "T26",
+      "date": "2026-09-30",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "LEGAL",
+      "task": "Put counsel's sign-off letter in the data room",
+      "detail": "One page confirming the legal review is complete - a strength buyers value."
+    },
+    {
+      "id": "T27",
+      "date": "2026-09-30",
+      "time_et": "11:00",
+      "owner": "Claude Code",
+      "stream": "SITE",
+      "task": "Final QA: crawler test per bot, speed, schema, links",
+      "detail": "Report: outputs/site/qa_final.md."
+    },
+    {
+      "id": "T28",
+      "date": "2026-09-30",
+      "time_et": "16:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Approve the Oct 1 automated batch",
+      "detail": "Claude Code queues each email for 9:05 AM recipient-local time; a canary copy to you fires first."
+    },
+    {
+      "id": "T29",
+      "date": "2026-10-01",
+      "time_et": "09:05",
+      "owner": "Auto",
+      "stream": "OUTREACH",
+      "task": "LAUNCH - Email 1 to AROA + RCI investor relations",
+      "detail": "office@aroaagency.com; gfishman@pondel.com + mwichman@pondel.com. SheX goes at 3:05 AM ET (9:05 Berlin) once the Impressum address is verified."
+    },
+    {
+      "id": "T30",
+      "date": "2026-10-01",
+      "time_et": "09:30",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Submit listings: Acquire.Fi, SideProjectors, IndieMaker",
+      "detail": "Same one-pager everywhere. Offers reviewed Fri Oct 16."
+    },
+    {
+      "id": "T31",
+      "date": "2026-10-01",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Contact forms: Creators Inc, Fanvue, Infloww, The Clueless",
+      "detail": "Paste Email 1 with each company's hook (Scripts tab)."
+    },
+    {
+      "id": "T32",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "LinkedIn connection requests with note",
+      "detail": "Monange, Fitzgerald, Morris (Fanvue); Bachman (Creators Inc); Langan (RCI); Cruz (The Clueless); Etelis (Fansly); French (ManyVids); Bouslama (Acquire.Fi)."
+    },
+    {
+      "id": "T33",
+      "date": "2026-10-01",
+      "time_et": "12:30",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "DMs: Instagram, Telegram, X",
+      "detail": "IG: @creatorsinc / Andy Bachman, @tonyizzet, Louna. Telegram: t.me/supercreator_app. X: @Acquire_Fi."
+    },
+    {
+      "id": "T34",
+      "date": "2026-10-02",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Reply to every response within an hour; book calls",
+      "detail": "calendly.com/temptationtoken/phone-meeting. Screen-share the live app, not slides."
+    },
+    {
+      "id": "T35",
+      "date": "2026-10-02",
+      "time_et": "12:30",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Telegram follow-up to AROA",
+      "detail": "t.me/aroaagency1 - one line + the Loom."
+    },
+    {
+      "id": "T36",
+      "date": "2026-10-05",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "AI",
+      "task": "AI Models rotation #2",
+      "detail": "Automatic after settlement."
+    },
+    {
+      "id": "T37",
+      "date": "2026-10-05",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Weekly results note to engaged buyers",
+      "detail": "Round winner, votes, new creators, pool depth, card buys. Claude Code drafts it from live data."
+    },
+    {
+      "id": "T38",
+      "date": "2026-10-06",
+      "time_et": "09:05",
+      "owner": "Auto",
+      "stream": "OUTREACH",
+      "task": "Email 2 (proof + data room under NDA) to AROA + RCI IR",
+      "detail": "Includes the Loom and what shipped since Oct 1."
+    },
+    {
+      "id": "T39",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Email 2 via LinkedIn messages and forms",
+      "detail": "Same content to every accepted connection and form contact."
+    },
+    {
+      "id": "T40",
+      "date": "2026-10-07",
+      "time_et": "10:30",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Call RCI investor relations: 212-883-0655",
+      "detail": "Ask who evaluates digital partnerships or acquisitions; send a same-day recap email. Script: Scripts tab."
+    },
+    {
+      "id": "T41",
+      "date": "2026-10-07",
+      "time_et": "11:30",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "One-line follow-up DMs to non-responders",
+      "detail": "Line + Loom link."
+    },
+    {
+      "id": "T42",
+      "date": "2026-10-08",
+      "time_et": "18:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Visit 2-3 clubs from your club list with the /clubs QR",
+      "detail": "Goal: signed-up clubs = demand evidence for the data room. Optional: Rick's Cabaret New York, 50 W 33rd St - ask for the GM and a corporate intro."
+    },
+    {
+      "id": "T43",
+      "date": "2026-10-09",
+      "time_et": "09:00",
+      "owner": "Jim",
+      "stream": "STORE",
+      "task": "Personal Play account: closed test hits 14 days - apply for production",
+      "detail": "Answers: outputs/listings/play_production_answers.md."
+    },
+    {
+      "id": "T44",
+      "date": "2026-10-09",
+      "time_et": "12:00",
+      "owner": "Jim",
+      "stream": "AUDIT",
+      "task": "Check SolidProof status; answer any questions same day",
+      "detail": ""
+    },
+    {
+      "id": "T45",
+      "date": "2026-10-12",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "AI",
+      "task": "AI Models rotation #3",
+      "detail": "Automatic after settlement."
+    },
+    {
+      "id": "T46",
+      "date": "2026-10-12",
+      "time_et": "09:05",
+      "owner": "Auto",
+      "stream": "OUTREACH",
+      "task": "Email 3 ('offers reviewed Friday') to AROA + RCI IR",
+      "detail": "Jim sends the same note via LinkedIn/forms at 10:00."
+    },
+    {
+      "id": "T47",
+      "date": "2026-10-13",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "DATA",
+      "task": "Open the data room to every buyer who signed the NDA",
+      "detail": "Track who opened what - interest signal."
+    },
+    {
+      "id": "T48",
+      "date": "2026-10-14",
+      "time_et": "12:00",
+      "owner": "Claude Code",
+      "stream": "AUDIT",
+      "task": "Publish the SolidProof report on /audit, pinned to live addresses",
+      "detail": "Then send it to every engaged buyer."
+    },
+    {
+      "id": "T49",
+      "date": "2026-10-15",
+      "time_et": "17:00",
+      "owner": "Jim",
+      "stream": "OUTREACH",
+      "task": "Last-call note to engaged buyers",
+      "detail": "'Reviewing offers tomorrow at 5 PM ET.'"
+    },
+    {
+      "id": "T50",
+      "date": "2026-10-16",
+      "time_et": "17:00",
+      "owner": "Jim + Mike",
+      "stream": "CLOSE",
+      "task": "OFFERS REVIEW",
+      "detail": "Rank by total value, cash at close, earn-out terms, certainty, speed. Best structure beats biggest headline."
+    },
+    {
+      "id": "T51",
+      "date": "2026-10-19",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "AI",
+      "task": "AI Models rotation #4",
+      "detail": "Automatic after settlement."
+    },
+    {
+      "id": "T52",
+      "date": "2026-10-19",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "CLOSE",
+      "task": "Counter/accept, sign the LOI, engage the lawyer",
+      "detail": "Asset purchase vs. LLC purchase per CPA advice."
+    },
+    {
+      "id": "T53",
+      "date": "2026-10-21",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "CLOSE",
+      "task": "Open escrow; buyer deposit",
+      "detail": ""
+    },
+    {
+      "id": "T54",
+      "date": "2026-10-23",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "CLOSE",
+      "task": "Buyer diligence Q&A session",
+      "detail": "Data room + live walkthrough."
+    },
+    {
+      "id": "T55",
+      "date": "2026-10-25",
+      "time_et": "09:00",
+      "owner": "Jim",
+      "stream": "OPS",
+      "task": "Clock change: UK/EU fell back - London is ET+4 until Nov 1",
+      "detail": ""
+    },
+    {
+      "id": "T56",
+      "date": "2026-10-26",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "AI",
+      "task": "AI Models rotation #5",
+      "detail": "Automatic after settlement."
+    },
+    {
+      "id": "T57",
+      "date": "2026-10-26",
+      "time_et": "10:00",
+      "owner": "Claude Code",
+      "stream": "CLOSE",
+      "task": "Transfer rehearsal on a fork",
+      "detail": "Safe owner swap, role moves, bot transfer checklist, project transfers - dry run."
+    },
+    {
+      "id": "T58",
+      "date": "2026-10-28",
+      "time_et": "10:00",
+      "owner": "Jim + Mike",
+      "stream": "CLOSE",
+      "task": "Sign the purchase agreement",
+      "detail": ""
+    },
+    {
+      "id": "T59",
+      "date": "2026-11-01",
+      "time_et": "09:00",
+      "owner": "Jim",
+      "stream": "OPS",
+      "task": "Clock change: US fell back - all times now EST",
+      "detail": ""
+    },
+    {
+      "id": "T60",
+      "date": "2026-11-02",
+      "time_et": "07:00",
+      "owner": "Auto",
+      "stream": "AI",
+      "task": "AI Models rotation #6 (skip if closed)",
+      "detail": ""
+    },
+    {
+      "id": "T61",
+      "date": "2026-11-02",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "CLOSE",
+      "task": "Escrow funded - start transfers per the runbook",
+      "detail": "Closing tab, in order."
+    },
+    {
+      "id": "T62",
+      "date": "2026-11-03",
+      "time_et": "10:00",
+      "owner": "Jim + Mike",
+      "stream": "CLOSE",
+      "task": "Transfers day 1: Safe owner swap + roles + treasury to buyer wallets",
+      "detail": "Onchain moves only - never hand over keys or seed phrases."
+    },
+    {
+      "id": "T63",
+      "date": "2026-11-04",
+      "time_et": "10:00",
+      "owner": "Jim",
+      "stream": "CLOSE",
+      "task": "Transfers day 2: domains, hosting, repo, cloud projects, Expo/Play, Telegram bot",
+      "detail": ""
+    },
+    {
+      "id": "T64",
+      "date": "2026-11-05",
+      "time_et": "10:00",
+      "owner": "Claude Code",
+      "stream": "CLOSE",
+      "task": "Rotate every key and secret; verify buyer controls everything",
+      "detail": ""
+    },
+    {
+      "id": "T65",
+      "date": "2026-11-06",
+      "time_et": "12:00",
+      "owner": "Jim",
+      "stream": "CLOSE",
+      "task": "Buyer confirms receipt - escrow releases funds",
+      "detail": "Sale closed."
+    }
+  ],
+  "sequence": [
+    {
+      "acquirer": "A13",
+      "company": "SheX Agency",
+      "date": "2026-10-01",
+      "time_et": "03:05",
+      "channel": "Email (auto)",
+      "action": "Email 1 to the verified Impressum address (9:05 Berlin)"
+    },
+    {
+      "acquirer": "A3",
+      "company": "AROA Agency",
+      "date": "2026-10-01",
+      "time_et": "09:05",
+      "channel": "Email (auto)",
+      "action": "Email 1 to office@aroaagency.com"
+    },
+    {
+      "acquirer": "A6",
+      "company": "RCI Hospitality Holdings (NASDAQ: RICK)",
+      "date": "2026-10-01",
+      "time_et": "09:05",
+      "channel": "Email (auto)",
+      "action": "Email 1 to gfishman@pondel.com + mwichman@pondel.com"
+    },
+    {
+      "acquirer": "A10",
+      "company": "Acquire.Fi",
+      "date": "2026-10-01",
+      "time_et": "09:30",
+      "channel": "Listing form",
+      "action": "Submit the Acquire.Fi seller form"
+    },
+    {
+      "acquirer": "A1",
+      "company": "Fanvue",
+      "date": "2026-10-01",
+      "time_et": "10:00",
+      "channel": "Web form",
+      "action": "Email 1 + Fanvue hook via fanvue.com business contact"
+    },
+    {
+      "acquirer": "A2",
+      "company": "Creators Inc",
+      "date": "2026-10-01",
+      "time_et": "10:00",
+      "channel": "Web form",
+      "action": "Email 1 via creatorsinc.com/contact"
+    },
+    {
+      "acquirer": "A4",
+      "company": "Infloww",
+      "date": "2026-10-01",
+      "time_et": "10:00",
+      "channel": "Web form",
+      "action": "Email 1 via infloww.com contact"
+    },
+    {
+      "acquirer": "A7",
+      "company": "The Clueless",
+      "date": "2026-10-01",
+      "time_et": "10:00",
+      "channel": "Web form",
+      "action": "Email 1 via theclueless.ai"
+    },
+    {
+      "acquirer": "A1",
+      "company": "Fanvue",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to Monange, Fitzgerald, Morris"
+    },
+    {
+      "acquirer": "A2",
+      "company": "Creators Inc",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to Andy Bachman"
+    },
+    {
+      "acquirer": "A4",
+      "company": "Infloww",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to directors found on Companies House"
+    },
+    {
+      "acquirer": "A6",
+      "company": "RCI Hospitality Holdings (NASDAQ: RICK)",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to Eric Langan"
+    },
+    {
+      "acquirer": "A7",
+      "company": "The Clueless",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to Ruben Cruz"
+    },
+    {
+      "acquirer": "A8",
+      "company": "Fansly",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to Michael Etelis"
+    },
+    {
+      "acquirer": "A9",
+      "company": "ManyVids",
+      "date": "2026-10-01",
+      "time_et": "10:30",
+      "channel": "LinkedIn",
+      "action": "Connect note to Bella French (no cold email - CASL)"
+    },
+    {
+      "acquirer": "A10",
+      "company": "Acquire.Fi",
+      "date": "2026-10-01",
+      "time_et": "12:30",
+      "channel": "X",
+      "action": "DM @Acquire_Fi with the one-pager link"
+    },
+    {
+      "acquirer": "A11",
+      "company": "Louna's Models",
+      "date": "2026-10-01",
+      "time_et": "12:30",
+      "channel": "Instagram",
+      "action": "DM Louna - award-category + ownership angle"
+    },
+    {
+      "acquirer": "A12",
+      "company": "Upbrand",
+      "date": "2026-10-01",
+      "time_et": "12:30",
+      "channel": "Instagram",
+      "action": "DM @tonyizzet"
+    },
+    {
+      "acquirer": "A2",
+      "company": "Creators Inc",
+      "date": "2026-10-01",
+      "time_et": "12:30",
+      "channel": "Instagram",
+      "action": "DM @creatorsinc + Bachman (podcast-guest + acquisition angle)"
+    },
+    {
+      "acquirer": "A5",
+      "company": "Supercreator (supercreator.app)",
+      "date": "2026-10-01",
+      "time_et": "12:30",
+      "channel": "Telegram",
+      "action": "DM t.me/supercreator_app + book the consultation Calendly"
+    },
+    {
+      "acquirer": "A8",
+      "company": "Fansly",
+      "date": "2026-10-02",
+      "time_et": "10:00",
+      "channel": "Web form",
+      "action": "Email 1 via fansly.com business contact"
+    },
+    {
+      "acquirer": "A3",
+      "company": "AROA Agency",
+      "date": "2026-10-02",
+      "time_et": "12:30",
+      "channel": "Telegram",
+      "action": "Nudge on t.me/aroaagency1 + Loom"
+    },
+    {
+      "acquirer": "A13",
+      "company": "SheX Agency",
+      "date": "2026-10-06",
+      "time_et": "03:05",
+      "channel": "Email (auto)",
+      "action": "Email 2"
+    },
+    {
+      "acquirer": "A3",
+      "company": "AROA Agency",
+      "date": "2026-10-06",
+      "time_et": "09:05",
+      "channel": "Email (auto)",
+      "action": "Email 2 (proof + data room)"
+    },
+    {
+      "acquirer": "A6",
+      "company": "RCI Hospitality Holdings (NASDAQ: RICK)",
+      "date": "2026-10-06",
+      "time_et": "09:05",
+      "channel": "Email (auto)",
+      "action": "Email 2 (proof + data room)"
+    },
+    {
+      "acquirer": "A1",
+      "company": "Fanvue",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 2 (proof + data room) to accepted connections"
+    },
+    {
+      "acquirer": "A10",
+      "company": "Acquire.Fi",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "Email / X",
+      "action": "Follow-up with Loom + audit status"
+    },
+    {
+      "acquirer": "A2",
+      "company": "Creators Inc",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "IG / LinkedIn",
+      "action": "Email 2 (proof + data room)"
+    },
+    {
+      "acquirer": "A4",
+      "company": "Infloww",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 2 (proof + data room)"
+    },
+    {
+      "acquirer": "A5",
+      "company": "Supercreator (supercreator.app)",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "Telegram",
+      "action": "Email 2 content (proof + data room)"
+    },
+    {
+      "acquirer": "A7",
+      "company": "The Clueless",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 2 (proof + data room)"
+    },
+    {
+      "acquirer": "A8",
+      "company": "Fansly",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 2 (proof + data room)"
+    },
+    {
+      "acquirer": "A9",
+      "company": "ManyVids",
+      "date": "2026-10-06",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 2 content via message"
+    },
+    {
+      "acquirer": "A11",
+      "company": "Louna's Models",
+      "date": "2026-10-06",
+      "time_et": "12:30",
+      "channel": "Instagram",
+      "action": "Proof DM with Loom"
+    },
+    {
+      "acquirer": "A12",
+      "company": "Upbrand",
+      "date": "2026-10-06",
+      "time_et": "12:30",
+      "channel": "Instagram",
+      "action": "Proof DM with Loom"
+    },
+    {
+      "acquirer": "A6",
+      "company": "RCI Hospitality Holdings (NASDAQ: RICK)",
+      "date": "2026-10-07",
+      "time_et": "10:30",
+      "channel": "Phone",
+      "action": "Call IR at 212-883-0655 - ask who evaluates digital deals"
+    },
+    {
+      "acquirer": "A6",
+      "company": "RCI Hospitality Holdings (NASDAQ: RICK)",
+      "date": "2026-10-08",
+      "time_et": "18:00",
+      "channel": "Visit (optional)",
+      "action": "Rick's Cabaret New York - GM demo + corporate intro"
+    },
+    {
+      "acquirer": "A13",
+      "company": "SheX Agency",
+      "date": "2026-10-12",
+      "time_et": "03:05",
+      "channel": "Email (auto)",
+      "action": "Email 3"
+    },
+    {
+      "acquirer": "A3",
+      "company": "AROA Agency",
+      "date": "2026-10-12",
+      "time_et": "09:05",
+      "channel": "Email (auto)",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A6",
+      "company": "RCI Hospitality Holdings (NASDAQ: RICK)",
+      "date": "2026-10-12",
+      "time_et": "09:05",
+      "channel": "Email (auto)",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A1",
+      "company": "Fanvue",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A2",
+      "company": "Creators Inc",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "IG / LinkedIn",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A4",
+      "company": "Infloww",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A5",
+      "company": "Supercreator (supercreator.app)",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "Telegram",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A7",
+      "company": "The Clueless",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A8",
+      "company": "Fansly",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Email 3 - offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A9",
+      "company": "ManyVids",
+      "date": "2026-10-12",
+      "time_et": "10:00",
+      "channel": "LinkedIn",
+      "action": "Offers reviewed Oct 16"
+    },
+    {
+      "acquirer": "A1",
+      "company": "Fanvue",
+      "date": "2026-10-15",
+      "time_et": "17:00",
+      "channel": "LinkedIn",
+      "action": "Last call (if engaged)"
+    }
+  ]
+}

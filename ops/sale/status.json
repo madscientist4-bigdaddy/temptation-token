@@ -1,0 +1,14 @@
+{
+  "_comment": "Facts with no API. Edit by hand; the digest prints the as_of date and nags after 7 days.",
+  "as_of": "2026-09-25",
+  "solidproof": {
+    "state": "NOT AUDITED - quote not yet requested (Part 5.6). Live site currently claims otherwise; see outputs/site/false_claims_2026-09-25.md",
+    "phase1_scope": "TTS token + TTSVotingV3d",
+    "phase2_scope": "TTSStaking proxy + Trophy NFT"
+  },
+  "blockaid": { "state": "appeal #1263614 open; do not re-appeal until pool depth and volume move (Part 4.9)" },
+  "play": { "state": "no Play Console app created; blocked on Jim confirming account type (Plan T05)" },
+  "listings": { "state": "not posted; drafts pending (Part 7.2) - Acquire.Fi / SideProjectors / IndieMaker" },
+  "transak": { "state": "sandbox key only; production key pending from Jim (Plan T07)" },
+  "apple": { "state": "no App Store submission planned (guideline 1.2); PWA route per Part 6.3" }
+}

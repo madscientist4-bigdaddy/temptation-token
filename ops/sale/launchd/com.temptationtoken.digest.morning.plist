@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.temptationtoken.digest.morning</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/functionisedproductions/Projects/temptation-token/ops/sale/run_digest.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DIGEST_MODE</key><string>morning</string>
+    <!-- launchd StartCalendarInterval follows the Mac's local time, which is ET here.
+         If the machine ever moves timezone these fire at the new local hour. -->
+    <key>TZ</key><string>America/New_York</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+  <!-- The Mac sleeps overnight. RunAtLoad is false so installing the job does not fire
+       it, but a missed calendar interval is run as soon as the machine wakes, which is
+       why the 06:55 pmset wake matters more for punctuality than for delivery. -->
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/functionisedproductions/Projects/temptation-token/logs/sale-digest.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/functionisedproductions/Projects/temptation-token/logs/sale-digest.err.log</string>
+</dict>
+</plist>
