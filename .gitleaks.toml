@@ -1,0 +1,65 @@
+# gitleaks config — default ruleset plus EVM-specific rules.
+# Hook: .githooks/pre-commit (enable per clone: git config core.hooksPath .githooks)
+# Full-history scan: gitleaks git --redact --log-opts="--all"
+# False positive on one line: append  gitleaks:allow  in a trailing comment.
+title = "temptation-token"
+
+[extend]
+useDefault = true
+
+# This file lists public constants as allowlist patterns; do not scan it against itself.
+[[allowlists]]
+description = "gitleaks config"
+paths = ['''^\.gitleaks\.toml$''']
+
+# A 64-hex value sitting next to a word that says what it is. High confidence.
+[[rules]]
+id = "evm-private-key-assigned"
+description = "64-hex private key assigned to a key/wallet/signer-named variable or flag"
+regex = '''(?i)(?:private[_-]?key|priv[_-]?key|secret[_-]?key|\bpk\b|_pk\b|mnemonic|signer|deployer|wallet)[a-z0-9_]{0,24}["'\s]*[:=,( ]\s*["'`]?(?:0x)?([0-9a-f]{64})\b'''
+secretGroup = 1
+keywords = ["key", "pk", "mnemonic", "signer", "deployer", "wallet"]
+
+# Any bare 64-hex string. A private key, a tx hash and a bytes32 are indistinguishable
+# by shape, so this allowlists lines that name themselves as a hash and leaves the rest
+# for a human. Entropy drops zero-padded ABI words.
+[[rules]]
+id = "raw-64-hex-private-key"
+description = "Raw 64-hex string that could be a private key"
+regex = '''\b(?:0x)?([0-9a-fA-F]{64})\b'''
+secretGroup = 1
+entropy = 3.5
+
+  [[rules.allowlists]]
+  description = "lines that identify the value as a hash, not a key"
+  regexTarget = "line"
+  regexes = [
+    '''(?i)tx|hash|topic|digest|sha-?256|keccak|bytes32|role|slot|salt|root|selector|uuid|integrity|checksum|basescan|etherscan|blockscout|sourcify|upkeep|requestId|commit''',
+  ]
+
+  [[rules.allowlists]]
+  description = "generated artifacts: bytecode, ABIs, lockfiles, build output"
+  paths = [
+    '''(^|/)package-lock\.json$''',
+    '''(^|/)(out|cache|broadcast|artifacts|node_modules|dist)/''',
+    '''flattened.*\.sol$''',
+    '''(^|/)(lib|vendor)/(forge-std|openzeppelin[^/]*)/''',
+    '''^outputs/audit/.*\.json$''',
+  ]
+
+  [[rules.allowlists]]
+  description = "public constants: anvil/hardhat account #0 test key, ERC-1967 implementation/admin/beacon slots"
+  regexes = [
+    '''ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+    '''360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc''',
+    '''b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103''',
+    '''a3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50''',
+  ]
+
+# Key-bearing RPC URLs: the provider key is the last path segment.
+[[rules]]
+id = "rpc-url-with-key"
+description = "Alchemy/Infura RPC URL with the API key inline"
+regex = '''(?i)(?:alchemy\.com/v2|infura\.io/v3)/([a-z0-9_-]{16,})'''
+secretGroup = 1
+keywords = ["alchemy.com", "infura.io"]

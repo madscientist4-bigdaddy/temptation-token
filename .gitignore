@@ -50,3 +50,6 @@ __pycache__/
 outputs/*.app.tar.gz
 outputs/*.apk
 outputs/*.ipa
+
+# Claude Code local permission files — they accumulate literal commands, including any secret typed into one
+.claude/settings.local*.json

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Blocks a commit whose staged changes contain a secret. Config: .gitleaks.toml
+# Enable once per clone:  git config core.hooksPath .githooks
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks not found — install it (brew install gitleaks). Commit blocked." >&2
+  exit 1
+fi
+root=$(git rev-parse --show-toplevel)
+if ! gitleaks git --pre-commit --staged --redact --no-banner --config "$root/.gitleaks.toml" "$root"; then
+  echo "" >&2
+  echo "pre-commit: gitleaks found a possible secret in the staged changes (values redacted above)." >&2
+  echo "  Real secret  -> unstage it, move it to .env, reference it by name." >&2
+  echo "  A tx hash or other public value -> add a trailing 'gitleaks:allow' comment on that line." >&2
+  exit 1
+fi

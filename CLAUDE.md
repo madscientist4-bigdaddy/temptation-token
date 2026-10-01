@@ -148,6 +148,19 @@ on them — facts here reflect the last verification, not real-time state.
 - Note: pushing to `main` triggers Railway (bot) auto-deploy; Vercel deploys via
   `vercel --prod`. Treat a push/deploy as outward-facing — fine under autonomous policy,
   but be deliberate.
+- 📏 **RULE — never type a secret into a command. Always reference it from `.env` by
+  name.** No literal key, token, password or key-bearing RPC URL on a command line, in an
+  inline `VAR=value cmd` prefix, in an `export`, or in a `curl` header. Load it instead:
+  `node --env-file=.env script.mjs`, or `set -a; . ./.env; set +a` and then `"$VAR_NAME"`.
+  When inspecting one, print the variable name, its length and the public address it
+  controls — never the value.
+  **Why:** Claude Code saves every approved command verbatim into
+  `.claude/settings.local.json`. A duplicate of that file (`settings.local 3.json`) was
+  committed on 2026-08-17 (`fce5cdb`) to this **public** repo carrying a raw private key
+  (controls `0x767651E74c290122Dd8CC934e471fCE091BbC5c2`), an Etherscan key, an Alchemy
+  key and a Vercel bypass token. Removed from the tree 2026-10-01; **it is still in git
+  history, so all four are burned — rotate, never reuse.** Guard: `.gitleaks.toml` +
+  `.githooks/pre-commit` (enable per clone with `git config core.hooksPath .githooks`).
 
 ## Session Start
 **"Read CLAUDE.md and continue from where we left off."** Check memory files for
