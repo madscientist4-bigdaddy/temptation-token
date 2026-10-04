@@ -51,7 +51,10 @@ export function VoteCard({
       </Pressable>
 
       <View style={st.info}>
-        <Text style={st.name}>{profile.display_name || 'Anonymous'}</Text>
+        <View style={st.nameRow}>
+          <Text style={st.name}>{profile.display_name || 'Anonymous'}</Text>
+          {profile.entry_type === 'ai_model' ? <Text style={st.aiBadge}>AI Model</Text> : null}
+        </View>
         <Pressable
           style={st.linkBtn}
           onPress={() => {
@@ -107,6 +110,8 @@ const st = StyleSheet.create({
   },
   counterTxt: { color: colors.muted, fontSize: 10, letterSpacing: 0.8, fontFamily: sans },
   info: { padding: 14 },
+  aiBadge: { fontFamily: sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: colors.gold, borderWidth: 1, borderColor: colors.gold, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   name: { fontFamily: sans, fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 10 },
   linkBtn: {
     backgroundColor: '#FF7A00', borderRadius: 10, paddingVertical: 15, alignItems: 'center', justifyContent: 'center',

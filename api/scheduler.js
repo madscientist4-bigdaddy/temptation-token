@@ -10,9 +10,9 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { evaluateAutoFund } from './_lib/autofund.js'
 import { evaluateVrfAutoFund } from './_lib/vrf_autofund.js'
 import { evaluateKeeperAutopilot, ACTION as ACTION_NAME } from './_lib/keeper_autopilot.js'
+import { verifyAdminToken } from '../lib/adminAuth.js'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
-const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 const VOTING_ADDRESS  = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 
 // ── ONE RPC for the whole file ────────────────────────────────────────────────
@@ -39,9 +39,20 @@ const TTS_TRANSFER_ABI   = parseAbi([
   'function balanceOf(address) view returns (uint256)',
 ])
 const numv = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d }
-// Service-key Supabase (cron context) — falls back to anon if unset.
-function sbService(path, opts = {}) {
-  const key = process.env.SUPABASE_SERVICE_KEY || SUPABASE_KEY
+// Service-key Supabase. There is NO public-key fallback: this file used to carry the
+// anon key as a constant and quietly fell back to it, which is how sbGet/sbPatch came to
+// read and write scheduled_posts as `anon` and why that table needed open public write
+// policies. Without SUPABASE_SERVICE_KEY every helper now rejects with a named error
+// instead of downgrading.
+function serviceKey() {
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!key) throw new Error('SUPABASE_SERVICE_KEY missing')
+  return key
+}
+// async on purpose: a missing key must surface as a rejected promise, because callers
+// chain .then/.catch on the return value and a synchronous throw would skip them.
+async function sbService(path, opts = {}) {
+  const key = serviceKey()
   return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     ...opts,
     headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
@@ -121,17 +132,19 @@ const COMMUNITY_CHAT_ID = process.env.COMMUNITY_CHAT_ID || '-1003930752060'
 // ── Supabase helpers ──────────────────────────────────────────────────────────
 
 async function sbGet(table, query = '') {
+  const key = serviceKey()
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    headers: { apikey: key, Authorization: `Bearer ${key}` }
   })
   return r.json()
 }
 
 async function sbPatch(table, query, body) {
+  const key = serviceKey()
   return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     method: 'PATCH',
     headers: {
-      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      apikey: key, Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json', Prefer: 'return=minimal'
     },
     body: JSON.stringify(body)
@@ -1280,7 +1293,16 @@ export default async function handler(req, res) {
   }
 
   // Manual fire: POST /api/scheduler?action=fire&id=UUID
+  // Publishes to the official X/Telegram accounts, so it is gated: an admin session
+  // token (the dashboard's "Post now" button) or Bearer CRON_SECRET. It had no guard at
+  // all — anyone with a post id could publish it. Fail-closed: verifyAdminToken() is
+  // false when its secret is unset, and an unset CRON_SECRET matches nothing.
   if (req.method === 'POST' && req.query?.action === 'fire') {
+    const secret = process.env.CRON_SECRET || ''
+    const auth = req.headers.authorization || ''
+    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    const isCron = !!secret && bearer === secret
+    if (!isCron && !verifyAdminToken(bearer)) return res.status(401).json({ error: 'Unauthorized' })
     const id = req.query.id || req.body?.id
     if (!id) return res.status(400).json({ error: 'Missing post id' })
     const posts = await sbGet('scheduled_posts', `id=eq.${id}&select=*`)

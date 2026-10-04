@@ -97,7 +97,10 @@ export function LeaderboardScreen() {
                 <View style={[st.thumb, st.thumbEmpty]}><Text style={{ fontSize: 20 }}>📸</Text></View>
               )}
               <View style={{ flex: 1 }}>
-                <Text style={st.name} numberOfLines={1}>{p.display_name || 'Anonymous'}</Text>
+                <View style={st.nameRow}>
+                  <Text style={[st.name, { flexShrink: 1 }]} numberOfLines={1}>{p.display_name || 'Anonymous'}</Text>
+                  {p.entry_type === 'ai_model' ? <Text style={st.aiBadge}>AI Model</Text> : null}
+                </View>
                 <Text style={st.votes}>
                   <Text style={st.votesNum}>{p.votes.toLocaleString()}</Text> $TTS
                   {pool > 0 && p.votes > 0 ? <Text style={st.share}>  · {Math.round((p.votes / pool) * 100)}%</Text> : null}
@@ -140,6 +143,8 @@ const st = StyleSheet.create({
   rank: { fontFamily: serif, fontWeight: '600', width: 28, textAlign: 'center' },
   thumb: { width: 50, height: 50, borderRadius: 7, borderWidth: 1, borderColor: colors.border },
   thumbEmpty: { backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  aiBadge: { fontFamily: sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: colors.gold, borderWidth: 1, borderColor: colors.gold, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontFamily: sans, fontSize: 15, fontWeight: '700', color: colors.text },
   votes: { fontFamily: sans, fontSize: 12.5, color: colors.muted, marginTop: 2 },
   votesNum: { color: colors.goldLight, fontWeight: '700', fontSize: 13.5 },

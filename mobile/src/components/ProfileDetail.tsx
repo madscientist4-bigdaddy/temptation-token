@@ -43,7 +43,10 @@ export function ProfileDetail({
               <Text style={st.rank}>Rank #{rank}</Text>
               {share > 0 ? <Text style={st.share}>{share}% of pool</Text> : null}
             </View>
-            <Text style={st.name}>{profile?.display_name || 'Anonymous'}</Text>
+            <View style={st.nameRow}>
+              <Text style={st.name}>{profile?.display_name || 'Anonymous'}</Text>
+              {profile?.entry_type === 'ai_model' ? <Text style={st.aiBadge}>AI Model</Text> : null}
+            </View>
 
             <View style={st.statBox}>
               <Text style={st.statLabel}>Total Votes</Text>
@@ -102,6 +105,8 @@ const st = StyleSheet.create({
   rankRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   rank: { fontFamily: serif, fontStyle: 'italic', fontSize: 18, color: colors.gold },
   share: { fontFamily: sans, fontSize: 12, color: colors.muted, letterSpacing: 0.6 },
+  aiBadge: { fontFamily: sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: colors.gold, borderWidth: 1, borderColor: colors.gold, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   name: { fontFamily: sans, fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: 18 },
   statBox: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10,

@@ -12,6 +12,7 @@ export type Profile = {
   link_title: string
   link_url: string
   round_id?: number
+  entry_type?: string | null
 }
 
 export type CommunityStats = {

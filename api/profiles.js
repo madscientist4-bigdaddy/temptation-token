@@ -36,7 +36,7 @@ const isAddr = (w) => /^0x[0-9a-fA-F]{40}$/.test(w || '')
 const isTxHash = (h) => /^0x[0-9a-fA-F]{64}$/.test(h || '')
 
 // Explicit safe-field allowlist for public profile reads.
-const SAFE_SELECT = 'select=id,display_name,image_url,link_title,link_url,round_id'
+const SAFE_SELECT = 'select=id,display_name,image_url,link_title,link_url,round_id,entry_type'
 
 function sb(path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1${path}`, {
@@ -109,6 +109,7 @@ async function handleList(req, res) {
       link_title: x.link_title || '',
       link_url: x.link_url || '',
       round_id: x.round_id,
+      entry_type: x.entry_type || null,
     }))
     res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=30')
     res.status(200).json({ profiles })

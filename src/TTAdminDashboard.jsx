@@ -3987,7 +3987,10 @@ function ContentCalendarScreen({ showToast }) {
   const postNow = async (post) => {
     setFiring(f => ({ ...f, [post.id]: true }))
     try {
-      const r = await fetch(`/api/scheduler?action=fire&id=${post.id}`, { method: 'POST' })
+      const r = await fetch(`/api/scheduler?action=fire&id=${post.id}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${adminToken()}` },
+      })
       const d = await r.json()
       if (d.ok) {
         showToast(`Posted: ${PLATFORM_LABEL[post.platform]}`, 's')

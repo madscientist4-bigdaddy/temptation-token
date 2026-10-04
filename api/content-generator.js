@@ -14,7 +14,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
-const SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtbGlrZHh5a2d2aXlwcnF0cXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxOTE0MzQsImV4cCI6MjA4OTc2NzQzNH0.wdP_IpWbt_2HxI2a7Msu_oySnwhsVT9KR-J7eTe4T3k'
 const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
 const ADMIN_CHAT_ID  = process.env.ADMIN_CHAT_ID || '-5273368658'
 
@@ -23,18 +22,29 @@ const LP_LOCKED_DATE  = new Date('2026-05-06')
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 
+// Service key only — no public-key fallback. These helpers insert and delete
+// scheduled_posts rows that get published to the official accounts, so they must not
+// run as `anon`. A missing key rejects with a named error instead of downgrading.
+function serviceKey() {
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!key) throw new Error('SUPABASE_SERVICE_KEY missing')
+  return key
+}
+
 async function sbGet(table, query = '') {
+  const key = serviceKey()
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    headers: { apikey: key, Authorization: `Bearer ${key}` }
   })
   return r.json()
 }
 
 async function sbInsert(table, rows) {
+  const key = serviceKey()
   return fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: {
-      apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+      apikey: key, Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json', Prefer: 'return=minimal'
     },
     body: JSON.stringify(rows)
@@ -42,9 +52,10 @@ async function sbInsert(table, rows) {
 }
 
 async function sbDelete(table, query) {
+  const key = serviceKey()
   return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     method: 'DELETE',
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    headers: { apikey: key, Authorization: `Bearer ${key}` }
   })
 }
 

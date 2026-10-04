@@ -252,6 +252,7 @@ const S = `
   .r1{color:var(--gold);}.r2{color:#c0c0c0;}.r3{color:#cd7f32;}.r4,.r5{color:var(--muted);font-size:1.1rem;}
   .lbthumb { width:50px; height:50px; border-radius:7px; object-fit:cover; flex-shrink:0; border:1px solid var(--border); pointer-events:none; }
   .lbinfo { flex:1; min-width:0; }
+  .aibadge { display:inline-block; margin-left:8px; padding:2px 8px; border:1px solid var(--gold); border-radius:999px; color:var(--gold); font-family:var(--font-b); font-size:.62rem; font-weight:700; letter-spacing:.06em; vertical-align:middle; white-space:nowrap; }
   .lbname { font-family:var(--font-b); font-size:1rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .lbvotes { font-size:.76rem; color:var(--muted); letter-spacing:.06em; margin-top:2px; }
   .lbvotes strong { color:var(--gold-light); font-family:var(--font-b); font-size:.92rem; font-weight:700; }
@@ -871,6 +872,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
         id: i + 1,
         username: r.display_name || 'Anonymous',
         profileId: r.profileId,
+        entry_type: r.entry_type || null,
         link: r.link_title || 'Profile',
         link_url: r.link_url || '',
         votes: 0,
@@ -1168,7 +1170,7 @@ function PlayScreen({ balance, setBalance, showToast, connected, address, wallet
                   <div className="pcounter">{i+1} / {photos.length}</div>
                 </div>
                 <div className="pinfo">
-                  <div className="pname">{ph.username}</div>
+                  <div className="pname">{ph.username}{ph.entry_type === 'ai_model' && <span className="aibadge">AI Model</span>}</div>
                   <button className="plink" onClick={() => { const raw = ph.link_url || ''; const url = /^https?:\/\//.test(raw) ? raw : raw.includes('.') ? 'https://' + raw : 'https://app.temptationtoken.io'; window.open(url, '_blank') }}>🔗 {ph.link || 'Profile'}</button>
                 </div>
                 <div className="vsec">
@@ -1244,7 +1246,7 @@ function LeaderboardScreen() {
           const profile = await readContract(VOTING_ADDRESS, VOTING_ABI, 'getProfile', [roundId || 1n, r.profileId])
           if (profile) votes = Math.floor(Number(profile[2]) / 1e18)
         } catch(_) {}
-        return { id: i+1, username: r.display_name || 'Anonymous', profileId: r.profileId, img: r.image_url || '', votes, myVotes: 0, link_url: '', link: '' }
+        return { id: i+1, username: r.display_name || 'Anonymous', profileId: r.profileId, entry_type: r.entry_type || null, img: r.image_url || '', votes, myVotes: 0, link_url: '', link: '' }
       }))
       const sorted = withVotes.sort((a,b) => b.votes - a.votes)
       setItems(sorted)
@@ -1280,7 +1282,7 @@ function LeaderboardScreen() {
                 : <div className="lbthumb" style={{ background:'var(--surface2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem' }}>📸</div>
               }
               <div className="lbinfo">
-                <div className="lbname">{p.username}</div>
+                <div className="lbname">{p.username}{p.entry_type === 'ai_model' && <span className="aibadge">AI Model</span>}</div>
                 <div className="lbvotes"><strong>{p.votes.toLocaleString()}</strong> $TTS {totalPool > 0 && <span style={{ color:'var(--muted)', fontSize:'.7rem' }}>· {Math.round((p.votes/totalPool)*100)}%</span>}</div>
                 <div className="lb-bar-w"><div className="lb-bar" style={{ width:`${(p.votes/maxV)*100}%` }} /></div>
               </div>
