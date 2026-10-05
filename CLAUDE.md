@@ -2,10 +2,11 @@
 2026-10-04, then server code was moved off the public key (`e143c62`, deployed 23:17 UTC).
 
 - **Open public-key write rules were removed** from `submissions`, `admin_config`,
-  `admin_audit_log`, `project_expenses`, `project_income`, `stakes`, `users` and
-  `scheduled_posts`. Every removal is logged in table **`policy_change_log`** with the
-  reason and a `restore_sql` column. Read that table before assuming a public-key read or
-  write still works.
+  `admin_audit_log`, `project_expenses`, `project_income`, `stakes` and `users`. On
+  `scheduled_posts` the wide-open `anon_all` rule was only **narrowed** to a stopgap (see
+  ⏳ below). Every change is logged in table **`policy_change_log`** with the reason and a
+  `restore_sql` column. Read that table before assuming a public-key read or write still
+  works.
 - **`api/scheduler.js` and `api/content-generator.js` use `SUPABASE_SERVICE_KEY` only.**
   The hardcoded anon key and `sbService`'s anon fallback are gone; with the variable unset
   every helper rejects with `SUPABASE_SERVICE_KEY missing`. Proven on production: the
@@ -14,12 +15,21 @@
   2026-10-05.
 - **`POST /api/scheduler?action=fire` needs auth**: an admin session token (the
   dashboard's "Post now" sends it) or `Bearer CRON_SECRET`. No credentials → 401.
-- ⏳ **`scheduled_posts` still carries the stopgap** — four `public_*` policies and the
-  `scheduled_posts_public_key_guard` trigger. Nothing in server code needs them any more.
-  The drop is written and authorised but has not run: the Supabase connector's
-  confirmation for destructive SQL fails from Claude Code with `Invalid or expired
-  requestState` (four attempts, one with Jim at the keyboard). Paste the block in
-  `BLOCKERS.md` into the Supabase SQL editor, then repeat the checks listed there.
+- **`/api/content-generator` needs the same auth** (`47304eb`, 2026-10-05). It was open
+  to anyone: every call is a paid Claude call on the app's key, and `{force:true}` deletes
+  the week's pending drafts. The `x-vercel-cron` header alone is **not** accepted — the
+  Monday cron gets in on the `CRON_SECRET` bearer Vercel sends. **First cron under this
+  rule is Mon 2026-10-12 08:00 UTC: confirm 49 rows land for that week.**
+- ⏳ **`scheduled_posts` still carries the stopgap** (checked 2026-10-05 20:55 UTC): four
+  `public_*` policies and the `scheduled_posts_public_key_guard` trigger. Nothing in
+  server code needs them any more. **Until they are dropped, anyone holding the public
+  key — it is in git history — can still:** read every draft; delete any `pending` or
+  `rejected` row; insert `pending` rows into the approval queue; and set any row's status
+  to `posted`, `failed` or `skipped` or move its `scheduled_at` / `posted_at`. They cannot
+  edit content or approve a post. The drop is written and authorised but has not run: the
+  Supabase connector's confirmation for destructive SQL fails from Claude Code with
+  `Invalid or expired requestState` (four attempts, one with Jim at the keyboard). Paste
+  the block in `BLOCKERS.md` into the Supabase SQL editor, then repeat the checks there.
 - **Profile photos live in the `profile-photos` storage bucket**, with the link in
   `submissions.image_url` (all 25 approved rows are `https://…/storage/v1/object/…`).
   **Never assume `image_url` is a data URL.**
@@ -29,8 +39,10 @@
   card + leaderboard and the mobile VoteCard, ProfileDetail and Leaderboard show an
   **"AI Model"** badge — that exact text, nothing else.
 - 🕳 **Still open, found on the way:**
-  - `/api/content-generator` takes POST with **no auth**. Anyone can trigger a paid Claude
-    call, and `{force:true}` deletes this week's pending rows and regenerates them.
+  - `api/scheduler.js`'s bare cron path accepts the `x-vercel-cron` header **or** the
+    `CRON_SECRET` bearer. Whether Vercel strips that header from outside requests has not
+    been tested; if it does not, the header is a way round the secret onto the keeper and
+    funder jobs. The generator was built bearer-only for that reason.
   - The Railway bot has **no Supabase key at all** (`SUPABASE_SERVICE_KEY` and
     `SUPABASE_KEY` are both unset there), so replying "done" to an Instagram handoff
     cannot mark the post. The `ig_confirm` button link still works.

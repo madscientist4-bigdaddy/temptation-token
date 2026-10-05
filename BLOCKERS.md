@@ -10,8 +10,10 @@ step does not complete from Claude Code. Four attempts (three `apply_migration`,
 `execute_sql`) ended in `Invalid or expired requestState` — the fourth right after Jim
 answered "I'm here — retry now", so it is not only an unattended-timeout. Plain reads and
 a single-row `update` through the same connector work. Nothing was partially applied:
-checked 2026-10-05 20:27 UTC, four policies and one trigger are still on the table and
-`policy_change_log` still ends at row 9.
+checked 2026-10-05 20:55 UTC — after Jim reported pasting the block — four policies and
+one trigger are still on the table and `policy_change_log` still ends at row 9. If the
+SQL editor showed an error or a "destructive operation" prompt, it did not go through;
+also check the editor is on project `gmlikdxykgviyprqtqwz`.
 
 **To clear it**, paste this into the Supabase SQL editor (Dashboard → SQL Editor). If you
 would rather Claude ran it, reconnect the Supabase connector first (`/mcp`):
@@ -36,5 +38,6 @@ commit;
 **Afterwards, repeat the step-5 checks:** fire without credentials → 401; fire Instagram
 draft `3155a1b5-43e6-4711-a34a-3f66bd27d892` with `Bearer CRON_SECRET`, open its
 `ig_confirm` link, confirm the row reads `posted`, then put it back to `pending` with
-`posted_at` and `error` null; and one generator dry run (`POST {dry_run:true}`, about
+`posted_at` and `error` null; and one generator dry run (`POST {dry_run:true}` with
+`Authorization: Bearer $CRON_SECRET` — the endpoint needs auth since `47304eb`; about
 $0.20 on the app's Anthropic key — approved up to a $1 total, about $0.20 used so far).
