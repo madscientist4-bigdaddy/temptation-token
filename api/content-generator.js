@@ -12,6 +12,7 @@
 //   sends Telegram admin alert.
 
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyAdminToken } from '../lib/adminAuth.js'
 
 const SUPABASE_URL   = 'https://gmlikdxykgviyprqtqwz.supabase.co'
 const VOTING_ADDRESS = '0x783b8cd80b586b723188c93ef94ee1beede617b4'
@@ -520,6 +521,24 @@ function buildIgRows(igPosts, weekStart, weekStartStr) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end()
+
+  // ── AUTH ────────────────────────────────────────────────────────────────────
+  // This endpoint had no guard. Every path below either makes a paid Claude call on
+  // ANTHROPIC_API_KEY (generate, dry run) or rewrites the week's drafts (force deletes
+  // pending/rejected rows), so an anonymous POST could spend without limit.
+  // Accepts Bearer CRON_SECRET — which Vercel sends on cron invocations when the
+  // variable is set, as it is in Production — or an admin session token (the dashboard's
+  // Generate button). The x-vercel-cron header is deliberately NOT accepted: Vercel
+  // documents the bearer as the cron auth signal, and a header is not a secret.
+  // Fail-closed: an unset CRON_SECRET matches nothing, and verifyAdminToken() is false
+  // when its secret is unset.
+  {
+    const secret = process.env.CRON_SECRET || ''
+    const auth = req.headers.authorization || ''
+    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    const isCron = !!secret && bearer === secret
+    if (!isCron && !verifyAdminToken(bearer)) return res.status(401).json({ error: 'Unauthorized' })
+  }
 
   const isDryRun   = req.method === 'POST' && req.body?.dry_run === true
   const forceRegen = req.method === 'POST' && (req.body?.force === true || req.body?.tts_bootstrap === true)

@@ -3927,7 +3927,7 @@ function ContentCalendarScreen({ showToast }) {
     try {
       const r = await fetch('/api/content-generator', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken()}` },
         body: JSON.stringify({ force })
       })
       const d = await r.json()
