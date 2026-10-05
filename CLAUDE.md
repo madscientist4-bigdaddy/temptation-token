@@ -16,9 +16,10 @@
   dashboard's "Post now" sends it) or `Bearer CRON_SECRET`. No credentials → 401.
 - ⏳ **`scheduled_posts` still carries the stopgap** — four `public_*` policies and the
   `scheduled_posts_public_key_guard` trigger. Nothing in server code needs them any more.
-  The drop is written and authorised but has not run: the Supabase connector asks for a
-  confirmation on destructive SQL and that prompt expires when nobody is at the keyboard.
-  See `BLOCKERS.md`.
+  The drop is written and authorised but has not run: the Supabase connector's
+  confirmation for destructive SQL fails from Claude Code with `Invalid or expired
+  requestState` (four attempts, one with Jim at the keyboard). Paste the block in
+  `BLOCKERS.md` into the Supabase SQL editor, then repeat the checks listed there.
 - **Profile photos live in the `profile-photos` storage bucket**, with the link in
   `submissions.image_url` (all 25 approved rows are `https://…/storage/v1/object/…`).
   **Never assume `image_url` is a data URL.**

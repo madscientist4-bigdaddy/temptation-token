@@ -5,14 +5,16 @@
 **What is blocked:** step 6 of the `scheduler-key-fix` brief. Server code no longer uses
 the public key (`e143c62`, deployed and verified), so these can go.
 
-**Why:** the Supabase connector asks for a confirmation before destructive SQL. Three
-attempts (two `apply_migration`, one `execute_sql`) ended in `Invalid or expired
-requestState` because nobody answered the prompt. Nothing was partially applied — four
-policies and one trigger are still on the table, and `policy_change_log` still ends at
-row 9.
+**Why:** the Supabase connector asks for a confirmation before destructive SQL, and that
+step does not complete from Claude Code. Four attempts (three `apply_migration`, one
+`execute_sql`) ended in `Invalid or expired requestState` — the fourth right after Jim
+answered "I'm here — retry now", so it is not only an unattended-timeout. Plain reads and
+a single-row `update` through the same connector work. Nothing was partially applied:
+checked 2026-10-05 20:27 UTC, four policies and one trigger are still on the table and
+`policy_change_log` still ends at row 9.
 
-**To clear it**, either answer the Supabase confirmation when Claude retries, or paste
-this into the Supabase SQL editor:
+**To clear it**, paste this into the Supabase SQL editor (Dashboard → SQL Editor). If you
+would rather Claude ran it, reconnect the Supabase connector first (`/mcp`):
 
 ```sql
 begin;
