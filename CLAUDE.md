@@ -1,3 +1,44 @@
+🔐 **PUBLIC-KEY LOCKDOWN — 2026-10-04 / 05.** The database was changed from chat on
+2026-10-04, then server code was moved off the public key (`e143c62`, deployed 23:17 UTC).
+
+- **Open public-key write rules were removed** from `submissions`, `admin_config`,
+  `admin_audit_log`, `project_expenses`, `project_income`, `stakes`, `users` and
+  `scheduled_posts`. Every removal is logged in table **`policy_change_log`** with the
+  reason and a `restore_sql` column. Read that table before assuming a public-key read or
+  write still works.
+- **`api/scheduler.js` and `api/content-generator.js` use `SUPABASE_SERVICE_KEY` only.**
+  The hardcoded anon key and `sbService`'s anon fallback are gone; with the variable unset
+  every helper rejects with `SUPABASE_SERVICE_KEY missing`. Proven on production: the
+  keeper settled round 14 and started round 15 (05:22 / 05:32 UTC, both audit rows
+  written), and the Monday 08:25 UTC generator cron inserted all 49 rows for the week of
+  2026-10-05.
+- **`POST /api/scheduler?action=fire` needs auth**: an admin session token (the
+  dashboard's "Post now" sends it) or `Bearer CRON_SECRET`. No credentials → 401.
+- ⏳ **`scheduled_posts` still carries the stopgap** — four `public_*` policies and the
+  `scheduled_posts_public_key_guard` trigger. Nothing in server code needs them any more.
+  The drop is written and authorised but has not run: the Supabase connector asks for a
+  confirmation on destructive SQL and that prompt expires when nobody is at the keyboard.
+  See `BLOCKERS.md`.
+- **Profile photos live in the `profile-photos` storage bucket**, with the link in
+  `submissions.image_url` (all 25 approved rows are `https://…/storage/v1/object/…`).
+  **Never assume `image_url` is a data URL.**
+- **AI Models** are managed by tables `ai_model_pool` and `ai_model_settings` and the
+  function `ai_models_rotate`. They are `submissions` rows with `entry_type = 'ai_model'`
+  (14 of the 25 approved). `/api/public-profiles` returns `entry_type`, and the web play
+  card + leaderboard and the mobile VoteCard, ProfileDetail and Leaderboard show an
+  **"AI Model"** badge — that exact text, nothing else.
+- 🕳 **Still open, found on the way:**
+  - `/api/content-generator` takes POST with **no auth**. Anyone can trigger a paid Claude
+    call, and `{force:true}` deletes this week's pending rows and regenerates them.
+  - The Railway bot has **no Supabase key at all** (`SUPABASE_SERVICE_KEY` and
+    `SUPABASE_KEY` are both unset there), so replying "done" to an Instagram handoff
+    cannot mark the post. The `ig_confirm` button link still works.
+  - Five more API files still carry the anon key as a fallback constant:
+    `approve-profile.js`, `community-stats.js`, `set-club-wallet.js`, `kyc.js`, `bonus.js`.
+  - No post has been approved or fired since 2026-08-31; 576 rows sit at `pending`.
+
+---
+
 ✅ **SALE SPRINT — 2026-09-25.** Parts 0-8 of `ops/sale/TTS_Sale_Sprint_ClaudeCode.md`
 worked; full report `outputs/sale/sprint_report.md`. Three findings outrank everything else:
 
@@ -488,14 +529,14 @@ Consolidated; `vercel.json` rewrites preserve old URLs. Each `api/*.js` = 1 func
 | File | Routes / actions |
 |---|---|
 | `admin.js` | `?action=auth` (server-side login → HMAC token) · `?action=data` (token-gated Supabase proxy, service key, table allowlist). Rewrites: `/api/admin-auth`, `/api/admin-data` |
-| `profiles.js` | `?action=list` (ALL approved profiles, round-agnostic — safe fields) · `?action=submit` (GET rate-limit / POST insert) · `?action=vote` (record vote) · `?action=sync` (POST — carry approved profiles onto the current on-chain round via idempotent `batchApproveProfiles`; PlayScreen fires it on load; fixes empty play screen after weekly rollover). Rewrites: `/api/public-profiles`, `/api/submit-profile` |
+| `profiles.js` | `?action=list` (ALL approved profiles, round-agnostic — safe fields, incl. `entry_type`) · `?action=submit` (GET rate-limit / POST insert) · `?action=vote` (record vote) · `?action=sync` (POST — carry approved profiles onto the current on-chain round via idempotent `batchApproveProfiles`; PlayScreen fires it on load; fixes empty play screen after weekly rollover). Rewrites: `/api/public-profiles`, `/api/submit-profile` |
 | `bonus.js` | `?action=signup` (surfaces sent / already-credited+txHash / why-not; self-heals a claim row with no valid tx_hash → retroactive re-send) · `?action=vote-match` · `?action=refer-capture` (record referral link) · `?action=referral` (qualify + pay from dedicated referral wallet, kill-switch + anti-sybil gated). Rewrites: `/api/signup-bonus`, `/api/vote-match`, `/api/referral-credit`. Auto-funder lives in `scheduler.js` |
 | `kyc.js` | `?action=session\|webhook\|status\|age\|account\|request` (Persona KYC + 18+ ack). **Persona stays sandbox (no purchase) → `?action=request` is the LAUNCH KYC path**: user submits wallet → `verified_submitters` row at `status=pending` → admin approves in Verifications tab (manual-verify box / Override Approve). User-facing flow no longer shows a sandbox Persona window. Rewrites: `/api/kyc-*`, `/api/age-acknowledge` |
 | `approve-profile.js` | admin approve → `batchApproveProfiles` + `setProfileClub` on V3d (service key) |
 | `set-club-wallet.js` | register/deregister club → `setClubWallet` on V3d |
 | `community-stats.js` | community stats + bot heartbeat (`/api/bot-health`) |
 | `content-generator.js` | weekly @temptationtoken post generation (cron) |
-| `scheduler.js` | daily social/status crons · `?action=keeper` (CRON_SECRET — keeper autopilot tick, every 10 min from the Railway bot) · `?action=keeper-status` (read-only) · `?action=dispatch` (CRON_SECRET) · `?action=vrf-status` · `?action=listings-watch` · `?action=ig_confirm` |
+| `scheduler.js` | daily social/status crons · `POST ?action=fire&id=` (admin token or CRON_SECRET — publish one scheduled post now) · `?action=keeper` (CRON_SECRET — keeper autopilot tick, every 10 min from the Railway bot) · `?action=keeper-status` (read-only) · `?action=dispatch` (CRON_SECRET) · `?action=vrf-status` · `?action=listings-watch` · `?action=ig_confirm` |
 | `social-post.js` | X/Telegram posting (`/api/notify` rewrite) |
 | `chat.js` | Claude support chatbot (Haiku + web_search) |
 | `rpc.js` | cached Base RPC proxy for the frontend |
